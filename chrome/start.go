@@ -10,16 +10,16 @@ import(
 	"regexp"
 	"time"
 	"log"
-	"html"
+	//"html"
 	"encoding/json"
-	"github.com/lunny/html2md"
+	//"github.com/lunny/html2md"
 	"github.com/zaddone/studySystem/request"
 	"github.com/gorilla/websocket"
 	"github.com/zaddone/studySystem/config"
 )
+
 var (
 	port = "9222"
-
 	rooturl string = "https://www.toutiao.com"
 	op =[]string{
 		"--remote-debugging-port="+port,
@@ -37,99 +37,132 @@ var (
 )
 func init(){
 	var err error
-	retitle, err = regexp.Compile(`title: \'[\s\s]+?\'`)
+	//retitle, err = regexp.Compile(`title: \'[\s\s]+\'`)
+	retitle, err = regexp.Compile(`title: \'[\S\s]+?\'`)
 	if err != nil {
 		panic(err)
 	}
-	rec, err = regexp.Compile(`content: \'[\s\s]+?\'`)
+	rec, err = regexp.Compile(`content: \'[\S\s]+?\'`)
 	if err != nil {
 		panic(err)
 	}
 	start(func(in string){
-		fmt.Println(in)
-		open("https://www.toutiao.com/ch/news_baby/",func(v interface{})error{
-			//fmt.Println(v)
-			requestId:=""
-			step:=0
-			id:=float64(time.Now().Unix())
-			runStream((v.(map[string]interface{}))["webSocketDebuggerUrl"].(string),func(_v interface{},c *websocket.Conn){
-				__v :=_v.(map[string]interface{})
-				if step == 0{
+		//fmt.Println(in)
+
+		go func (){
+			for{
+				Coll("https://www.toutiao.com/ch/news_baby/")
+				<-time.After(5 * time.Minute)
+			//Coll("https://www.toutiao.com/ch/news_regimen/")
+			}
+		}()
+	})
+	log.Println("run")
+}
+
+func Coll(uri string){
+	//runStream(in,func(v interface{},bc *websocket.Conn){
+	//	fmt.Println("b",v)
+	//})
+	openPage(uri,func(v interface{})error{
+		requestId:=""
+		count :=0
+		step:=0
+		id:=float64(time.Now().Unix())
+		var id_1 float64 = 0
+		_vb := v.(map[string]interface{})
+		var stop chan bool = nil
+		fmt.Println(_vb["id"])
+		runStream(_vb["webSocketDebuggerUrl"].(string),func(_v interface{},writeChan chan interface{}){
+			__v :=_v.(map[string]interface{})
+			//fmt.Println(__v)
+			if step == 0{
+				if __v["method"] == "Network.loadingFailed"{
+					closePage(_vb["id"].(string))
 					//fmt.Println(__v)
-					if __v["method"] !="Network.responseReceived"{
-						return
-					}
-					u := (__v["params"].(map[string]interface{}))
-					_u := u["response"].(map[string]interface{})
-					uri:= _u["url"].(string)
-					if strings.Contains(uri,"/api/pc/feed/"){
-						//u["RequestId"].(string)
-						requestId = u["requestId"].(string)
-						fmt.Println(uri,requestId)
-						//panic(0)
-						step = 1
-					}
+				}
+				if __v["method"] !="Network.responseReceived"{
 					return
-				}else if step ==1{
-					if __v["method"] !="Network.loadingFinished"{
-						return
-					}
-					if !strings.EqualFold((__v["params"].(map[string]interface{}))["requestId"].(string),requestId){
-						return
-					}
-					fmt.Println(__v)
-					//err := c.WriteJSON(map[string]interface{}{"method":"Network.disable","id":99})
-					//if err != nil {
-					//	log.Fatal("w:", err)
-					//}
-
-					err := c.WriteJSON(map[string]interface{}{
-						"method":"Network.getResponseBody",
-						"id":id,
-						"params":map[string]interface{}{"requestId":requestId},
-					})
-					if err != nil {
-						log.Fatal("w:", err)
-					}
-					step = 2
+				}
+				u := (__v["params"].(map[string]interface{}))
+				_u := u["response"].(map[string]interface{})
+				uri:= _u["url"].(string)
+				if !strings.Contains(uri,"/api/pc/feed/"){
 					return
-				}else if step ==2 {
-					//if (__v["params"].(map[string]interface{}))["body"] == nil{
-					//	return
-					//}
-					//fmt.Println(__v)
-					//if strings.Contains(fmt.Sprintln(__v),"body"){
-					//	fmt.Println(__v)
-					//}
-					//return
-					_id := __v["id"]
-					if _id==nil {
-						return
-					}
-					if id != __v["id"].(float64){
-						return
-					}
-					//fmt.Println(__v)
-					body := __v["result"].(map[string]interface{})["body"].(string)
-					body_:= map[string]interface{}{}
-					json.Unmarshal([]byte(body),&body_)
-					for _,d := range body_["data"].([]interface{}){
-						if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
-							fmt.Println(err)
-						}
-					}
-					err := c.WriteJSON(map[string]interface{}{"method":"Network.disable","id":99})
-					if err != nil {
-						log.Fatal("w:", err)
-					}
-
-
 				}
 
-				//fmt.Println(["Network.responseReceived"])
-			})
-			return nil
+				//fmt.Println(__v)
+				requestId = u["requestId"].(string)
+				step = 1
+				if stop != nil {
+					close(stop)
+					stop = nil
+				}
+				return
+			}else if step ==1{
+				if __v["method"] !="Network.loadingFinished"{
+					return
+				}
+				if !strings.EqualFold((__v["params"].(map[string]interface{}))["requestId"].(string),requestId){
+					return
+				}
+				//fmt.Println(__v)
+				writeChan<-map[string]interface{}{
+					"method":"Network.getResponseBody",
+					"id":id,
+					"params":map[string]interface{}{"requestId":requestId},
+				}
+				step = 2
+				return
+			}else if step ==2 {
+				_id := __v["id"]
+				if _id==nil {
+					return
+				}
+				if id != __v["id"].(float64){
+					return
+				}
+				//fmt.Println(__v)
+				body := __v["result"].(map[string]interface{})["body"].(string)
+				body_:= map[string]interface{}{}
+				json.Unmarshal([]byte(body),&body_)
+				for _,d := range body_["data"].([]interface{}){
+					if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
+						fmt.Println(err)
+					}else{
+						count++
+					}
+				}
+				if count>50 {
+					closePage(_vb["id"].(string))
+					return
+					//panic(0)
+				}
+				go func (){
+					stop = make(chan bool)
+					for{
+						select{
+							case <-time.After(5 * time.Second):
+								writeChan<-map[string]interface{}{
+									"method":"Input.dispatchKeyEvent",
+									"id":id_1,
+									"params":map[string]interface{}{
+										"type":"keyDown",
+										"windowsVirtualKeyCode":int(0x22),
+										"nativeVirtualKeyCode":int(0x22),
+									},
+								}
+							case <- stop:
+								return
+						}
+					}
+				}()
+				step = 0
+
+			}
 		})
+
+		return nil
 	})
 
 }
@@ -169,7 +202,22 @@ func start(hand func(string)){
 		log.Fatal(err)
 	}
 }
-func open(u string,hand func(interface{})error){
+func closePage(id string){
+	err := request.ClientHttp_(Ourl+"/json/close/"+id,"GET",nil,nil,func(body io.Reader,st int)error {
+		if st != 200 {
+			db,err := ioutil.ReadAll(body)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("%d %s",st,db)
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+func openPage(u string,hand func(interface{})error){
 	err := request.ClientHttp_(Ourl+"/json/new/?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
 		if st != 200 {
 			db,err := ioutil.ReadAll(body)
@@ -191,7 +239,9 @@ func open(u string,hand func(interface{})error){
 	}
 
 }
-func runStream(u string,hand func(interface{},*websocket.Conn)){
+
+func runStream(u string,hand func(interface{},chan interface{}))*websocket.Conn{
+//func runStream(u string,hand func(interface{}))*websocket.Conn{
 	c, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
 		log.Fatal("dial:", err)
@@ -201,22 +251,42 @@ func runStream(u string,hand func(interface{},*websocket.Conn)){
 	if err != nil {
 		log.Fatal("w:", err)
 	}
+	writeChan := make(chan interface{},5)
 	//err = c.WriteJSON(map[string]interface{}{"method":"DOM.getFlattenedDocument","id":2})
 	//if err != nil {
 	//	log.Fatal("w:", err)
 	//}
 	go func(){
+		//fmt.Println(u)
 		var db interface{}
 		for{
 			err = c.ReadJSON(&db)
 			if err != nil {
-				log.Println(err)
+				close(writeChan)
+				log.Println("stream",err)
 				return
 			}
-			hand(db,c)
+			go hand(db,writeChan)
 			//fmt.Println(db)
 		}
 	}()
+	go func(){
+		//fmt.Println(u,"w")
+		for{
+			w:= <-writeChan
+			if w == nil {
+				log.Println("stream w")
+				return
+			}
+			log.Println(w)
+			err := c.WriteJSON(w)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
+	}()
+	return c
 }
 
 func extract(uri string) error {
@@ -249,19 +319,22 @@ func _extract(body []byte) {
 	loc := retitle.FindIndex(body)
 	fmt.Println(loc)
 	if len(loc)==0 {
-		//fmt.println(string(body))
+		//fmt.Println(string(body))
 		return
+	}else{
+		//title := string(body[loc[0]+8:loc[1]-1])
+		title := string(body[loc[0]:loc[1]])
+		fmt.Println(title)
 	}
-	title := string(body[loc[0]+8:loc[1]-1])
-	fmt.Println(title)
-	loc_ := rec.FindIndex(body)
-	if len(loc_)==0 {
-		//fmt.println(title)
-		fmt.Println(string(body))
-		return
-	}
-	content:=html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])))
-	fmt.Println(content)
+	//loc_ := rec.FindIndex(body)
+	//if len(loc_)==0 {
+	//	//fmt.println(title)
+	//	//fmt.Println(string(body))
+	//	return
+	//}
+	//content:=html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])))
+	//fmt.Println(content)
+
 	//fmt.println(string(db[loc[0]+8:loc[1]-1]))
 
 }
