@@ -308,34 +308,22 @@ func extract(uri string) error {
 
 }
 func _extract(body []byte) {
-	//retitle, err := regexp.Compile("title: \\'[\\s\\s]+?\\'")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//rec, err := regexp.Compile("content: \\'[\\s\\s]+?\\'")
-	//if err != nil {
-	//	panic(err)
-	//}
 	loc := retitle.FindIndex(body)
 	fmt.Println(loc)
 	if len(loc)==0 {
-		//fmt.Println(string(body))
 		return
-	}else{
+	}
 		//title := string(body[loc[0]+8:loc[1]-1])
 		title := string(body[loc[0]:loc[1]])
-		fmt.Println(title)
+	fmt.Println(title)
+	loc_ := rec.FindIndex(body)
+	if len(loc_)==0 {
+		//fmt.println(title)
+		//fmt.Println(string(body))
+		return
 	}
-	//loc_ := rec.FindIndex(body)
-	//if len(loc_)==0 {
-	//	//fmt.println(title)
-	//	//fmt.Println(string(body))
-	//	return
-	//}
-	//content:=html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])))
-	//fmt.Println(content)
+	content:=html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])))
 
-	//fmt.println(string(db[loc[0]+8:loc[1]-1]))
 
 }
 
