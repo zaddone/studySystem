@@ -1,6 +1,7 @@
 package chrome
 
 import(
+
 	"fmt"
 	"io/ioutil"
 	"os/exec"
@@ -10,12 +11,14 @@ import(
 	"regexp"
 	"time"
 	"log"
-	//"html"
+	"html"
 	"encoding/json"
-	//"github.com/lunny/html2md"
+	"github.com/lunny/html2md"
 	"github.com/zaddone/studySystem/request"
 	"github.com/gorilla/websocket"
 	"github.com/zaddone/studySystem/config"
+	"github.com/zaddone/studySystem/wxmsg"
+
 )
 
 var (
@@ -132,6 +135,7 @@ func Coll(uri string){
 					}else{
 						count++
 					}
+					time.Sleep(1*time.Second)
 				}
 				if count>50 {
 					closePage(_vb["id"].(string))
@@ -300,30 +304,37 @@ func extract(uri string) error {
 		if st != 200 {
 			return fmt.Errorf("%d %s",st,db)
 		}
-		//fmt.Println(string(db))
-		_extract(db)
+		err,p := _extract(db)
+		if err != nil {
+			fmt.Println(err)
+		}else{
+			//wxmsg.SaveToWXDB(p.ToWXString())
+			fmt.Println(p.Title,
+			wxmsg.SaveToWXDB(p.ToWXString()))
+		}
 		//fmt.Println(string(db))
 		return nil
 	})
 
 }
-func _extract(body []byte) {
+func _extract(body []byte) (error,*Page) {
+
 	loc := retitle.FindIndex(body)
-	fmt.Println(loc)
 	if len(loc)==0 {
-		return
+		return fmt.Errorf("Not Found title"),nil
 	}
-		//title := string(body[loc[0]+8:loc[1]-1])
-		title := string(body[loc[0]:loc[1]])
-	fmt.Println(title)
 	loc_ := rec.FindIndex(body)
 	if len(loc_)==0 {
-		//fmt.println(title)
-		//fmt.Println(string(body))
-		return
+		return fmt.Errorf("Not Found content"),nil
 	}
-	content:=html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])))
-
+	p := NewPage(
+		string(body[loc[0]+8:loc[1]-1]),
+		html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1]))))
+	err := p.CheckUpdateWork()
+	if err != nil {
+		return err,p
+	}
+	return p.SaveDB(),p
 
 }
 

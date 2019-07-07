@@ -86,3 +86,21 @@ func CreateColl(c_name string) error {
 	})
 
 }
+
+func SaveToWXDB(body string) error {
+	var res  map[string]interface{}
+	err := PostRequest(
+		"https://api.weixin.qq.com/tcb/databaseadd",
+		map[string]interface{}{
+			"query":fmt.Sprintf("db.collection(\"%s\").add({data:[%s]})",config.Conf.CollPageName,body)},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil {
+		return err
+	}
+	if res["errcode"].(float64) != 0 {
+		return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
+	}
+	return nil
+}
