@@ -10,6 +10,7 @@ import(
 	"net/url"
 	//"sync"
 	"github.com/boltdb/bolt"
+	//"sort"
 )
 
 var (
@@ -123,11 +124,33 @@ func NewPage(title,content string) (p *Page) {
 
 func (self *Page) ToWXString() string {
 	var link []string
-	for i:=0;i<len(self.relevant);i+=8{
-		link = append(link,
-		fmt.Sprintf("%d",binary.BigEndian.Uint64(self.relevant[i:i+8])))
+	var linkint []uint64
+	var sort func(int)
+	sort = func(i int){
+		if i == 0 {
+			return
+		}
+		I := i-1
+		if linkint[i]>linkint[I] {
+			linkint[I],linkint[i] = linkint[i],linkint[I]
+			link[I],link[i] = link[i],link[I]
+			sort(I)
+		}
 	}
-	fmt.Println(link)
+	var j int
+	for i:=0;i<len(self.relevant);i+=8{
+		id := binary.BigEndian.Uint64(self.relevant[i:i+8])
+		linkint = append(linkint,id)
+		link = append(link,
+		fmt.Sprintf("%d",id))
+		sort(j)
+		j++
+
+	}
+	if j>10{
+		link = link[:10]
+	}
+	//fmt.Println(link)
 	return fmt.Sprintf("{_id:\"%d\",link:\"%s\",title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),strings.Join(link," "),self.Title,url.QueryEscape(self.Content))
 
 }
