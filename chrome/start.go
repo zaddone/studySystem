@@ -13,6 +13,7 @@ import(
 	"log"
 	"html"
 	"encoding/json"
+	"encoding/binary"
 	"github.com/lunny/html2md"
 	"github.com/zaddone/studySystem/request"
 	"github.com/gorilla/websocket"
@@ -54,9 +55,10 @@ func init(){
 
 		go func (){
 			for{
-				Coll("https://www.toutiao.com/ch/news_baby/")
-				<-time.After(5 * time.Minute)
+			Coll("https://www.toutiao.com/ch/news_baby/")
 			//Coll("https://www.toutiao.com/ch/news_regimen/")
+			//https://www.toutiao.com/ch/news_sports/
+			<-time.After(15 * time.Minute)
 			}
 		}()
 	})
@@ -69,7 +71,7 @@ func Coll(uri string){
 	//})
 	openPage(uri,func(v interface{})error{
 		requestId:=""
-		count :=0
+		//count :=0
 		step:=0
 		id:=float64(time.Now().Unix())
 		var id_1 float64 = 0
@@ -89,8 +91,8 @@ func Coll(uri string){
 				}
 				u := (__v["params"].(map[string]interface{}))
 				_u := u["response"].(map[string]interface{})
-				uri:= _u["url"].(string)
-				if !strings.Contains(uri,"/api/pc/feed/"){
+				//_uri:= _u["url"].(string)
+				if !strings.Contains(_u["url"].(string),"/api/pc/feed/"){
 					return
 				}
 
@@ -129,6 +131,7 @@ func Coll(uri string){
 				body := __v["result"].(map[string]interface{})["body"].(string)
 				body_:= map[string]interface{}{}
 				json.Unmarshal([]byte(body),&body_)
+				count := 0
 				for _,d := range body_["data"].([]interface{}){
 					if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
 						fmt.Println(err)
@@ -137,7 +140,7 @@ func Coll(uri string){
 					}
 					time.Sleep(1*time.Second)
 				}
-				if count>50 {
+				if count == 0 {
 					closePage(_vb["id"].(string))
 					return
 					//panic(0)
@@ -294,7 +297,7 @@ func runStream(u string,hand func(interface{},chan interface{}))*websocket.Conn{
 }
 
 func extract(uri string) error {
-	fmt.Println(uri)
+	//fmt.Println(uri)
 	return request.ClientHttp_(uri,"GET",nil,config.Conf.Header,
 	func(body io.Reader,st int)error {
 		db,err := ioutil.ReadAll(body)
@@ -309,8 +312,15 @@ func extract(uri string) error {
 			fmt.Println(err)
 		}else{
 			//wxmsg.SaveToWXDB(p.ToWXString())
-			fmt.Println(p.Title,
-			wxmsg.SaveToWXDB(p.ToWXString()))
+			fmt.Println(p.Title)
+			body,ids := p.ToWXString()
+			err := wxmsg.SaveToWXDB(body)
+			if err == nil {
+				err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids)
+			}
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
 		//fmt.Println(string(db))
 		return nil
@@ -329,7 +339,9 @@ func _extract(body []byte) (error,*Page) {
 	}
 	p := NewPage(
 		string(body[loc[0]+8:loc[1]-1]),
-		html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1]))))
+		html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1]))),
+		//className,
+	)
 	err := p.CheckUpdateWork()
 	if err != nil {
 		return err,p

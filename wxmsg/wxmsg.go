@@ -3,6 +3,7 @@ import(
 	"io"
 	"fmt"
 	"bytes"
+	"strings"
 	"net/url"
 	"net/http"
 	//"io/ioutil"
@@ -87,7 +88,27 @@ func CreateColl(c_name string) error {
 
 }
 
+func UpdateToWXDB(id uint64,ids []string) error {
+	//fmt.Println(id,ids)
+	var res  map[string]interface{}
+	err := PostRequest(
+		"https://api.weixin.qq.com/tcb/databaseupdate",
+		map[string]interface{}{
+			"query":fmt.Sprintf("db.collection(\"%s\").where({_id:db.command.in(%s)}).update({data:{link:db.command.unshift(\"%d\")}})",config.Conf.CollPageName,fmt.Sprintf("[%s]",strings.Join(ids,",")),id)},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil {
+		return err
+	}
+	if res["errcode"].(float64) != 0 {
+		return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
+	}
+	return nil
+}
+
 func SaveToWXDB(body string) error {
+	//fmt.Println(body)
 	var res  map[string]interface{}
 	err := PostRequest(
 		"https://api.weixin.qq.com/tcb/databaseadd",

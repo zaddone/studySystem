@@ -10,6 +10,7 @@ import(
 	"net/url"
 	//"sync"
 	"github.com/boltdb/bolt"
+	//"math"
 	//"sort"
 )
 
@@ -36,15 +37,16 @@ type Page struct {
 	Par []byte
 	Children []byte
 	relevant []byte
+	//class []byte
 }
-func ViewPageBucket(hand func(*bolt.Bucket)error) error {
+func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
 	db,err := bolt.Open(PageDB,0600,nil)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 	return db.View(func(t *bolt.Tx)error{
-		b := t.Bucket(pageBucket)
+		b := t.Bucket(Bucket)
 		if b == nil {
 			return fmt.Errorf("b==nil")
 		}
@@ -52,23 +54,23 @@ func ViewPageBucket(hand func(*bolt.Bucket)error) error {
 	})
 }
 
-
-func (self *Page)LoadPage(id []byte,handle func([]byte, *bolt.Bucket)) error {
-
-	db,err := bolt.Open(PageDB,0600,nil)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return db.View(func(t *bolt.Tx)error{
-		b := t.Bucket(pageBucket)
-		if b == nil {
-			return fmt.Errorf("b==nil")
-		}
-		return json.Unmarshal(b.Get(id),self)
-	})
-
-}
+//
+//func (self *Page)LoadPage(id []byte,handle func([]byte, *bolt.Bucket)) error {
+//
+//	db,err := bolt.Open(PageDB,0600,nil)
+//	if err != nil {
+//		return err
+//	}
+//	defer db.Close()
+//	return db.View(func(t *bolt.Tx)error{
+//		b := t.Bucket(pageBucket)
+//		if b == nil {
+//			return fmt.Errorf("b==nil")
+//		}
+//		return json.Unmarshal(b.Get(id),self)
+//	})
+//
+//}
 func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)) (p *Page) {
 
 	p = &Page{}
@@ -84,9 +86,10 @@ func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)) (p *Page) {
 
 }
 
+
 func (self *Page) link(lid []byte) error {
 	var p *Page
-	err := ViewPageBucket(func(b *bolt.Bucket)error {
+	err := ViewPageBucket(pageBucket,func(b *bolt.Bucket)error {
 		p = findSetPage(
 			lid,
 			b,
@@ -115,43 +118,29 @@ func NewPage(title,content string) (p *Page) {
 		//Id:time.Now().UnixNano(),
 		Title:title,
 		Content:content,
+		//class:[]byte(class),
 	}
 	p.Id = make([]byte,8)
-	binary.BigEndian.PutUint64(p.Id,uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(p.Id,uint64(time.Now().UnixNano()))
 	return
 }
 
 
-func (self *Page) ToWXString() string {
-	var link []string
-	var linkint []uint64
-	var sort func(int)
-	sort = func(i int){
-		if i == 0 {
-			return
-		}
-		I := i-1
-		if linkint[i]>linkint[I] {
-			linkint[I],linkint[i] = linkint[i],linkint[I]
-			link[I],link[i] = link[i],link[I]
-			sort(I)
-		}
-	}
-	var j int
+func (self *Page) ToWXString() (string,[]string) {
+	var link,_link []string
 	for i:=0;i<len(self.relevant);i+=8{
-		id := binary.BigEndian.Uint64(self.relevant[i:i+8])
-		linkint = append(linkint,id)
-		link = append(link,
-		fmt.Sprintf("%d",id))
-		sort(j)
-		j++
-
+		link = append(
+		link,
+		fmt.Sprintf("\"%d\"",
+		binary.BigEndian.Uint64(self.relevant[i:i+8])))
 	}
-	if j>10{
-		link = link[:10]
+	if len(link)>10{
+		_link = link[:10]
+	}else{
+		_link = link
 	}
 	//fmt.Println(link)
-	return fmt.Sprintf("{_id:\"%d\",link:\"%s\",title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),strings.Join(link," "),self.Title,url.QueryEscape(self.Content))
+	return fmt.Sprintf("{_id:\"%d\",link:%s,title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),fmt.Sprintf("[%s]",strings.Join(_link,",")),self.Title,url.QueryEscape(self.Content)),link
 
 }
 
@@ -177,60 +166,60 @@ func (self *Page) SaveDB() error {
 }
 
 
-func addWork(k string,tx *bolt.Tx,W map[string][]byte){
-	lk := len([]rune(k))
-	if lk>255 {
-		lk = 255
-	}
-	b := tx.Bucket([]byte{byte(lk)})
-	if b != nil {
-		db := b.Get([]byte(k))
-		if db != nil {
-			W[k] = db
-			return
-		}
-	}
-	W[k] = []byte{}
-	//for i:=1 ; i<lk ; i++{
-	//	b := tx.Bucket([]byte{byte(i)})
-	//	b_ := tx.Bucket([]byte{byte(lk-i)})
-	//	handWork(
-	//		b,
-	//		b_,
-	//		[]byte(string([]rune(k)[i:])),
-	//		[]byte(string([]rune(k)[:i])),
-	//		W,
-	//	)
-	//	handWork(
-	//		b_,
-	//		b,
-	//		[]byte(string([]rune(k)[:i])),
-	//		[]byte(string([]rune(k)[i:])),
-	//		W,
-	//	)
-	//}
-}
+//func addWork(k string,tx *bolt.Tx,W map[string][]byte){
+//	//lk := len([]rune(k))
+//	//if lk>255 {
+//	//	lk = 255
+//	//}
+//	b := tx.Bucket(WordBucket)
+//	if b != nil {
+//		db := b.Get([]byte(k))
+//		if db != nil {
+//			W[k] = db
+//			return
+//		}
+//	}
+//	W[k] = []byte{}
+//	//for i:=1 ; i<lk ; i++{
+//	//	b := tx.Bucket([]byte{byte(i)})
+//	//	b_ := tx.Bucket([]byte{byte(lk-i)})
+//	//	handWork(
+//	//		b,
+//	//		b_,
+//	//		[]byte(string([]rune(k)[i:])),
+//	//		[]byte(string([]rune(k)[:i])),
+//	//		W,
+//	//	)
+//	//	handWork(
+//	//		b_,
+//	//		b,
+//	//		[]byte(string([]rune(k)[:i])),
+//	//		[]byte(string([]rune(k)[i:])),
+//	//		W,
+//	//	)
+//	//}
+//}
 
-func handWork(b,b_ *bolt.Bucket,key,key_ []byte,W_ map[string][]byte){
-
-	if b == nil {
-		return
-	}
-	val := b.Get(key)
-	if val == nil {
-		return
-	}
-	W_[string(key)] = val
-	if b_ == nil {
-		return
-	}
-	val = b_.Get(key_)
-	if val == nil {
-		val = []byte{}
-	}
-	W_[string(key_)] = val
-
-}
+//func handWork(b,b_ *bolt.Bucket,key,key_ []byte,W_ map[string][]byte){
+//
+//	if b == nil {
+//		return
+//	}
+//	val := b.Get(key)
+//	if val == nil {
+//		return
+//	}
+//	W_[string(key)] = val
+//	if b_ == nil {
+//		return
+//	}
+//	val = b_.Get(key_)
+//	if val == nil {
+//		val = []byte{}
+//	}
+//	W_[string(key_)] = val
+//
+//}
 
 func (self *Page) CheckUpdateWork() error {
 
@@ -241,10 +230,20 @@ func (self *Page) CheckUpdateWork() error {
 	}
 	defer db.Close()
 	W :=map[string][]byte{}
-	lenWord:=len(work)
+	//for k,_ := range work {
+	//	W[k] = []byte{}
+	//}
+	//lenWord:=len(work)
 	db.View(func(tx *bolt.Tx)error{
-		for k,_ := range work {
-			addWork(k,tx,W)
+		b := tx.Bucket(WordBucket)
+		if b != nil {
+			for k,_ := range work {
+				W[k] = b.Get([]byte(k))
+			}
+		}else{
+			for k,_ := range work {
+				W[k] = nil
+			}
 		}
 		return nil
 	})
@@ -253,6 +252,7 @@ func (self *Page) CheckUpdateWork() error {
 	for _,v := range W {
 		le := len(v)
 		lev := float64(le/8)
+		//fmt.Println(lev)
 		for i:=0;i<le;i+=8{
 			v_ := string(v[i:i+8])
 			vm[v_]+=1
@@ -261,12 +261,14 @@ func (self *Page) CheckUpdateWork() error {
 	}
 	var max int
 	for _,v := range vm {
+		//fmt.Println(binary.BigEndian.Uint64([]byte(k)),v)
 		if v>max{
 			max = v
 		}
 	}
-	if max >= lenWord {
-		return fmt.Errorf("is Same")
+	fmt.Println(max,len(vm),len(W))
+	if max >= len(W) {
+		return fmt.Errorf("is Same %d %d",max,len(W))
 	}
 
 	var max_ float64
@@ -285,16 +287,21 @@ func (self *Page) CheckUpdateWork() error {
 	}
 
 	return db.Update(func(tx *bolt.Tx)error{
+
+		b,err := tx.CreateBucketIfNotExists(WordBucket)
+		if err != nil {
+			return err
+		}
 		for k,v := range W {
-			lk := len([]rune(k))
-			if lk>255 {
-				lk = 255
-			}
-			b,err := tx.CreateBucketIfNotExists([]byte{byte(lk)})
+			//lk := len([]rune(k))
+			//if lk>255 {
+			//	lk = 255
+			//}
+
+			err:= b.Put([]byte(k),append(v,self.Id...))
 			if err != nil {
 				return err
 			}
-			return b.Put([]byte(k),append(v,self.Id...))
 
 		}
 		return nil
@@ -321,7 +328,7 @@ func split_(li []string)(map[string]int){
 		}
 		//fmt.Println(k,v)
 	}
-	fmt.Println(len(key))
+	//fmt.Println(len(key))
 	//for k,v := range key{
 	//	fmt.Println(k,v)
 	//}
