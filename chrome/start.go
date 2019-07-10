@@ -37,10 +37,15 @@ var (
 	k = []byte{10,68,101,118,84,111,111,108,115,32}
 	retitle *regexp.Regexp
 	rec *regexp.Regexp
+	rea *regexp.Regexp
 
 )
 func init(){
 	var err error
+	rea, err = regexp.Compile("\\<a[\\S\\s]+?\\</a\\>")
+	if err != nil {
+		panic(err)
+	}
 	//retitle, err = regexp.Compile(`title: \'[\s\s]+\'`)
 	retitle, err = regexp.Compile(`title: \'[\S\s]+?\'`)
 	if err != nil {
@@ -56,9 +61,11 @@ func init(){
 		go func (){
 			for{
 			Coll("https://www.toutiao.com/ch/news_baby/")
-			//Coll("https://www.toutiao.com/ch/news_regimen/")
-			//https://www.toutiao.com/ch/news_sports/
-			<-time.After(15 * time.Minute)
+			Coll("https://www.toutiao.com/ch/news_regimen/")
+			Coll("https://www.toutiao.com/ch/news_sports/")
+			Coll("https://www.toutiao.com/ch/news_essay/")
+			//https:https://www.toutiao.com/ch/news_essay/
+			<-time.After(5 * time.Minute)
 			}
 		}()
 	})
@@ -132,13 +139,16 @@ func Coll(uri string){
 				body_:= map[string]interface{}{}
 				json.Unmarshal([]byte(body),&body_)
 				count := 0
-				for _,d := range body_["data"].([]interface{}){
+				d__ :=  body_["data"]
+				if d__ != nil {
+				for _,d := range d__.([]interface{}){
 					if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
 						fmt.Println(err)
 					}else{
 						count++
 					}
 					time.Sleep(1*time.Second)
+				}
 				}
 				if count == 0 {
 					closePage(_vb["id"].(string))
@@ -321,6 +331,7 @@ func extract(uri string) error {
 			if err != nil {
 				fmt.Println(err)
 			}
+
 		}
 		//fmt.Println(string(db))
 		return nil
@@ -338,8 +349,8 @@ func _extract(body []byte) (error,*Page) {
 		return fmt.Errorf("Not Found content"),nil
 	}
 	p := NewPage(
-		string(body[loc[0]+8:loc[1]-1]),
-		html2md.Convert(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1]))),
+		html.UnescapeString(string(body[loc[0]+8:loc[1]-1])),
+		html2md.Convert(rea.ReplaceAllString(html.UnescapeString(string(body[loc_[0]+10:loc_[1]-1])),"")),
 		//className,
 	)
 	err := p.CheckUpdateWork()

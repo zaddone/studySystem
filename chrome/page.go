@@ -10,6 +10,7 @@ import(
 	"net/url"
 	//"sync"
 	"github.com/boltdb/bolt"
+	"github.com/zaddone/studySystem/config"
 	//"math"
 	//"sort"
 )
@@ -224,6 +225,10 @@ func (self *Page) SaveDB() error {
 func (self *Page) CheckUpdateWork() error {
 
 	work := self.getSplitWord()
+	//fmt.Println(work)
+	if len(work)<100 {
+		return fmt.Errorf("work < 100")
+	}
 	db,err := bolt.Open(WordDB,0600,nil)
 	if err != nil {
 		return err
@@ -411,6 +416,25 @@ func split(li []string)(key map[string]int){
 }
 
 func (self *Page) getSplitWord() (m map[string]int) {
+
+	outkey,err :=regexp.Compile(config.Conf.OutKey)
+	if err != nil {
+		panic(err)
+	}
+	var con []string
+	G:
+	for _,s := range strings.Split(self.Content,"\n"){
+		if len(s)<2 {
+			con = append(con,s)
+			continue
+		}
+		if outkey.MatchString(s){
+			fmt.Println("key",s)
+			continue G
+		}
+		con = append(con,s)
+	}
+	self.Content = strings.Join(con,"\n")
 	return split_(append(regTitle.FindAllString(self.Title,-1),regTitle.FindAllString(self.Content,-1)...))
 
 	//m = map[string]int{}
