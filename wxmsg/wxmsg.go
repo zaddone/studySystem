@@ -24,9 +24,12 @@ var(
 
 func setToken() int {
 	db := map[string]interface{}{}
-	request.ClientHttp(wxToKenUrl,"GET",[]int{200},nil,func(body io.Reader)error{
+	err := request.ClientHttp(wxToKenUrl,"GET",[]int{200},nil,func(body io.Reader)error{
 		return json.NewDecoder(body).Decode(&db)
 	})
+	if err != nil {
+		panic(err)
+	}
 	if db["access_token"]==nil {
 		return setToken()
 	}
@@ -42,9 +45,9 @@ func init(){
 		"secret":	[]string{config.Conf.WXSec},
 	}).Encode())
 
-	fmt.Println(wxToKenUrl)
+	//fmt.Println(wxToKenUrl)
 	k := setToken()
-	fmt.Println(k)
+	fmt.Println("setToKen",k)
 	//k := time.Duration(setToken())*time.Second
 	go func(){
 		for{

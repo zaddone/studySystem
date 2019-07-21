@@ -32,6 +32,7 @@ func reverse(s string) (s_ []rune) {
 }
 
 type Page struct {
+
 	Id []byte
 	Title string
 	Content string
@@ -40,6 +41,7 @@ type Page struct {
 	relevant []byte
 	//class []byte
 }
+
 func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
 	db,err := bolt.Open(PageDB,0600,nil)
 	if err != nil {
@@ -72,6 +74,7 @@ func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
 //	})
 //
 //}
+
 func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)) (p *Page) {
 
 	p = &Page{}
@@ -128,7 +131,7 @@ func NewPage(title,content string) (p *Page) {
 
 
 func (self *Page) ToWXString() (string,[]string) {
-	var link,_link []string
+	var link []string
 	for i:=0;i<len(self.relevant);i+=8{
 		link = append(
 		link,
@@ -136,12 +139,10 @@ func (self *Page) ToWXString() (string,[]string) {
 		binary.BigEndian.Uint64(self.relevant[i:i+8])))
 	}
 	if len(link)>10{
-		_link = link[:10]
-	}else{
-		_link = link
+		link = link[:10]
 	}
 	//fmt.Println(link)
-	return fmt.Sprintf("{_id:\"%d\",link:%s,title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),fmt.Sprintf("[%s]",strings.Join(_link,",")),self.Title,url.QueryEscape(self.Content)),link
+	return fmt.Sprintf("{_id:\"%d\",link:%s,title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),fmt.Sprintf("[%s]",strings.Join(link,",")),self.Title,url.QueryEscape(self.Content)),link
 
 }
 
@@ -225,10 +226,13 @@ func (self *Page) SaveDB() error {
 func (self *Page) CheckUpdateWork() error {
 
 	work := self.getSplitWord()
-	//fmt.Println(work)
-	if len(work)<100 {
-		return fmt.Errorf("work < 100")
+	if len(work) ==0 {
+		return fmt.Errorf("work = 0")
 	}
+	//fmt.Println(work)
+	//if len(work)<100 {
+	//	return fmt.Errorf("work < 100")
+	//}
 	db,err := bolt.Open(WordDB,0600,nil)
 	if err != nil {
 		return err
@@ -320,24 +324,39 @@ func split_(li []string)(map[string]int){
 	for _,l := range li {
 		lr := []rune(l)
 		for j:=0;j<len(lr);j++{
-			for _j:=j+2;_j<len(lr);_j++{
+			for _j:=j+2;_j<len(lr);_j++ {
 				key[string(lr[j:_j])]+=1
 			}
 		}
 	}
-
+	nkey := map[string]int{}
 	for k,v := range key {
 		if v<=1 {
 			delete(key,k)
 			continue
 		}
+		nkey[k] = v
 		//fmt.Println(k,v)
 	}
+	G:
+	for k,v := range nkey {
+		//delete(key,k)
+		for _k,_v := range key {
+			if len(k) >= len(_k) {
+				continue
+			}
+			if strings.Contains(_k,k) && (v==_v) {
+				//fmt.Println(_k,k)
+				delete(nkey,k)
+				continue G
+			}
+		}
+	}
 	//fmt.Println(len(key))
-	//for k,v := range key{
+	//for k,v := range nkey{
 	//	fmt.Println(k,v)
 	//}
-	return key
+	return nkey
 
 }
 func split(li []string)(key map[string]int){
@@ -417,6 +436,9 @@ func split(li []string)(key map[string]int){
 
 func (self *Page) getSplitWord() (m map[string]int) {
 
+	if float64(len(self.Title))/float64(len(self.Content)) > 0.5 {
+		return
+	}
 	outkey,err :=regexp.Compile(config.Conf.OutKey)
 	if err != nil {
 		panic(err)
@@ -435,6 +457,7 @@ func (self *Page) getSplitWord() (m map[string]int) {
 		con = append(con,s)
 	}
 	self.Content = strings.Join(con,"\n")
+	//return split_(regTitle.FindAllString(self.Content,-1))
 	return split_(append(regTitle.FindAllString(self.Title,-1),regTitle.FindAllString(self.Content,-1)...))
 
 	//m = map[string]int{}

@@ -28,6 +28,7 @@ type Config struct {
 	WXAppid string
 	WXSec string
 	CollPageName string
+	ToutiaoUri []string
 	//UserInfo *url.Values
 	OutKey string
 	//Site []*SitePage
@@ -65,7 +66,16 @@ func NewConfig(fileName string)  *Config {
 		c.WXAppid = "wx92ebd09c7b0d944f"
 		c.WXSec = "b3005d3c298e27b60ee1f90d188a9d86"
 		c.CollPageName = "pageColl"
-		c.OutKey="头条号|公众号|打赏|转载|订购|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
+		c.OutKey="头条客户端|头条号|公众号|打赏|转载|订购|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
+		c.ToutiaoUri = []string{
+			"https://www.toutiao.com",
+			"https://www.toutiao.com/ch/news_hot/",
+			"https://www.toutiao.com/ch/news_finance/",
+			"https://www.toutiao.com/ch/news_baby/",
+			"https://www.toutiao.com/ch/news_regimen/",
+			"https://www.toutiao.com/ch/news_sports/",
+			"https://www.toutiao.com/ch/news_essay/",
+		}
 		c.Header = http.Header{
 			//"Content-Type":[]string{"application/x-www-form-urlencoded","multipart/form-data"},
 			"Upgrade-Insecure-Requests":[]string{"1"},
