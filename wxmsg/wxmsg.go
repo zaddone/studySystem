@@ -19,6 +19,7 @@ var(
 	//wxToKenUrl= "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=wx92ebd09c7b0d944f&secret=b3005d3c298e27b60ee1f90d188a9d86"
 	toKen string
 	env string = "guomi-2i7wu"
+	MaxCount float64 = 10000
 	//ExpiresIn int64
 )
 
@@ -77,6 +78,32 @@ func PostRequest(url string,PostBody map[string]interface{},h func(io.Reader)err
 	//return request.ClientHttp(fmt.Sprintf("%s?access_token=%s",url,toKen),"POST",[]int{200},PostBody,h)
 
 }
+func CollectionClearDB(hand func()error)error {
+
+	return PostRequest("https://api.weixin.qq.com/tcb/databasecollectionget",map[string]interface{}{},func(body io.Reader)error{
+		var res  map[string]interface{}
+		json.NewDecoder(body).Decode(&res)
+
+		errcode := res["errcode"].(float64)
+		if errcode != 0 {
+			return fmt.Errorf("%.0f %s",errcode,res["errmsg"].(string))
+		}
+		for _,coll := range res["collections"].([]interface{}){
+			c := coll.(map[string]interface{})
+			if !strings.EqualFold(c["name"].(string),config.Conf.CollPageName){
+				continue
+			}
+			if MaxCount > c["count"].(float64) {
+				return nil
+			}
+			return hand()
+
+		}
+		return nil
+	})
+
+}
+
 func CreateColl(c_name string) error {
 
 	return PostRequest("https://api.weixin.qq.com/tcb/databasecollectionadd",map[string]interface{}{"collection_name":c_name},func(body io.Reader)error{
@@ -89,6 +116,27 @@ func CreateColl(c_name string) error {
 		return fmt.Errorf(res["errmsg"].(string))
 	})
 
+}
+
+func DBDelete(ids []string)error {
+	fmt.Println(ids)
+	return PostRequest(
+		"https://api.weixin.qq.com/tcb/databasedelete",
+		map[string]interface{}{
+			"query":fmt.Sprintf(
+				"db.collection(\"%s\").where({_id:db.command.in([%s])}).remove()",
+				config.Conf.CollPageName,
+				strings.Join(ids,","))},
+		func(body io.Reader)error{
+
+		var res  map[string]interface{}
+		json.NewDecoder(body).Decode(&res)
+		errcode := res["errcode"].(float64)
+		if errcode == 0 {
+			return nil
+		}
+		return fmt.Errorf("%.0f %s",errcode,res["errmsg"].(string))
+	})
 }
 
 func UpdateToWXDB(id uint64,ids []string) error {

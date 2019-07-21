@@ -4,6 +4,7 @@ import(
 	"time"
 	"log"
 	"strings"
+	"bytes"
 	"regexp"
 	"encoding/binary"
 	"encoding/json"
@@ -23,6 +24,78 @@ var (
 	regTitle *regexp.Regexp = regexp.MustCompile(`[\p{Han}]+`)
 
 )
+func clearLocalDB(hand func([]string)error) error {
+
+	db,err := bolt.Open(PageDB,0600,nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	tx,err := db.Begin(true)
+	if err != nil {
+		return err
+	}
+	b := tx.Bucket(pageBucket)
+	if b == nil {
+		return fmt.Errorf("b == nil")
+	}
+	c := b.Cursor()
+	//p := &Page{}
+	var klink []byte
+	var klinkStr []string
+	for k,_ := c.First();k!=nil&&len(klinkStr)<100;k,_ = c.Next(){
+		klink = append(klink,k...)
+		klinkStr = append(klinkStr,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(k)))
+		err = b.Delete(k)
+		if err != nil {
+			panic(err)
+		}
+	}
+	fmt.Println(klinkStr)
+	db_,err := bolt.Open(WordDB,0600,nil)
+	if err != nil {
+		return err
+	}
+	defer db_.Close()
+	tx_,err := db_.Begin(true)
+	if err != nil {
+		return err
+	}
+	b_ := tx_.Bucket(WordBucket)
+	if b_ == nil {
+		return fmt.Errorf("b == nil")
+	}
+	c_ := b_.Cursor()
+	for k,v := c_.First();k!= nil;k,v = c_.Next(){
+		vlen := len(v)
+		var nv []byte
+		for i:=0;i<vlen;i+=8{
+			_v := v[i:i+8]
+			if !bytes.Contains(klink,_v){
+				nv=append(nv,_v...)
+			}
+		}
+		lenv := len(nv)
+		if lenv == 0 {
+			fmt.Println("-",string(k))
+			b_.Delete(k)
+		}else{
+			if lenv != vlen {
+				b_.Put(k,nv)
+			}
+			
+		}
+	}
+	err = hand(klinkStr)
+	fmt.Println("hand",err)
+	if err != nil {
+		return err
+	}
+	tx_.Commit()
+	tx.Commit()
+	return nil
+
+}
 func reverse(s string) (s_ []rune) {
 	s_ = []rune(s)
 	for i, j := 0, len(s_)-1; i < j; i, j = i+1, j-1 {

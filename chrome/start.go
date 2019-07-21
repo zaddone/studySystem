@@ -73,20 +73,37 @@ func init(){
 	}
 	go start(func(in string){
 		i:=0
+		err := ClearDB()
+		if err != nil {
+			panic(err)
+		}
 		w:=new(sync.WaitGroup)
 		for{
 			Coll(uris[i],w)
 			w.Wait()
 			log.Println("wait")
-			<-time.After(2 * time.Minute)
 			i++
 			if i>=len(uris){
+				err := ClearDB()
+				if err != nil {
+					panic(err)
+				}
 				i=0
 			}
+			<-time.After(2 * time.Minute)
 		}
 
 	})
 	log.Println("run")
+}
+
+func ClearDB() error {
+
+	fmt.Println("begin Clear")
+	return wxmsg.CollectionClearDB(func()error{
+		return clearLocalDB(wxmsg.DBDelete)
+	})
+
 }
 
 func Coll(uri string,w *sync.WaitGroup){
