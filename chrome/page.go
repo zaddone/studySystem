@@ -17,6 +17,7 @@ import(
 )
 
 var (
+
 	WordDB = "word.db"
 	PageDB = "page.db"
 	pageBucket = []byte("page")
@@ -83,7 +84,6 @@ func clearLocalDB(hand func([]string)error) error {
 			if lenv != vlen {
 				b_.Put(k,nv)
 			}
-			
 		}
 	}
 	err = hand(klinkStr)
@@ -113,6 +113,74 @@ type Page struct {
 	Children []byte
 	relevant []byte
 	//class []byte
+}
+func getWord() (wordlist map[string][]string,err error) {
+	pDB,err := bolt.Open(PageDB,0600,nil)
+	if err != nil {
+		return nil,err
+	}
+	defer pDB.Close()
+	db,err := bolt.Open(WordDB,0600,nil)
+	if err != nil {
+		return nil,err
+	}
+	defer db.Close()
+	pTx,err := pDB.Begin(false)
+	if err != nil {
+		return nil,err
+	}
+	pbuck := pTx.Bucket(pageBucket)
+	wordlist = make(map[string][]string)
+	err = db.View(func(tx *bolt.Tx)error{
+		b := tx.Bucket(WordBucket)
+		if b == nil {
+			return fmt.Errorf("b = nil")
+		}
+		c := b.Cursor()
+		for k,v := c.First(); k!= nil ; k,v = c.Next() {
+			le := len(v)
+			lev := le/8
+			if lev < 4  || lev>100 {
+				continue
+			}
+			var noId []string
+			var c2 int
+			for i:=0;i<le;i+=8 {
+				pid := v[i:i+8]
+				noId = append(
+					noId,
+				fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)) )
+				p := &Page{}
+				err = json.Unmarshal(pbuck.Get(pid),p)
+				if err != nil {
+					//panic(err)
+					fmt.Println(err)
+					continue
+					return err
+				}
+				//chr = append(chr,p.Children...)
+				if bytes.Contains(v,p.Par){
+					c2++
+				}else{
+					for j:=0;j<len(p.Children);j+=8{
+						if bytes.Contains(v,p.Children[j:j+8]){
+							c2++
+							break
+						}
+					}
+				}
+				//fmt.Println(pid,binary.BigEndian.Uint64(pid))
+			}
+			if c2 > (lev-c2) {
+				//co2++
+				wordlist[string(k)] = noId
+				//fmt.Println(string(k),lev,c2)
+			}
+		}
+		return nil
+	})
+	return
+
 }
 
 func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
@@ -215,7 +283,12 @@ func (self *Page) ToWXString() (string,[]string) {
 		link = link[:10]
 	}
 	//fmt.Println(link)
-	return fmt.Sprintf("{_id:\"%d\",link:%s,title:\"%s\",text:\"%s\"}", binary.BigEndian.Uint64(self.Id),fmt.Sprintf("[%s]",strings.Join(link,",")),self.Title,url.QueryEscape(self.Content)),link
+	return fmt.Sprintf(
+		"{_id:\"%d\",link:[%s],title:\"%s\",text:\"%s\"}",
+		binary.BigEndian.Uint64(self.Id),
+		strings.Join(link,","),
+		self.Title,
+		url.QueryEscape(self.Content)),link
 
 }
 
@@ -299,36 +372,52 @@ func (self *Page) SaveDB() error {
 func (self *Page) CheckUpdateWork() error {
 
 	work := self.getSplitWord()
-	if len(work) ==0 {
+	if len(work) == 0 {
 		return fmt.Errorf("work = 0")
 	}
-	//fmt.Println(work)
-	//if len(work)<100 {
-	//	return fmt.Errorf("work < 100")
-	//}
 	db,err := bolt.Open(WordDB,0600,nil)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 	W :=map[string][]byte{}
-	//for k,_ := range work {
-	//	W[k] = []byte{}
-	//}
-	//lenWord:=len(work)
 	db.View(func(tx *bolt.Tx)error{
 		b := tx.Bucket(WordBucket)
 		if b != nil {
+			c := b.Cursor()
 			for k,_ := range work {
-				W[k] = b.Get([]byte(k))
+				k__ := []byte(k)
+				k_,v_ := c.Seek(k__)
+				if bytes.Contains(k_,k__){
+					W[k] = v_
+				}else{
+					W[k] = []byte{}
+				}
 			}
 		}else{
 			for k,_ := range work {
-				W[k] = nil
+				W[k] = []byte{}
 			}
 		}
 		return nil
 	})
+
+	G:
+	for k,v := range W {
+		if len(v)>0{
+			continue
+		}
+		for _k,_ := range work{
+			if len(k) >= len(_k){
+				continue
+			}
+			if strings.Contains(_k,k) {
+				delete(W,k)
+				continue G
+			}
+		}
+	}
+
 	vm := map[string]int{}
 	vm_ := map[string]float64{}
 	for _,v := range W {
@@ -349,7 +438,7 @@ func (self *Page) CheckUpdateWork() error {
 		}
 	}
 	fmt.Println(max,len(vm),len(W))
-	if max >= len(W) {
+	if (float64(max)/float64(len(W))) > 0.9 {
 		return fmt.Errorf("is Same %d %d",max,len(W))
 	}
 
@@ -402,34 +491,34 @@ func split_(li []string)(map[string]int){
 			}
 		}
 	}
-	nkey := map[string]int{}
+	//nkey := map[string]int{}
 	for k,v := range key {
 		if v<=1 {
 			delete(key,k)
 			continue
 		}
-		nkey[k] = v
+		//nkey[k] = v
 		//fmt.Println(k,v)
 	}
-	G:
-	for k,v := range nkey {
-		//delete(key,k)
-		for _k,_v := range key {
-			if len(k) >= len(_k) {
-				continue
-			}
-			if strings.Contains(_k,k) && (v==_v) {
-				//fmt.Println(_k,k)
-				delete(nkey,k)
-				continue G
-			}
-		}
-	}
+	//G:
+	//for k,v := range nkey {
+	//	//delete(key,k)
+	//	for _k,_v := range key {
+	//		if len(k) >= len(_k) {
+	//			continue
+	//		}
+	//		if strings.Contains(_k,k) && (v==_v) {
+	//			//fmt.Println(_k,k)
+	//			delete(nkey,k)
+	//			continue G
+	//		}
+	//	}
+	//}
 	//fmt.Println(len(key))
 	//for k,v := range nkey{
 	//	fmt.Println(k,v)
 	//}
-	return nkey
+	return key
 
 }
 func split(li []string)(key map[string]int){

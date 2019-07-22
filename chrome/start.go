@@ -71,16 +71,22 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
-	go start(func(in string){
+
+	go start(func(in string)error{
 		i:=0
 		err := ClearDB()
 		if err != nil {
 			panic(err)
 		}
+		UpWord()
 		w:=new(sync.WaitGroup)
 		for{
-			Coll(uris[i],w)
+			err = Coll(uris[i],w)
+			if err != nil {
+				return err
+			}
 			w.Wait()
+
 			log.Println("wait")
 			i++
 			if i>=len(uris){
@@ -90,11 +96,54 @@ func init(){
 				}
 				i=0
 			}
+			UpWord()
 			<-time.After(2 * time.Minute)
 		}
-
+		return nil
 	})
 	log.Println("run")
+}
+
+func UpWord(){
+	word := "word"
+	w,err := getWord()
+	log.Println("word begin",len(w))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	err = wxmsg.DeleteColl(word)
+	if err != nil {
+		log.Println(err)
+	}
+	err = wxmsg.CreateColl(word)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	ci :=0
+	var db [][]string
+	var d []string
+	for k,v := range w {
+		ci++
+		d = append(d,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k,strings.Join(v,",")))
+		if ci>=100{
+			ci=0
+			db = append(db,d)
+			d = nil
+		}
+
+	}
+	for _,d := range db {
+		//fmt.Println(strings.Join(d,","))
+		err = wxmsg.AddToWXDB(word,strings.Join(d,","))
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+
 }
 
 func ClearDB() error {
@@ -106,12 +155,12 @@ func ClearDB() error {
 
 }
 
-func Coll(uri string,w *sync.WaitGroup){
+func Coll(uri string,w *sync.WaitGroup)error{
 	//runStream(in,func(v interface{},bc *websocket.Conn){
 	//	fmt.Println("b",v)
 	//})
 	fmt.Println(uri)
-	openPage(uri,func(v interface{})error{
+	return openPage(uri,func(v interface{})error{
 		requestId:=""
 		//count :=0
 		step:=0
@@ -221,53 +270,56 @@ func Coll(uri string,w *sync.WaitGroup){
 					}
 				}()
 				step = 0
-
 			}
 		})
-
 		return nil
 	})
 
 }
 
-func start(hand func(string)){
-	runout := func(r io.ReadCloser){
+func start(hand func(string)error){
+	runout := func(r io.Reader){
 		var db [8192]byte
 		for{
+
 			n,err := r.Read(db[:])
 			if err != nil {
 				if err != io.EOF{
 					log.Println(err)
-					break
-					//panic(err)
+					return
 				}
 			}
-			//fmt.Println(string(db[:n]))
-
 			if bytes.HasPrefix(db[:n],k){
-
-				//fmt.Println(string(db[23:n-1]))
-				hand(string(db[23:n-1]))
-				//websocket.Dial(string(db[23:n-1]),"","")
+				err = hand(string(db[23:n-1]))
+				if err != nil {
+					log.Println(err)
+					return
+				}
 			}
 		}
 	}
-	cmd := exec.Command("google-chrome",op... )
-	out,err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatal(err)
+	for{
+		cmd := exec.Command("google-chrome",op... )
+		out,err := cmd.StdoutPipe()
+		if err != nil {
+			log.Fatal(err)
+		}
+		outerr,err := cmd.StderrPipe()
+		if err != nil {
+			log.Fatal(err)
+		}
+		go runout(out)
+		go runout(outerr)
+		err = cmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		cmd.Wait()
+		out.Close()
+		outerr.Close()
+		log.Println("cmd end")
 	}
-	outerr,err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-	go runout(out)
-	go runout(outerr)
-	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cmd.Wait()
+
 	//select{}
 }
 func closePage(id string){
@@ -286,8 +338,8 @@ func closePage(id string){
 		log.Println(err)
 	}
 }
-func openPage(u string,hand func(interface{})error){
-	err := request.ClientHttp_(Ourl+"/json/new/?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
+func openPage(u string,hand func(interface{})error) error {
+	return request.ClientHttp_(Ourl+"/json/new/?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
 		if st != 200 {
 			db,err := ioutil.ReadAll(body)
 			if err != nil {
@@ -300,13 +352,17 @@ func openPage(u string,hand func(interface{})error){
 		if err != nil {
 			return err
 		}
-		return hand(k)
+		er := hand(k)
+		if er != nil {
+			log.Println(er)
+		}
+		return nil
 
 	})
-	if err != nil {
-		log.Println(err)
-		//panic(err)
-	}
+	//if err != nil {
+	//	log.Println(err)
+	//	//panic(err)
+	//}
 
 }
 func runBrowserStream(u string,hand func(interface{})) (chan interface{}){

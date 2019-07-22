@@ -104,6 +104,19 @@ func CollectionClearDB(hand func()error)error {
 
 }
 
+func DeleteColl(c_name string) error {
+
+	return PostRequest("https://api.weixin.qq.com/tcb/databasecollectiondelete",map[string]interface{}{"collection_name":c_name},func(body io.Reader)error{
+		var res  map[string]interface{}
+		json.NewDecoder(body).Decode(&res)
+		if res["errcode"].(float64) == 0 {
+			return nil
+		}
+		//fmt.Println(res,res["errcode"].(float64),res["errmsg"].(string))
+		return fmt.Errorf(res["errmsg"].(string))
+	})
+
+}
 func CreateColl(c_name string) error {
 
 	return PostRequest("https://api.weixin.qq.com/tcb/databasecollectionadd",map[string]interface{}{"collection_name":c_name},func(body io.Reader)error{
@@ -158,13 +171,13 @@ func UpdateToWXDB(id uint64,ids []string) error {
 	return nil
 }
 
-func SaveToWXDB(body string) error {
+func AddToWXDB(coll string,body string) error {
 	//fmt.Println(body)
 	var res  map[string]interface{}
 	err := PostRequest(
 		"https://api.weixin.qq.com/tcb/databaseadd",
 		map[string]interface{}{
-			"query":fmt.Sprintf("db.collection(\"%s\").add({data:[%s]})",config.Conf.CollPageName,body)},
+			"query":fmt.Sprintf("db.collection(\"%s\").add({data:[%s]})",coll,body)},
 		func(body io.Reader)error{
 		return json.NewDecoder(body).Decode(&res)
 	})
@@ -175,4 +188,23 @@ func SaveToWXDB(body string) error {
 		return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
 	}
 	return nil
+}
+func SaveToWXDB(body string) error {
+	return AddToWXDB(config.Conf.CollPageName,body)
+	//fmt.Println(body)
+	//var res  map[string]interface{}
+	//err := PostRequest(
+	//	"https://api.weixin.qq.com/tcb/databaseadd",
+	//	map[string]interface{}{
+	//		"query":fmt.Sprintf("db.collection(\"%s\").add({data:[%s]})",config.Conf.CollPageName,body)},
+	//	func(body io.Reader)error{
+	//	return json.NewDecoder(body).Decode(&res)
+	//})
+	//if err != nil {
+	//	return err
+	//}
+	//if res["errcode"].(float64) != 0 {
+	//	return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
+	//}
+	//return nil
 }
