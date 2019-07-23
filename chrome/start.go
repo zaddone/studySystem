@@ -78,7 +78,7 @@ func init(){
 		if err != nil {
 			panic(err)
 		}
-		UpWord()
+		//UpWord()
 		w:=new(sync.WaitGroup)
 		for{
 			err = Coll(uris[i],w)
@@ -94,10 +94,10 @@ func init(){
 				if err != nil {
 					panic(err)
 				}
+				UpWord()
 				i=0
 			}
-			UpWord()
-			<-time.After(2 * time.Minute)
+			<-time.After(20 * time.Minute)
 		}
 		return nil
 	})

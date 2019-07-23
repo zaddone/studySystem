@@ -402,21 +402,21 @@ func (self *Page) CheckUpdateWork() error {
 		return nil
 	})
 
-	G:
-	for k,v := range W {
-		if len(v)>0{
-			continue
-		}
-		for _k,_ := range work{
-			if len(k) >= len(_k){
-				continue
-			}
-			if strings.Contains(_k,k) {
-				delete(W,k)
-				continue G
-			}
-		}
-	}
+	//G:
+	//for k,v := range W {
+	//	if len(v)>0{
+	//		continue
+	//	}
+	//	for _k,_ := range work{
+	//		if len(k) >= len(_k){
+	//			continue
+	//		}
+	//		if strings.Contains(_k,k) {
+	//			delete(W,k)
+	//			continue G
+	//		}
+	//	}
+	//}
 
 	vm := map[string]int{}
 	vm_ := map[string]float64{}
@@ -491,34 +491,34 @@ func split_(li []string)(map[string]int){
 			}
 		}
 	}
-	//nkey := map[string]int{}
+	nkey := map[string]int{}
 	for k,v := range key {
 		if v<=1 {
 			delete(key,k)
 			continue
 		}
-		//nkey[k] = v
+		nkey[k] = v
 		//fmt.Println(k,v)
 	}
-	//G:
-	//for k,v := range nkey {
-	//	//delete(key,k)
-	//	for _k,_v := range key {
-	//		if len(k) >= len(_k) {
-	//			continue
-	//		}
-	//		if strings.Contains(_k,k) && (v==_v) {
-	//			//fmt.Println(_k,k)
-	//			delete(nkey,k)
-	//			continue G
-	//		}
-	//	}
-	//}
+	G:
+	for k,v := range nkey {
+		//delete(key,k)
+		for _k,_v := range key {
+			if len(k) >= len(_k) {
+				continue
+			}
+			if strings.Contains(_k,k) && (v==_v) {
+				//fmt.Println(_k,k)
+				delete(nkey,k)
+				continue G
+			}
+		}
+	}
 	//fmt.Println(len(key))
 	//for k,v := range nkey{
 	//	fmt.Println(k,v)
 	//}
-	return key
+	return nkey
 
 }
 func split(li []string)(key map[string]int){
