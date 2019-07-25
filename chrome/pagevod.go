@@ -15,6 +15,7 @@ import(
 var (
 	regG *regexp.Regexp = regexp.MustCompile("伦理|福利|色情")
 	regW *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|\p{Han}]+`)
+	regM *regexp.Regexp = regexp.MustCompile(`[0-9]+`)
 	regS = regexp.MustCompile(`\S+\$\S+\.m3u8`)
 	rootUrl string = "http://www.okzyw.com"
 	contentTag string = "vod|"
@@ -52,12 +53,17 @@ func (self *Pagevod) loadPage(uri string,) error {
 		}
 		doc.Find(".vodinfobox li span").Each(func(i int,s *goquery.Selection){
 			for _,l := range regW.FindAllString(s.Text(),-1){
+				kl := regM.ReplaceAllString(l,"")
+				if len(kl) ==0 {
+					continue
+				}
 				keyMap[l]+=1
 			}
 		})
 		for k,_:= range keyMap {
 			self.key=append(self.key,k)
 		}
+		//fmt.Println(self.key)
 
 		tt := doc.Find(".ibox.playBox .vodplayinfo").Text()
 		self.vod = regS.FindAllString(tt,-1)

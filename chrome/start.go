@@ -90,9 +90,9 @@ func init(){
 		panic(err)
 	}
 	go syncPushWXDB()
-	go syncRunPageVod()
-	fmt.Println("run vod")
-	return
+	//go syncRunPageVod()
+	//fmt.Println("run vod")
+	//return
 	go start(func(in string)error{
 		//i:=0
 		err := ClearDB()
@@ -109,6 +109,7 @@ func init(){
 				}
 				w.Wait()
 			}
+			findPageVod()
 			err := ClearDB()
 			if err != nil {
 				panic(err)
