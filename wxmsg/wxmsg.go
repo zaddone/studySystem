@@ -170,6 +170,24 @@ func UpdateToWXDB(id uint64,ids []string) error {
 	}
 	return nil
 }
+func UpdateWXDB(coll string,_id string,body string) error {
+	//fmt.Println(body)
+	var res  map[string]interface{}
+	err := PostRequest(
+		"https://api.weixin.qq.com/tcb/databaseupdate",
+		map[string]interface{}{
+			"query":fmt.Sprintf("db.collection(\"%s\").doc(\"%s\").update({data:{%s}})",coll,_id,body)},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil {
+		return err
+	}
+	if res["errcode"].(float64) != 0 {
+		return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
+	}
+	return nil
+}
 
 func AddToWXDB(coll string,body string) error {
 	//fmt.Println(body)

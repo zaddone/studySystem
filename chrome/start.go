@@ -14,7 +14,7 @@ import(
 	"log"
 	"html"
 	"encoding/json"
-	"encoding/binary"
+	//"encoding/binary"
 	"github.com/lunny/html2md"
 	"github.com/zaddone/studySystem/request"
 	"github.com/gorilla/websocket"
@@ -41,16 +41,34 @@ var (
 	rea *regexp.Regexp
 	rej *regexp.Regexp
 	uris = config.Conf.ToutiaoUri
-	//[]string{
-	//	"https://www.toutiao.com/ch/news_finance/",
-	//	"https://www.toutiao.com/ch/news_finance/",
-	//	"https://www.toutiao.com/ch/news_baby/",
-	//	"https://www.toutiao.com/ch/news_regimen/",
-	//	"https://www.toutiao.com/ch/news_sports/",
-	//	"https://www.toutiao.com/ch/news_essay/",
-	//}
+	WXDBPushChan = make(chan pageInterface,10)
 
 )
+type pageInterface interface {
+	GetId() uint64
+	ToWXString() (string,[]string)
+	GetUpdate() bool
+	GetTitle() string
+}
+func syncPushWXDB(){
+	for{
+		p:=<-WXDBPushChan
+		fmt.Println(p.GetTitle())
+		body,ids := p.ToWXString()
+		if p.GetUpdate(){
+			err := wxmsg.UpdateWXDB(config.Conf.CollPageName,fmt.Sprintf("%d",p.GetId()),body)
+			if err != nil {
+				log.Println(err)
+			}
+		}else{
+			err := wxmsg.SaveToWXDB(body)
+			if (err == nil) && (len(ids)>0) {
+				err = wxmsg.UpdateToWXDB(p.GetId(),ids[:1])
+			}
+		}
+	}
+
+}
 func init(){
 	//fmt.Println("init")
 	var err error
@@ -71,33 +89,50 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
-
+	go syncPushWXDB()
+	go syncRunPageVod()
+	fmt.Println("run vod")
+	return
 	go start(func(in string)error{
-		i:=0
+		//i:=0
 		err := ClearDB()
 		if err != nil {
 			panic(err)
 		}
-		//UpWord()
+		UpWord()
 		w:=new(sync.WaitGroup)
 		for{
-			err = Coll(uris[i],w)
-			if err != nil {
-				return err
-			}
-			w.Wait()
-
-			log.Println("wait")
-			i++
-			if i>=len(uris){
-				err := ClearDB()
+			for _,u := range uris {
+				err = Coll(u,w)
 				if err != nil {
-					panic(err)
+					return err
 				}
-				UpWord()
-				i=0
+				w.Wait()
 			}
-			<-time.After(20 * time.Minute)
+			err := ClearDB()
+			if err != nil {
+				panic(err)
+			}
+			UpWord()
+			<-time.After(30 * time.Minute)
+
+			//err = Coll(uris[i],w)
+			//if err != nil {
+			//	return err
+			//}
+			//w.Wait()
+
+			//log.Println("wait")
+			//i++
+			//if i>=len(uris){
+			//	err := ClearDB()
+			//	if err != nil {
+			//		panic(err)
+			//	}
+			//	UpWord()
+			//	<-time.After(30 * time.Minute)
+			//	i=0
+			//}
 		}
 		return nil
 	})
@@ -480,15 +515,17 @@ func extract(uri string) error {
 			return err
 		}else{
 			//wxmsg.SaveToWXDB(p.ToWXString())
-			fmt.Println(p.Title)
-			body,ids := p.ToWXString()
-			err := wxmsg.SaveToWXDB(body)
-			if (err == nil) && (len(ids)>0) {
-				err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids[:1])
-			}
-			if err != nil {
-				fmt.Println(err)
-			}
+			//fmt.Println(p.Title)
+			WXDBPushChan<-p
+
+			//body,ids := p.ToWXString()
+			//err := wxmsg.SaveToWXDB(body)
+			//if (err == nil) && (len(ids)>0) {
+			//	err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids[:1])
+			//}
+			//if err != nil {
+			//	fmt.Println(err)
+			//}
 
 		}
 		//fmt.Println(string(db))

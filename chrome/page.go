@@ -52,7 +52,7 @@ func clearLocalDB(hand func([]string)error) error {
 			panic(err)
 		}
 	}
-	fmt.Println(klinkStr)
+	//fmt.Println(klinkStr)
 	db_,err := bolt.Open(WordDB,0600,nil)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func clearLocalDB(hand func([]string)error) error {
 		}
 		lenv := len(nv)
 		if lenv == 0 {
-			fmt.Println("-",string(k))
+			//fmt.Println("-",string(k))
 			b_.Delete(k)
 		}else{
 			if lenv != vlen {
@@ -113,23 +113,33 @@ type Page struct {
 	Children []byte
 	relevant []byte
 	//class []byte
+	update bool
+}
+func (self *Page) GetTitle() string{
+	return self.Title
+}
+func(self *Page) GetId() uint64 {
+	return binary.BigEndian.Uint64(self.Id)
+}
+func (self *Page)GetUpdate() bool {
+	return self.update
 }
 func getWord() (wordlist map[string][]string,err error) {
-	pDB,err := bolt.Open(PageDB,0600,nil)
-	if err != nil {
-		return nil,err
-	}
-	defer pDB.Close()
+	//pDB,err := bolt.Open(PageDB,0600,nil)
+	//if err != nil {
+	//	return nil,err
+	//}
+	//defer pDB.Close()
 	db,err := bolt.Open(WordDB,0600,nil)
 	if err != nil {
 		return nil,err
 	}
 	defer db.Close()
-	pTx,err := pDB.Begin(false)
-	if err != nil {
-		return nil,err
-	}
-	pbuck := pTx.Bucket(pageBucket)
+	//pTx,err := pDB.Begin(false)
+	//if err != nil {
+	//	return nil,err
+	//}
+	//pbuck := pTx.Bucket(pageBucket)
 	wordlist = make(map[string][]string)
 	err = db.View(func(tx *bolt.Tx)error{
 		b := tx.Bucket(WordBucket)
@@ -140,42 +150,42 @@ func getWord() (wordlist map[string][]string,err error) {
 		for k,v := c.First(); k!= nil ; k,v = c.Next() {
 			le := len(v)
 			lev := le/8
-			if lev < 4  || lev>100 {
+			if lev < 2  || lev>50 {
 				continue
 			}
 			var noId []string
-			var c2 int
+			//var c2 int
 			for i:=0;i<le;i+=8 {
 				pid := v[i:i+8]
 				noId = append(
 					noId,
 				fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)) )
-				p := &Page{}
-				err = json.Unmarshal(pbuck.Get(pid),p)
-				if err != nil {
-					//panic(err)
-					fmt.Println(err)
-					continue
-					return err
-				}
-				//chr = append(chr,p.Children...)
-				if bytes.Contains(v,p.Par){
-					c2++
-				}else{
-					for j:=0;j<len(p.Children);j+=8{
-						if bytes.Contains(v,p.Children[j:j+8]){
-							c2++
-							break
-						}
-					}
-				}
+				//p := &Page{}
+				//err = json.Unmarshal(pbuck.Get(pid),p)
+				//if err != nil {
+				//	//panic(err)
+				//	fmt.Println(err)
+				//	continue
+				//	return err
+				//}
+				////chr = append(chr,p.Children...)
+				//if bytes.Contains(v,p.Par){
+				//	c2++
+				//}else{
+				//	for j:=0;j<len(p.Children);j+=8{
+				//		if bytes.Contains(v,p.Children[j:j+8]){
+				//			c2++
+				//			break
+				//		}
+				//	}
+				//}
 				//fmt.Println(pid,binary.BigEndian.Uint64(pid))
 			}
-			if c2 > (lev-c2) {
+			//if c2 > (lev-c2) {
 				//co2++
-				wordlist[string(k)] = noId
+			wordlist[string(k)] = noId
 				//fmt.Println(string(k),lev,c2)
-			}
+			//}
 		}
 		return nil
 	})
@@ -231,6 +241,23 @@ func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)) (p *Page) {
 
 }
 
+func (self *Page) linkBucket(lid []byte,b *bolt.Bucket) error {
+
+	P := findSetPage(
+		lid,
+		b,
+		func(p *Page){
+			self.relevant = append(self.relevant,p.Id...)
+		},
+	)
+	if P == nil {
+		return fmt.Errorf("Not Find Page")
+	}
+	self.Par = lid
+
+	P.Children = append(P.Children,self.Id...)
+	return P.SaveDBBucket(b)
+}
 
 func (self *Page) link(lid []byte) error {
 	var p *Page
@@ -263,9 +290,9 @@ func NewPage(title,content string) (p *Page) {
 		//Id:time.Now().UnixNano(),
 		Title:title,
 		Content:content,
+		Id:make([]byte,8),
 		//class:[]byte(class),
 	}
-	p.Id = make([]byte,8)
 	binary.BigEndian.PutUint64(p.Id,uint64(time.Now().UnixNano()))
 	return
 }
@@ -292,6 +319,13 @@ func (self *Page) ToWXString() (string,[]string) {
 
 }
 
+func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
+	v,err := json.Marshal(self)
+	if err != nil {
+		return err
+	}
+	return b.Put(self.Id,v)
+}
 
 func (self *Page) SaveDB() error {
 	v,err := json.Marshal(self)
