@@ -20,6 +20,7 @@ import(
 	"github.com/gorilla/websocket"
 	"github.com/zaddone/studySystem/config"
 	"github.com/zaddone/studySystem/wxmsg"
+	"github.com/boltdb/bolt"
 
 )
 
@@ -42,6 +43,13 @@ var (
 	rej *regexp.Regexp
 	uris = config.Conf.ToutiaoUri
 	WXDBPushChan = make(chan pageInterface,10)
+	WordDB = "word.db"
+	PageDB = "page.db"
+	pageBucket = []byte("page")
+	WordBucket = []byte("word")
+
+	DbWord *bolt.DB
+	DbPage *bolt.DB
 
 )
 type pageInterface interface {
@@ -72,6 +80,15 @@ func syncPushWXDB(){
 func init(){
 	//fmt.Println("init")
 	var err error
+	DbPage,err = bolt.Open(PageDB,0600,nil)
+	if err != nil {
+		panic(err)
+	}
+	DbWord,err = bolt.Open(WordDB,0600,nil)
+	if err != nil {
+		panic(err)
+	}
+	return
 	//rej, err = regexp.Compile("\\<script[\\S\\s]+?\\</script\\>")
 	//if err != nil {
 	//	panic(err)
@@ -89,16 +106,13 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
+
 	go syncPushWXDB()
 	//go syncRunPageVod()
 	//fmt.Println("run vod")
 	//return
 	go start(func(in string)error{
-		//i:=0
-		err := ClearDB()
-		if err != nil {
-			panic(err)
-		}
+		//findPageVod()
 		UpWord()
 		w:=new(sync.WaitGroup)
 		for{
@@ -109,31 +123,10 @@ func init(){
 				}
 				w.Wait()
 			}
-			findPageVod()
-			err := ClearDB()
-			if err != nil {
-				panic(err)
-			}
 			UpWord()
-			<-time.After(30 * time.Minute)
+			findPageVod()
+			<-time.After(15 * time.Minute)
 
-			//err = Coll(uris[i],w)
-			//if err != nil {
-			//	return err
-			//}
-			//w.Wait()
-
-			//log.Println("wait")
-			//i++
-			//if i>=len(uris){
-			//	err := ClearDB()
-			//	if err != nil {
-			//		panic(err)
-			//	}
-			//	UpWord()
-			//	<-time.After(30 * time.Minute)
-			//	i=0
-			//}
 		}
 		return nil
 	})
@@ -574,3 +567,134 @@ func _extract(body []byte) (error,*Page) {
 
 }
 
+func SearchPage(key string,hand func(p *Page)) error {
+	if len(key) == 0 {
+		return fmt.Errorf("key ==0")
+	}
+	ks := map[string]int{}
+
+	lr := []rune(key)
+	for j:=0;j<len(lr);j++{
+		for _j:=j+2;_j<=len(lr);_j++ {
+			ks[string(lr[j:_j])]+=1
+		}
+	}
+	fmt.Println(ks)
+	var keys [][]byte
+	for str,_ := range ks{
+		keys = append(keys,[]byte(str))
+	}
+	pageMap := map[string]float64{}
+	err := DbWord.View(func(tx *bolt.Tx)error{
+		b := tx.Bucket(WordBucket)
+		if b == nil {
+			return fmt.Errorf("%s == nil",WordBucket)
+		}
+		c := b.Cursor()
+		for _,str := range keys {
+			k,v := c.Seek(str)
+			if bytes.Equal(k,str) || bytes.Contains(k,str){
+				vf := 1.0/float64(len(v)/8)*float64(len(str))
+				for i:=0;i<len(v);i+=8{
+					pageMap[string(v[i:i+8])] += vf
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(pageMap) == 0 {
+		return fmt.Errorf("kmap == 0")
+	}
+	var max float64
+	var maxid [][]byte
+	for k,v := range pageMap {
+		if v>max {
+			max = v
+			maxid = [][]byte{[]byte(k)}
+		}else if v==max{
+			maxid = append(maxid,[]byte(k))
+		}
+	}
+	//var pa []*Page
+	return DbPage.View(func(tx *bolt.Tx) error{
+		b := tx.Bucket(pageBucket)
+		if b == nil {
+			return fmt.Errorf("%s == nil",pageBucket)
+		}
+		for _,id := range maxid{
+			d_ := b.Get(id)
+			if d_ == nil {
+				continue
+			}
+			p_ := &Page{}
+			err := json.Unmarshal(d_,p_)
+			if err != nil{
+				fmt.Println(err)
+				continue
+			}
+			hand(p_)
+			//pa = append(pa,p_)
+			for i:=0;i< len(p_.Children);i+=8{
+				d__ := b.Get(p_.Children[i:i+8])
+				if d__ == nil {
+					continue
+				}
+				p__ := &Page{}
+				err =  json.Unmarshal(d__,p__)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				hand(p__)
+				//pa = append(pa,p__)
+			}
+		}
+		return nil
+	})
+	//if err != nil {
+	//	return err
+	//	//fmt.Println(err)
+	//}
+	//if len(pa)==0 {
+	//	return fmt.Errorf("page == 0 ")
+	//}
+
+
+}
+
+func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(k,v []byte)error)error{
+
+	return db.View(func(tx *bolt.Tx)error{
+		b := tx.Bucket(Bucket)
+		if b == nil {
+			return fmt.Errorf("%s ==nil",Bucket)
+		}
+		c := b.Cursor()
+		for k,v := c.Seek(beginkey);k!= nil;k,v = c.Next(){
+			err := hand(k,v)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+func ReadPageList(begin []byte,max int) (list []*Page,err error){
+	list = make([]*Page,0,max)
+	err = EachDB(DbPage,pageBucket,begin,func(k,v []byte)error{
+		p := &Page{}
+		er := json.Unmarshal(v,p)
+		if er == nil {
+			list = append(list,p)
+			if len(list)>=max {
+				return io.EOF
+			}
+		}
+		return nil
+	})
+	return
+
+}

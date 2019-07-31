@@ -38,6 +38,7 @@ func NewPagevod() (v *Pagevod) {
 	v.Id=make([]byte,8)
 	binary.BigEndian.PutUint64(v.Id,uint64(time.Now().UnixNano()))
 	return
+
 }
 func (self *Pagevod) loadPage(uri string,) error {
 
@@ -67,7 +68,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 
 		tt := doc.Find(".ibox.playBox .vodplayinfo").Text()
 		self.vod = regS.FindAllString(tt,-1)
-		if len(self.vod)==0{
+		if len(self.vod) == 0{
 			fmt.Println(tt)
 			return fmt.Errorf("find Not vod")
 		}
@@ -78,7 +79,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 }
 func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 
-	self.Content =contentTag + strings.Join(self.vod," ")
+	self.Content = contentTag + strings.Join(self.vod,"|")
 	IdMap := map[string]float64{}
 	for _,_k := range self.key{
 		k := []byte(_k)
@@ -114,24 +115,13 @@ func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 
 func (self *Pagevod)CheckOldVod()error{
 
-	db_,err := bolt.Open(WordDB,0600,nil)
-	if err != nil {
-		return err
-	}
-	defer db_.Close()
-	tx_,err := db_.Begin(true)
+	tx_,err := DbWord.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx_.Commit()
 	wordb := tx_.Bucket(WordBucket)
-
-	db,err := bolt.Open(PageDB,0600,nil)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	tx,err := db.Begin(true)
+	tx,err := DbPage.Begin(true)
 	if err != nil {
 		return err
 	}
@@ -164,13 +154,12 @@ func (self *Pagevod)CheckOldVod()error{
 func syncRunPageVod(){
 	for{
 		findPageVod()
-		<-time.After(1*time.Second)
+		<-time.After(1*time.Hour)
 	}
 }
 func findPageVod(){
 	i:=1
-	for c:=0;c<5000;{
-
+	for c:=0;c<20000;{
 		err:= getList(i,func(u,d string)error{
 			pv := NewPagevod()
 			err:=  pv.loadPage(u)
