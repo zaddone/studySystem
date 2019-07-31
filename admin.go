@@ -7,7 +7,7 @@ import(
 	"encoding/binary"
 	"fmt"
 	"io"
-	//"net/url"
+	"net/url"
 	"encoding/base64"
 
 	//"encoding/json"
@@ -21,6 +21,26 @@ func main(){
 	Router.GET("/",func(c *gin.Context){
 		c.HTML(http.StatusOK,"index.tmpl",nil)
 	})
+	Router.GET("/del",func(c *gin.Context){
+		id_,err := url.QueryUnescape(c.Query("id"))
+		if err != nil{
+			c.String(http.StatusNotFound,fmt.Sprintln(err))
+			return
+		}
+		id,err := base64.StdEncoding.DecodeString(id_)
+		if err != nil{
+			c.String(http.StatusNotFound,fmt.Sprintln(err))
+			return
+		}
+		err = chrome.DelPage(id)
+		if err != nil {
+			c.String(http.StatusNotFound,fmt.Sprintln(err))
+			return
+		}
+		chrome.WXDBDeleteChan <- []string{fmt.Sprintf("%d",binary.BigEndian.Uint64(id))}
+
+		c.JSON(http.StatusOK,gin.H{"msg":"Success"})
+	})
 	Router.GET("/search/:key",func(c *gin.Context){
 		plist := make([]*chrome.Page,0,10)
 		err := chrome.SearchPage(c.Param("key"),func(p *chrome.Page){
@@ -28,6 +48,7 @@ func main(){
 		})
 		if err != nil {
 			c.String(http.StatusNotFound,fmt.Sprintln(err))
+			return
 		}
 		c.JSON(http.StatusOK,gin.H{"dblist":plist,"count":len(plist)})
 	})

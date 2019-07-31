@@ -19,7 +19,7 @@ import(
 var (
 	regTitle *regexp.Regexp = regexp.MustCompile(`[\p{Han}]+`)
 )
-func clearLocalDB(hand func([]string)error) error {
+func clearLocalDB(max int,hand func([]string)error) error {
 
 	//db,err := bolt.Open(PageDB,0600,nil)
 	//if err != nil {
@@ -40,7 +40,7 @@ func clearLocalDB(hand func([]string)error) error {
 	var klink []byte
 	var klinkStr []string
 	p:= &Page{}
-	for k,v := c.First();k!=nil&&len(klinkStr)<100;k,v = c.Next(){
+	for k,v := c.First();k!=nil&&len(klinkStr)<max;k,v = c.Next(){
 		err = json.Unmarshal(v,p)
 		if err == nil {
 			if strings.HasSuffix(p.Content,contentTag){
@@ -165,7 +165,15 @@ func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
 	})
 }
 
-
+func DelPage(id []byte) (err error) {
+	return DbPage.Batch(func(tx *bolt.Tx)error{
+		b := tx.Bucket(pageBucket)
+		if b== nil {
+			return fmt.Errorf("b == nil")
+		}
+		return b.Delete(id)
+	})
+}
 
 func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)bool) (p *Page) {
 	pagedb := b.Get(id)

@@ -42,7 +42,8 @@ var (
 	rea *regexp.Regexp
 	rej *regexp.Regexp
 	uris = config.Conf.ToutiaoUri
-	WXDBPushChan = make(chan pageInterface,10)
+	WXDBPushChan = make(chan pageInterface,100)
+	WXDBDeleteChan = make(chan []string,100)
 	WordDB = "word.db"
 	PageDB = "page.db"
 	pageBucket = []byte("page")
@@ -60,19 +61,27 @@ type pageInterface interface {
 }
 func syncPushWXDB(){
 	for{
-		p:=<-WXDBPushChan
-		fmt.Println(p.GetTitle())
-		body,ids := p.ToWXString()
-		if p.GetUpdate(){
-			err := wxmsg.UpdateWXDB(config.Conf.CollPageName,fmt.Sprintf("%d",p.GetId()),body)
+		select{
+		case p:=<-WXDBPushChan:
+			fmt.Println(p.GetTitle())
+			body,ids := p.ToWXString()
+			if p.GetUpdate(){
+				err := wxmsg.UpdateWXDB(config.Conf.CollPageName,fmt.Sprintf("%d",p.GetId()),body)
+				if err != nil {
+					log.Println(err)
+				}
+			}else{
+				err := wxmsg.SaveToWXDB(body)
+				if (err == nil) && (len(ids)>0) {
+					err = wxmsg.UpdateToWXDB(p.GetId(),ids[:1])
+				}
+			}
+		case ids := <-WXDBDeleteChan:
+			err := wxmsg.DBDelete(ids)
 			if err != nil {
 				log.Println(err)
 			}
-		}else{
-			err := wxmsg.SaveToWXDB(body)
-			if (err == nil) && (len(ids)>0) {
-				err = wxmsg.UpdateToWXDB(p.GetId(),ids[:1])
-			}
+
 		}
 	}
 
@@ -123,8 +132,9 @@ func init(){
 				}
 				w.Wait()
 			}
-			UpWord()
 			findPageVod()
+			UpWord()
+			ClearDB(500)
 			<-time.After(15 * time.Minute)
 
 		}
@@ -175,11 +185,15 @@ func UpWord(){
 
 }
 
-func ClearDB() error {
+func ClearDB(max int) error {
 
 	fmt.Println("begin Clear")
 	return wxmsg.CollectionClearDB(func()error{
-		return clearLocalDB(wxmsg.DBDelete)
+		//return clearLocalDB(max,wxmsg.DBDelete)
+		return clearLocalDB(max,func(ids []string)error{
+			WXDBDeleteChan<-ids
+			return nil
+		})
 	})
 
 }

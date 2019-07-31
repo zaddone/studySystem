@@ -75,7 +75,7 @@ function pageHtml(data){
 	var items = [];
 	  last = next;
 	  $.each(data.dblist, function(key, val) {		
-	    items.push('<div class="col-md-4" ><p>'+val.Title+'</p><button type="button" data-text="'+val.Content+'" class="btn btn-primary" data-toggle="modal" data-target=".bd-modal-lg">context</button></div>');
+	    items.push('<div class="col-md-4" id="li'+key+'" ><p>'+val.Title+'</p><button type="button" data-text="'+val.Content+'" class="btn btn-primary" data-toggle="modal" data-target=".bd-modal-lg">show</button><button id="del" type="button" data-text="'+val.Id+'" class="btn btn-secondary"  >del</button></div>');
 		next = val.Id
 	  });
 	  $('.row').html(items.join(''));
@@ -94,7 +94,6 @@ loadDB()
 $('#myLargeModalLabel').on('show.bs.modal', function (event) {
   var button = $(event.relatedTarget)
   var recipient =markdown.toHTML(button.data('text')); 
-	console.log(recipient)
   var modal = $(this)
   modal.find('.modal-body').html(recipient)
  
@@ -119,7 +118,19 @@ $('#Search').click(function(){
 	  success: pageHtml,
 	});
 })
-	 
+$('.row').on('click','#del',function(event){	
+	let but = $(this)	
+	let id = $(this).data("text")	
+	$.ajax({
+	  dataType: "json",
+	  url: '/del',	 
+	  data:{"id":encodeURIComponent(id)},
+	  success: function(res){
+		but.parent().remove();
+		console.log(res)
+		},
+	});
+});	 
 });
 </script>
   </body>
