@@ -1,6 +1,7 @@
 package main
 import(
 	"github.com/zaddone/studySystem/chrome"
+	"github.com/zaddone/studySystem/config"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -37,13 +38,15 @@ func main(){
 			c.String(http.StatusNotFound,fmt.Sprintln(err))
 			return
 		}
-		chrome.WXDBDeleteChan <- []string{fmt.Sprintf("%d",binary.BigEndian.Uint64(id))}
+		chrome.WXDBChan <- chrome.NewDelId(config.Conf.CollPageName,[]string{fmt.Sprintf("%d",binary.BigEndian.Uint64(id))})
 
 		c.JSON(http.StatusOK,gin.H{"msg":"Success"})
 	})
 	Router.GET("/search/:key",func(c *gin.Context){
 		plist := make([]*chrome.Page,0,10)
 		err := chrome.SearchPage(c.Param("key"),func(p *chrome.Page){
+			//p.Title += binary.BigEndian.Uint64(p.Id)
+			p.Title += fmt.Sprintln(binary.BigEndian.Uint64(p.Id))
 			plist = append(plist,p)
 		})
 		if err != nil {
@@ -51,6 +54,9 @@ func main(){
 			return
 		}
 		c.JSON(http.StatusOK,gin.H{"dblist":plist,"count":len(plist)})
+	})
+	Router.GET("/pagejson",func(c *gin.Context){
+		c.JSON(http.StatusOK,gin.H{"msg":fmt.Sprintln(chrome.PageJsonFile())})
 	})
 	Router.GET("/showlist/:max",func(c *gin.Context){
 		be := c.DefaultQuery("begin","")

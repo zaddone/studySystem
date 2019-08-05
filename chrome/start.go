@@ -7,6 +7,7 @@ import(
 	"io/ioutil"
 	"os/exec"
 	"io"
+	"os"
 	"bytes"
 	"strings"
 	"regexp"
@@ -14,7 +15,7 @@ import(
 	"log"
 	"html"
 	"encoding/json"
-	//"encoding/binary"
+	"encoding/binary"
 	"github.com/lunny/html2md"
 	"github.com/zaddone/studySystem/request"
 	"github.com/gorilla/websocket"
@@ -41,16 +42,23 @@ var (
 	rec *regexp.Regexp
 	rea *regexp.Regexp
 	rej *regexp.Regexp
+	regTag *regexp.Regexp
+
 	uris = config.Conf.ToutiaoUri
-	WXDBPushChan = make(chan pageInterface,100)
-	WXDBDeleteChan = make(chan []string,100)
+	//WXDBPushChan = make(chan *UpdateId,100)
+	//WXDBDeleteChan = make(chan *DelId,100)
+	WXDBChan = make(chan interface{},100)
 	WordDB = "word.db"
 	PageDB = "page.db"
 	pageBucket = []byte("page")
+	pageListBucket = []byte("pageList")
+	//pageVodBucket = []byte("pageVod")
 	WordBucket = []byte("word")
 
 	DbWord *bolt.DB
 	DbPage *bolt.DB
+	//WordTmp string
+	//pageTmp string
 
 )
 type pageInterface interface {
@@ -59,33 +67,60 @@ type pageInterface interface {
 	GetUpdate() bool
 	GetTitle() string
 }
+
+type DelId struct{
+	coll string
+	ids []string
+}
+func NewDelId(c string,i []string) *DelId {
+	return &DelId{coll:c,ids:i}
+}
+type UpdateId struct{
+	id uint64
+	ids []string
+}
+type UpdateFile struct{
+	coll string
+	uri string
+}
+
 func syncPushWXDB(){
 	for{
-		select{
-		case p:=<-WXDBPushChan:
-			fmt.Println(p.GetTitle())
-			body,ids := p.ToWXString()
-			if p.GetUpdate(){
-				err := wxmsg.UpdateWXDB(config.Conf.CollPageName,fmt.Sprintf("%d",p.GetId()),body)
-				if err != nil {
-					log.Println(err)
-				}
-			}else{
-				err := wxmsg.SaveToWXDB(body)
-				if (err == nil) && (len(ids)>0) {
-					err = wxmsg.UpdateToWXDB(p.GetId(),ids[:1])
-				}
-			}
-		case ids := <-WXDBDeleteChan:
-			err := wxmsg.DBDelete(ids)
+		p := <-WXDBChan
+		switch rs := p.(type) {
+		case *DelId:
+			fmt.Println("del")
+			err := wxmsg.DBDelete(rs.coll,rs.ids)
 			if err != nil {
-				log.Println(err)
+				log.Println("del",err)
 			}
-
+		case *UpdateId:
+			fmt.Println("update")
+			err := wxmsg.UpdateToWXDB(rs.id,rs.ids)
+			if err != nil {
+				log.Println("update",err)
+			}
+		case *UpdateFile:
+			fmt.Println("file")
+			err := wxmsg.UpDBToWX(rs.coll,rs.uri)
+			if err != nil {
+				log.Println("file",err)
+			}
+		default:
+			log.Println("default",p,rs)
 		}
+		//select{
+		//case p:=<-WXDBPushChan:
+		//	err = wxmsg.UpdateToWXDB(p.id,p.ids)
+		//case idsc := <-WXDBDeleteChan:
+		//	err := wxmsg.DBDelete(idsc.coll,idsc.ids)
+		//	if err != nil {
+		//		log.Println(err)
+		//	}
+		//}
 	}
-
 }
+
 func init(){
 	//fmt.Println("init")
 	var err error
@@ -97,7 +132,9 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
-	return
+	if !config.Conf.Coll{
+		return
+	}
 	//rej, err = regexp.Compile("\\<script[\\S\\s]+?\\</script\\>")
 	//if err != nil {
 	//	panic(err)
@@ -107,6 +144,12 @@ func init(){
 		panic(err)
 	}
 	//retitle, err = regexp.Compile(`title: \'[\s\s]+\'`)
+	//chineseTag: '军事',
+	regTag,err = regexp.Compile(`chineseTag: \'[\S\s]+?\'`)
+	if err != nil {
+		panic(err)
+	}
+
 	retitle, err = regexp.Compile(`title: \'[\S\s]+?\'`)
 	if err != nil {
 		panic(err)
@@ -122,7 +165,7 @@ func init(){
 	//return
 	go start(func(in string)error{
 		//findPageVod()
-		UpWord()
+		//UpWord()
 		w:=new(sync.WaitGroup)
 		for{
 			for _,u := range uris {
@@ -133,8 +176,8 @@ func init(){
 				w.Wait()
 			}
 			findPageVod()
-			UpWord()
-			ClearDB(500)
+			ClearDB()
+			updateFileToWX()
 			<-time.After(15 * time.Minute)
 
 		}
@@ -142,58 +185,36 @@ func init(){
 	})
 	log.Println("run")
 }
+func updateFileToWX() error {
 
-func UpWord(){
-	word := "word"
-	w,err := getWord()
-	log.Println("word begin",len(w))
+	_,err := os.Stat(string(WordBucket))
 	if err != nil {
-		log.Println(err)
-		return
-	}
-	err = wxmsg.DeleteColl(word)
-	if err != nil {
-		log.Println(err)
-	}
-	err = wxmsg.CreateColl(word)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	ci :=0
-	var db [][]string
-	var d []string
-	for k,v := range w {
-		ci++
-		d = append(d,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k,strings.Join(v,",")))
-		if ci>=100{
-			ci=0
-			db = append(db,d)
-			d = nil
-		}
-
-	}
-	for _,d := range db {
-		//fmt.Println(strings.Join(d,","))
-		err = wxmsg.AddToWXDB(word,strings.Join(d,","))
+		err = WordJsonFile()
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 	}
-
+	WXDBChan<-&UpdateFile{string(pageBucket),string(pageBucket)}
+	<-time.After(1 * time.Minute)
+	WXDBChan<-&UpdateFile{string(WordBucket),string(WordBucket)}
+	//time.Sleep()
+	return nil
 
 }
 
-func ClearDB(max int) error {
+
+func ClearDB() error {
 
 	fmt.Println("begin Clear")
+
 	return wxmsg.CollectionClearDB(func()error{
 		//return clearLocalDB(max,wxmsg.DBDelete)
-		return clearLocalDB(max,func(ids []string)error{
-			WXDBDeleteChan<-ids
+		return clearLocalDB(func(ids []string,idw []string)error{
+			WXDBChan<-&DelId{config.Conf.CollPageName,ids}
+			WXDBChan<-&DelId{string(WordBucket),idw}
 			return nil
 		})
+
 	})
 
 }
@@ -519,25 +540,26 @@ func extract(uri string) error {
 		}
 		err,p := _extract(db)
 		if err != nil {
-			//fmt.Println(err)
 			return err
-		}else{
-			//wxmsg.SaveToWXDB(p.ToWXString())
-			//fmt.Println(p.Title)
-			WXDBPushChan<-p
-
-			//body,ids := p.ToWXString()
-			//err := wxmsg.SaveToWXDB(body)
-			//if (err == nil) && (len(ids)>0) {
-			//	err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids[:1])
-			//}
-			//if err != nil {
-			//	fmt.Println(err)
-			//}
-
 		}
+		f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+		if err != nil {
+			panic(err)
+		}
+		s_,ids := p.ToWXString()
+		WXDBChan<-&UpdateId{p.GetId(),ids}
+		fmt.Println(p.Title)
+		_,err = f.WriteString(s_)
+		return f.Close()
+		//err := wxmsg.SaveToWXDB(body)
+		//if (err == nil) && (len(ids)>0) {
+		//	err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids[:1])
+		//}
+		//if err != nil {
+		//	fmt.Println(err)
+		//}
 		//fmt.Println(string(db))
-		return nil
+		//return nil
 	})
 
 }
@@ -553,6 +575,10 @@ func html2Text(t string) string {
 
 func _extract(body []byte) (error,*Page) {
 
+	//tag := regTag.Findindex(body)
+	//if len(loc)==0 {
+	//	return fmt.Errorf("Not Found tag"),nil
+	//}
 	loc := retitle.FindIndex(body)
 	if len(loc)==0 {
 		return fmt.Errorf("Not Found title"),nil
@@ -570,7 +596,7 @@ func _extract(body []byte) (error,*Page) {
 		html2Text(
 		html.UnescapeString(
 		string(body[loc_[0]+10:loc_[1]-1]))),"")),"\"","",-1),
-		//className,
+		"page",
 	)
 	//fmt.Println(p.Content)
 	err := p.CheckUpdateWork()
@@ -649,6 +675,8 @@ func SearchPage(key string,hand func(p *Page)) error {
 				fmt.Println(err)
 				continue
 			}
+
+			//p_.Title += binary.BigEndian.Uint64(id)
 			hand(p_)
 			//pa = append(pa,p_)
 			for i:=0;i< len(p_.Children);i+=8{
@@ -679,7 +707,7 @@ func SearchPage(key string,hand func(p *Page)) error {
 
 }
 
-func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(k,v []byte)error)error{
+func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(b *bolt.Bucket,k,v []byte)error)error{
 
 	return db.View(func(tx *bolt.Tx)error{
 		b := tx.Bucket(Bucket)
@@ -688,7 +716,7 @@ func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(k,v []byte)error
 		}
 		c := b.Cursor()
 		for k,v := c.Seek(beginkey);k!= nil;k,v = c.Next(){
-			err := hand(k,v)
+			err := hand(b,k,v)
 			if err != nil {
 				return err
 			}
@@ -696,12 +724,91 @@ func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(k,v []byte)error
 		return nil
 	})
 }
+func getFileTmpName(w []byte) string{
+	return fmt.Sprintf("%s_%d",w,time.Now().UnixNano())
+}
+func WordJsonFile()error{
+	//WordTmp = getFileTmpName(WordBucket)
+	f,err := os.OpenFile(string(WordBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return EachDB(DbWord,WordBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
+		le := len(v)
+		lev := le/8
+		if lev>50 {
+			return nil
+		}
+		nolist := make([]string,0,lev)
+		for i:=0;i<le;i+=8 {
+			pid := v[i:i+8]
+			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)))
+		}
+
+		 _,err = f.WriteString(fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
+		return err
+	})
+
+}
+func PageJsonFile()error{
+
+	f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	p := &Page{}
+	//p_ := &Page{}
+	var list,vodlist []byte
+	err = EachDB(DbPage,pageBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
+		err = json.Unmarshal(v,p)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(p.Content,contentTag){
+			vodlist = append(vodlist,k...)
+		}else{
+			list = append(list,k...)
+		}
+		p.relevant = append(p.Children,p.Par...)
+		p_db,_ := p.ToWXString()
+		_,err = f.WriteString(p_db)
+		return err
+
+	})
+	if err != nil {
+		return err
+	}
+	tx,err := DbPage.Begin(true)
+	if err != nil{
+		return err
+	}
+	bl,err := tx.CreateBucketIfNotExists(pageListBucket)
+	if err != nil{
+		return err
+	}
+	err = bl.Put([]byte("page"),list)
+	if err != nil {
+		return err
+	}
+	err = bl.Put([]byte("vod"),vodlist)
+	if err != nil {
+		return err
+	}
+	fmt.Println(len(list)/8,len(vodlist)/8)
+	return tx.Commit()
+
+
+}
+
 func ReadPageList(begin []byte,max int) (list []*Page,err error){
 	list = make([]*Page,0,max)
-	err = EachDB(DbPage,pageBucket,begin,func(k,v []byte)error{
+	err = EachDB(DbPage,pageBucket,begin,func(b *bolt.Bucket,k,v []byte)error{
 		p := &Page{}
 		er := json.Unmarshal(v,p)
 		if er == nil {
+			p.Title += fmt.Sprintln(binary.BigEndian.Uint64(k))
 			list = append(list,p)
 			if len(list)>=max {
 				return io.EOF

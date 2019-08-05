@@ -1,6 +1,7 @@
 package chrome
 import(
 	"io"
+	"os"
 	"fmt"
 	"log"
 	"regexp"
@@ -32,9 +33,11 @@ type Pagevod struct{
 func NewPagevod() (v *Pagevod) {
 
 	v = &Pagevod{
+		//page.Tag:"vod",
 		//Id:make([]byte,8),
 		//IsVod:true,
 	}
+	v.Tag = "vod"
 	v.Id=make([]byte,8)
 	binary.BigEndian.PutUint64(v.Id,uint64(time.Now().UnixNano()))
 	return
@@ -48,7 +51,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 			return err
 		}
 		self.Title = doc.Find(".vodInfo .vodh h2").Text()
-		keyMap := map[string]int{self.Title:1}
+		keyMap := map[string]int{}
 		for _,l := range regW.FindAllString(self.Title,-1){
 			keyMap[l]+=1
 		}
@@ -65,7 +68,6 @@ func (self *Pagevod) loadPage(uri string,) error {
 			self.key=append(self.key,k)
 		}
 		//fmt.Println(self.key)
-
 		tt := doc.Find(".ibox.playBox .vodplayinfo").Text()
 		self.vod = regS.FindAllString(tt,-1)
 		if len(self.vod) == 0{
@@ -80,6 +82,9 @@ func (self *Pagevod) loadPage(uri string,) error {
 func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 
 	self.Content = contentTag + strings.Join(self.vod,"|")
+	if wb == nil {
+		return self.SaveDBBucket(pb)
+	}
 	IdMap := map[string]float64{}
 	for _,_k := range self.key{
 		k := []byte(_k)
@@ -138,7 +143,7 @@ func (self *Pagevod)CheckOldVod()error{
 			log.Println(err)
 			continue
 		}
-		if !strings.HasSuffix(self.Content,contentTag){
+		if !strings.HasPrefix(self.Content,contentTag){
 			continue
 		}
 		if len(self.vod)==(len(strings.Split(self.Content,"|"))-1) {
@@ -148,7 +153,7 @@ func (self *Pagevod)CheckOldVod()error{
 		self.update = true
 		break
 	}
-	return self.SaveVod(wordb,pageb)
+	return self.SaveVod(nil,pageb)
 
 }
 func syncRunPageVod(){
@@ -161,17 +166,34 @@ func findPageVod(){
 	i:=1
 	for c:=0;c<20000;{
 		err:= getList(i,func(u,d string)error{
+			//fmt.Println(u,d)
 			pv := NewPagevod()
 			err:=  pv.loadPage(u)
 			if err != nil {
 				return err
 			}
-			WXDBPushChan<-pv
 			c++
-			return nil
+			//fmt.Println(pv)
+			body,ids := pv.ToWXString()
+			//fmt.Println(pv.Title)
+			WXDBChan<-&UpdateId{pv.GetId(),ids}
+			f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			if err != nil{
+				return err
+			}
+			defer f.Close()
+			_,err = f.WriteString(body)
+			if err != nil {
+				return err
+			}
+			return pv.SaveToList()
 		})
 		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
 		i++
 	}
@@ -179,6 +201,7 @@ func findPageVod(){
 }
 
 func getList(page int,readPage func(uri string,datetime string)error) error{
+	//fmt.Println("page",page)
 	return request.ClientHttp(fmt.Sprintf("%s/?m=vod-index-pg-%d.html",rootUrl,page),"GET",[]int{304,200},nil,func(body io.Reader)error{
 		doc,err := goquery.NewDocumentFromReader(body)
 		if err != nil {

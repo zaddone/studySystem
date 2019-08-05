@@ -1,15 +1,19 @@
 package wxmsg
 import(
+	"os"
 	"io"
+	"io/ioutil"
 	"fmt"
 	"bytes"
 	"strings"
 	"net/url"
 	"net/http"
+	"mime/multipart"
 	//"io/ioutil"
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/config"
 	"encoding/json"
+	"path/filepath"
 	"time"
 )
 var(
@@ -45,7 +49,6 @@ func init(){
 		"appid":	[]string{config.Conf.WXAppid},
 		"secret":	[]string{config.Conf.WXSec},
 	}).Encode())
-
 	//fmt.Println(wxToKenUrl)
 	k := setToken()
 	fmt.Println("setToKen",k)
@@ -131,14 +134,15 @@ func CreateColl(c_name string) error {
 
 }
 
-func DBDelete(ids []string)error {
+func DBDelete(coll string,ids []string)error {
 	fmt.Println(ids)
 	return PostRequest(
 		"https://api.weixin.qq.com/tcb/databasedelete",
 		map[string]interface{}{
 			"query":fmt.Sprintf(
 				"db.collection(\"%s\").where({_id:db.command.in([%s])}).remove()",
-				config.Conf.CollPageName,
+				coll,
+				//config.Conf.CollPageName,
 				strings.Join(ids,","))},
 		func(body io.Reader)error{
 
@@ -207,22 +211,235 @@ func AddToWXDB(coll string,body string) error {
 	}
 	return nil
 }
+
 func SaveToWXDB(body string) error {
+
 	return AddToWXDB(config.Conf.CollPageName,body)
-	//fmt.Println(body)
-	//var res  map[string]interface{}
-	//err := PostRequest(
-	//	"https://api.weixin.qq.com/tcb/databaseadd",
-	//	map[string]interface{}{
-	//		"query":fmt.Sprintf("db.collection(\"%s\").add({data:[%s]})",config.Conf.CollPageName,body)},
-	//	func(body io.Reader)error{
-	//	return json.NewDecoder(body).Decode(&res)
-	//})
+}
+func UpDBToWX(coll,uri string)error{
+	fp,pid,err := UpFileToWX(uri)
+	if err != nil {
+		//panic(err)
+		return err
+	}
+	var res map[string]interface{}
+	err = PostRequest(
+		"https://api.weixin.qq.com/tcb/databasemigrateimport",
+		map[string]interface{}{
+			"collection_name":coll,
+			"file_path":fp,
+			"file_type":1,
+			"stop_on_error":false,
+			"conflict_mode":2,
+		},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil{
+		//panic(err)
+		return err
+	}
+	if res["errcode"].(float64) != 0 {
+		return fmt.Errorf(res["errmsg"].(string))
+	}
+	job_id := res["job_id"]
+	for {
+		<-time.After(5*time.Second)
+		err = PostRequest(
+			"https://api.weixin.qq.com/tcb/databasemigratequeryinfo",
+			map[string]interface{}{
+				"job_id":job_id,
+			},
+			func(body io.Reader)error{
+			return json.NewDecoder(body).Decode(&res)
+		})
+		if err != nil {
+			return err
+			//log.Println(err)
+		}
+		if res["errcode"].(float64) != 0 {
+			return fmt.Errorf(res["errmsg"].(string))
+		}
+		if strings.EqualFold(res["status"].(string),"success"){
+			fmt.Println(res)
+			break
+		}
+
+	}
+	err = PostRequest(
+			"https://api.weixin.qq.com/tcb/batchdeletefile",
+			map[string]interface{}{
+				"fileid_list":[]string{pid},
+			},
+			func(body io.Reader)error{
+			return json.NewDecoder(body).Decode(&res)
+		})
+	if res["errcode"].(float64) != 0 {
+		fmt.Println(res)
+		return fmt.Errorf(res["errmsg"].(string))
+	}
+	return os.Remove(uri)
+
+}
+
+
+func UpFileToWX(uri string) (string,string,error) {
+
+	//fmt.Println(uri)
+	fi,err := os.Stat(uri)
+	if err != nil {
+		return "","",err
+	}
+
+	fileName := fmt.Sprintf("%s_%d",fi.Name(),time.Now().UnixNano())
+	var res  map[string]interface{}
+	err = PostRequest(
+		"https://api.weixin.qq.com/tcb/uploadfile",
+		map[string]interface{}{
+			"path":fileName,
+		},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil {
+		panic(err)
+		return "","",err
+	}
+	params := map[string]io.Reader{
+		"key":strings.NewReader(fileName),
+		"Signature":strings.NewReader(res["authorization"].(string)),
+		"x-cos-security-token":strings.NewReader(res["token"].(string)),
+		"x-cos-meta-fileid":strings.NewReader(res["cos_file_id"].(string)),
+		"file":mustOpen(uri),
+	}
+	//client := http.DefaultClient
+	err = Upload(res["url"].(string), params,fileName)
+	if err != nil {
+		panic(err)
+	}
+	//fmt.Println(res["file_id"].(string))
+	//return res["file_id"].(string),nil
+	return fileName,res["file_id"].(string),nil
+
+	//req,err := NewUploadRequest(res["url"].(string),params,"file",uri)
 	//if err != nil {
-	//	return err
+	//	panic(err)
+	//	return "",err
 	//}
-	//if res["errcode"].(float64) != 0 {
-	//	return fmt.Errorf("%.0f %s",res["errcode"].(float64),res["errmsg"].(string))
+	//resp, err := http.DefaultClient.Do(req)
+	////resp, err := http.Client.Do(req)
+	//if err != nil {
+	//	panic(err)
+	//	return "", err
 	//}
-	//return nil
+	//defer resp.Body.Close()
+	//db ,err  := ioutil.ReadAll(resp.Body)
+	//if err != nil {
+	//	return "",err
+	//}
+	//if bytes.Contains(db,[]byte("Error")){
+	//	return "",fmt.Errorf(string(db))
+	//}
+	//var ret interface{}
+	//if err := json.NewDecoder(resp.Body).Decode(&ret); err != nil {
+	//	panic(err)
+	//	return "",err
+	//}
+	//fmt.Println(ret)
+	//return res["file_id"].(string),nil
+
+}
+func Upload(url string, values map[string]io.Reader,fileName string) (err error) {
+    // Prepare a form that you will submit to that URL.
+    var b bytes.Buffer
+    w := multipart.NewWriter(&b)
+    for key, r := range values {
+        var fw io.Writer
+        if x, ok := r.(io.Closer); ok {
+            defer x.Close()
+        }
+        // Add an image file
+        if _, ok := r.(*os.File); ok {
+	//	fmt.Println(x.Name())
+            if fw, err = w.CreateFormFile(key,fileName); err != nil {
+                return
+            }
+        } else {
+            // Add other fields
+            if fw, err = w.CreateFormField(key); err != nil {
+                return
+            }
+        }
+        if _, err = io.Copy(fw, r); err != nil {
+            return err
+        }
+
+    }
+
+    w.Close()
+    req, err := http.NewRequest("POST", url, &b)
+    if err != nil {
+        return
+    }
+    req.Header.Set("Content-Type", w.FormDataContentType())
+    //fmt.Println()
+	Cli := &http.Client{}
+    res, err := Cli.Do(req)
+    if err != nil {
+        return
+    }
+    if res.StatusCode != 204 {
+
+	db ,err  := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(db))
+        return fmt.Errorf("bad status: %s", res.Status)
+    }
+    return
+}
+
+func mustOpen(f string) *os.File {
+    r, err := os.Open(f)
+    if err != nil {
+        panic(err)
+    }
+    return r
+}
+func NewUploadRequest(link string, params map[string]string, name, path string) (*http.Request, error) {
+	fp, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer fp.Close()
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	//part, err := writer.CreateFormField(name)
+	part, err := writer.CreateFormFile(name, filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(part, fp)
+	if err != nil {
+		return nil, err
+	}
+	for key, val := range params {
+		//fmt.Println(key,val)
+		err = writer.WriteField(key, val)
+		if err != nil {
+			return nil, err
+		}
+	}
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", link, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "multipart/form-data")
+	//fmt.Println(req.MultipartForm.Value)
+	return req, nil
 }

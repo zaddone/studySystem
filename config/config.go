@@ -31,6 +31,7 @@ type Config struct {
 	ToutiaoUri []string
 	//UserInfo *url.Values
 	OutKey string
+	MaxPage int
 	//Site []*SitePage
 }
 func (self *Config) Save(fileName string){
@@ -56,6 +57,7 @@ func NewConfig(fileName string)  *Config {
 		//c.UserArr=[]string{"lqylqjd","lqylxhsq","lqyyhsq","lqyjpc"}
 		c.Coll = true
 		c.Proxy = ""
+		c.MaxPage = 300
 		c.KvDbPath="MyKV.db"
 		c.DeduPath="dedu.db"
 		c.Static = "static"
@@ -68,13 +70,13 @@ func NewConfig(fileName string)  *Config {
 		c.CollPageName = "pageColl"
 		c.OutKey="头条客户端|头条号|公众号|打赏|转载|订购|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
 		c.ToutiaoUri = []string{
-			"https://www.toutiao.com",
+			//"https://www.toutiao.com",
 			"https://www.toutiao.com/ch/news_hot/",
-			"https://www.toutiao.com/ch/news_finance/",
-			"https://www.toutiao.com/ch/news_baby/",
-			"https://www.toutiao.com/ch/news_regimen/",
-			"https://www.toutiao.com/ch/news_sports/",
-			"https://www.toutiao.com/ch/news_essay/",
+			//"https://www.toutiao.com/ch/news_finance/",
+			//"https://www.toutiao.com/ch/news_baby/",
+			//"https://www.toutiao.com/ch/news_regimen/",
+			//"https://www.toutiao.com/ch/news_sports/",
+			//"https://www.toutiao.com/ch/news_essay/",
 		}
 		c.Header = http.Header{
 			//"Content-Type":[]string{"application/x-www-form-urlencoded","multipart/form-data"},

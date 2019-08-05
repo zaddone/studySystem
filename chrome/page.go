@@ -9,6 +9,7 @@ import(
 	"encoding/binary"
 	"encoding/json"
 	"net/url"
+	"os"
 	//"sync"
 	"github.com/boltdb/bolt"
 	"github.com/zaddone/studySystem/config"
@@ -18,8 +19,9 @@ import(
 
 var (
 	regTitle *regexp.Regexp = regexp.MustCompile(`[\p{Han}]+`)
+	regT *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|A-Z|\p{Han}]+`)
 )
-func clearLocalDB(max int,hand func([]string)error) error {
+func clearLocalDB(hand func([]string,[]string)error) error {
 
 	//db,err := bolt.Open(PageDB,0600,nil)
 	//if err != nil {
@@ -31,35 +33,32 @@ func clearLocalDB(max int,hand func([]string)error) error {
 		return err
 	}
 	//tx.Commit()
-	b := tx.Bucket(pageBucket)
+	b := tx.Bucket(pageListBucket)
 	if b == nil {
 		return fmt.Errorf("b == nil")
 	}
-	c := b.Cursor()
-	//p := &Page{}
-	var klink []byte
+	li := b.Get([]byte("page"))
+	pli := len(li)  - config.Conf.MaxPage*8
+
+	if pli < 1  {
+		return fmt.Errorf("%d",pli)
+	}
+
+	klink:=li[:pli]
 	var klinkStr []string
-	p:= &Page{}
-	for k,v := c.First();k!=nil&&len(klinkStr)<max;k,v = c.Next(){
-		err = json.Unmarshal(v,p)
-		if err == nil {
-			if strings.HasSuffix(p.Content,contentTag){
-				continue
-			}
-		}
-		klink = append(klink,k...)
-		klinkStr = append(klinkStr,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(k)))
+	for i:=0;i<pli;{
+		I := i+8
+		k := li[i:I]
 		err = b.Delete(k)
 		if err != nil {
 			panic(err)
 		}
+		klinkStr = append(klinkStr,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(k)))
+
+		err = b.Delete(k)
+		i = I
 	}
-	//fmt.Println(klinkStr)
-	//db_,err := bolt.Open(WordDB,0600,nil)
-	//if err != nil {
-	//	return err
-	//}
-	//defer db_.Close()
+
 	tx_,err := DbWord.Begin(true)
 	if err != nil {
 		return err
@@ -68,27 +67,47 @@ func clearLocalDB(max int,hand func([]string)error) error {
 	if b_ == nil {
 		return fmt.Errorf("b == nil")
 	}
+
+	//WordTmp = getFileTmpName(WordBucket)
+	fn := string(WordBucket)
+	_,err = os.Stat(fn)
+	if err == nil {
+		os.Remove(fn)
+	}
+	f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	if err != nil {
+		return err
+	}
 	c_ := b_.Cursor()
+	var klinkWord []string
 	for k,v := c_.First();k!= nil;k,v = c_.Next(){
 		vlen := len(v)
 		var nv []byte
+		nolist := make([]string,0,vlen/8)
 		for i:=0;i<vlen;i+=8{
 			_v := v[i:i+8]
 			if !bytes.Contains(klink,_v){
 				nv=append(nv,_v...)
+				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(_v)))
 			}
 		}
 		lenv := len(nv)
 		if lenv == 0 {
 			//fmt.Println("-",string(k))
 			b_.Delete(k)
+			if lenv/8 < 50 {
+				klinkWord = append(klinkWord,string(k))
+			}
 		}else{
 			if lenv != vlen {
 				b_.Put(k,nv)
+				_,err = f.WriteString(fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
 			}
 		}
 	}
-	err = hand(klinkStr)
+
+	f.Close()
+	err = hand(klinkStr,klinkWord)
 	//fmt.Println("hand",err)
 	if err != nil {
 		return err
@@ -116,6 +135,7 @@ type Page struct {
 	relevant []byte
 	//class []byte
 	update bool
+	Tag string
 }
 func (self *Page) GetTitle() string{
 	return self.Title
@@ -128,6 +148,42 @@ func (self *Page)GetUpdate() bool {
 }
 func getWord() (wordlist map[string][]string,err error) {
 	wordlist = make(map[string][]string)
+	err = DbWord.Update(func(tx *bolt.Tx)error{
+		b := tx.Bucket(WordBucket)
+		if b == nil {
+			return fmt.Errorf("b = nil")
+		}
+		c := b.Cursor()
+		for k,v := c.First(); k!= nil ; k,v = c.Next() {
+			le := len(v)
+			//lev := le/8
+			noId := map[string][]byte{}
+			for i:=0;i<le;i+=8 {
+				pid := v[i:i+8]
+				noId[fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid))] = pid
+			}
+
+			nolist := make([]string,0,len(noId))
+			v_ := make([]byte,0,le)
+			for k,t := range noId {
+				nolist = append(nolist,k)
+				v_ = append(v_,t...)
+			}
+			if len(v_) < le {
+				b.Put(k,v_)
+			}
+			if len(noId)>50 {
+				continue
+			}
+			wordlist[string(k)] = nolist
+		}
+		return nil
+	})
+	return
+
+}
+func getWord_() (wordlist map[string][]string,err error) {
+	wordlist = make(map[string][]string)
 	err = DbWord.View(func(tx *bolt.Tx)error{
 		b := tx.Bucket(WordBucket)
 		if b == nil {
@@ -137,7 +193,7 @@ func getWord() (wordlist map[string][]string,err error) {
 		for k,v := c.First(); k!= nil ; k,v = c.Next() {
 			le := len(v)
 			lev := le/8
-			if lev < 2  || lev>50 {
+			if lev>50 {
 				continue
 			}
 			var noId []string
@@ -197,21 +253,28 @@ func findSetPage(id []byte,b *bolt.Bucket,handle func(*Page)bool) (p *Page) {
 
 func (self *Page) linkBucket(lid []byte,b *bolt.Bucket) error {
 
-	P := findSetPage(
-		lid,
-		b,
-		func(p *Page) bool {
-			self.relevant = append(self.relevant,p.Id...)
-			return len(self.relevant)<=10
-		},
-	)
-	if P == nil {
-		return fmt.Errorf("Not Find Page")
-	}
-	self.Par = lid
 
-	P.Children = append(P.Children,self.Id...)
-	return P.SaveDBBucket(b)
+	pagedb := b.Get(lid)
+	p := &Page{}
+	err := json.Unmarshal(pagedb,p)
+	if err != nil {
+		return err
+	}
+	//P := findSetPage(
+	//	lid,
+	//	b,
+	//	func(p *Page) bool {
+	//		self.relevant = append(self.relevant,p.Id...)
+	//		return len(self.relevant)<=10
+	//	},
+	//)
+	//if P == nil {
+	//	return fmt.Errorf("Not Find Page")
+	//}
+	self.Par = lid
+	self.relevant = append(p.Id,p.Children...)
+	p.Children = append(p.Children,self.Id...)
+	return p.SaveDBBucket(b)
 }
 
 func (self *Page) link(lid []byte) error {
@@ -230,6 +293,7 @@ func (self *Page) link(lid []byte) error {
 		//if !handle(p){
 		//	return nil
 		//}
+		//bytes.Replace(
 		self.relevant = append(p.Id,p.Children...)
 		//p = findSetPage(
 		//	lid,
@@ -253,12 +317,13 @@ func (self *Page) link(lid []byte) error {
 }
 
 
-func NewPage(title,content string) (p *Page) {
+func NewPage(title,content,tag string) (p *Page) {
 	p = &Page{
 		//Id:time.Now().UnixNano(),
 		Title:title,
 		Content:content,
 		Id:make([]byte,8),
+		Tag:tag,
 		//class:[]byte(class),
 	}
 	binary.BigEndian.PutUint64(p.Id,uint64(time.Now().UnixNano()))
@@ -274,17 +339,27 @@ func (self *Page) ToWXString() (string,[]string) {
 		fmt.Sprintf("\"%d\"",
 		binary.BigEndian.Uint64(self.relevant[i:i+8])))
 	}
-	if len(link)>10{
-		link = link[:10]
-	}
+	//if len(link)>10{
+	//	link = link[:10]
+	//}
 	//fmt.Println(link)
 	return fmt.Sprintf(
 		"{_id:\"%d\",link:[%s],title:\"%s\",text:\"%s\"}",
 		binary.BigEndian.Uint64(self.Id),
 		strings.Join(link,","),
-		self.Title,
+		strings.Join(regT.FindAllString(self.Title,-1)," "),
 		url.QueryEscape(self.Content)),link
 
+}
+func (self *Page) SaveToList()error{
+	return DbPage.Update(func(tx *bolt.Tx)error{
+		b,err := tx.CreateBucketIfNotExists(pageListBucket)
+		if err != nil {
+			return err
+		}
+		tag := []byte(self.Tag)
+		return b.Put(tag,append(b.Get([]byte(self.Tag)),self.Id...,))
+	})
 }
 
 func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
@@ -292,6 +367,17 @@ func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+	//err  = DbPage.Batch(func(tx *bolt.Tx)error{
+	//	b,err := tx.CreateBucketIfNotExists(pageListBucket)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	tag := []byte(self.Tag)
+	//	return b.Put(tag,append(b.Get([]byte(self.Tag)),self.Id...,))
+	//})
+	//if err != nil {
+	//	return err
+	//}
 	return b.Put(self.Id,v)
 }
 
@@ -300,18 +386,34 @@ func (self *Page) SaveDB() error {
 	if err != nil {
 		return err
 	}
+
+	//err  = DbPage.Update(func(tx *bolt.Tx)error{
+	//	b,err := tx.CreateBucketIfNotExists(pageListBucket)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	tag := []byte(self.Tag)
+	//	return b.Put(tag,append(b.Get([]byte(self.Tag)),self.Id...,))
+	//})
+	//if err != nil {
+	//	return err
+	//}
 	//db,err := bolt.Open(PageDB,0600,nil)
 	//if err != nil {
 	//	return err
 	//}
 	//defer db.Close()
-	return DbPage.Update(func(t *bolt.Tx)error{
+	err = DbPage.Update(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(pageBucket)
 		if err != nil {
 			return err
 		}
 		return b.Put(self.Id,v)
 	})
+	if err != nil {
+		return err
+	}
+	return self.SaveToList()
 
 }
 
@@ -323,7 +425,6 @@ func (self *Page) CheckUpdateWork() error {
 	if len(work) == 0 {
 		return fmt.Errorf("work = 0")
 	}
-
 	W :=map[string][]byte{}
 	DbWord.View(func(tx *bolt.Tx)error{
 		b := tx.Bucket(WordBucket)
