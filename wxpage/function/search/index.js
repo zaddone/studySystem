@@ -10,26 +10,16 @@ exports.main = async (event, context) => {
   //console.log(config)
   if (!config.data) return
   const res = await db.collection(config.data.collword).where({
-    //_id: db.command.in(event.words)
-    _id: db.RegExp({
-      regexp: event.words.join('|'),
-    })
+    _id: db.command.in(event.words)
+    //_id: db.RegExp({
+    //  regexp: event.words.join('|'),
+    //})
   }).get()
   if (res.data.length===0)return;
   let Idmap = new Map()
-  for (let k of res.data){
-    //console.log(k)
-    let max =1
-    for (let w of event.words){
-      if (k._id.indexOf(w)!= -1){
-        if (w.length>max)max=w.length
-      }
-    }
-    //console.log(k)
+  for (let k of res.data){   
     for (let l of k.link){      
-      Idmap.set(l, ((Idmap.get(l) || 0) + (1 / k.link.length )* max) )    
-      //console.log(l)  
-      //Idmap.set(l, ((Idmap.get(l) || 0) + 1))      
+      Idmap.set(l, ((Idmap.get(l) || 0) + (1 / k.link.length) * k._id.length) )    
     }
   }
   let list = []

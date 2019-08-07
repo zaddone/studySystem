@@ -15,7 +15,7 @@ import(
 )
 var (
 	regG *regexp.Regexp = regexp.MustCompile("伦理|福利|色情")
-	regW *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|\p{Han}]+`)
+	//regW *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|\p{Han}]+`)
 	regM *regexp.Regexp = regexp.MustCompile(`[0-9]+`)
 	regS = regexp.MustCompile(`\S+\$\S+\.m3u8`)
 	rootUrl string = "http://www.okzyw.com"
@@ -52,11 +52,13 @@ func (self *Pagevod) loadPage(uri string,) error {
 		}
 		self.Title = doc.Find(".vodInfo .vodh h2").Text()
 		keyMap := map[string]int{}
-		for _,l := range regW.FindAllString(self.Title,-1){
+		ts := regT.FindAllString(self.Title,-1)
+		//self.Title = strings.Join(ts," ")
+		for _,l := range ts{
 			keyMap[l]+=1
 		}
 		doc.Find(".vodinfobox li span").Each(func(i int,s *goquery.Selection){
-			for _,l := range regW.FindAllString(s.Text(),-1){
+			for _,l := range regT.FindAllString(s.Text(),-1){
 				kl := regM.ReplaceAllString(l,"")
 				if len(kl) ==0 {
 					continue
@@ -65,7 +67,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 			}
 		})
 		for k,_:= range keyMap {
-			self.key=append(self.key,k)
+			self.key=append(self.key,strings.ToLower(k))
 		}
 		//fmt.Println(self.key)
 		tt := doc.Find(".ibox.playBox .vodplayinfo").Text()
@@ -124,13 +126,15 @@ func (self *Pagevod)CheckToSaveVod()error{
 		return err
 	}
 	defer tx_.Commit()
+	wb := tx_.Bucket(WordBucket)
+
 	tx,err := DbPage.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx.Commit()
+	pageb := tx.Bucket(pageBucket)
 
-	wb := tx_.Bucket(WordBucket)
 	IdMap := map[string]float64{}
 	IdMapN := map[string]int{}
 	for _,_k := range self.key{
@@ -151,56 +155,59 @@ func (self *Pagevod)CheckToSaveVod()error{
 			i = I
 		}
 	}
-	var maxN int = 0
-	var maxID string
-	for k,v := range IdMapN {
-		if v > maxN {
-			maxN = v
-			maxID = k
+
+	if len(IdMap) >0 {
+		var maxN int = 0
+		var maxID string
+		for k,v := range IdMapN {
+			if v > maxN {
+				maxN = v
+				maxID = k
+			}
 		}
-	}
-
-
-	pageb := tx.Bucket(pageBucket)
-	if maxN == len(self.key){
-		db := pageb.Get([]byte(maxID))
+		if maxN == len(self.key){
+			db := pageb.Get([]byte(maxID))
+			p_ := &Page{}
+			err := json.Unmarshal(db,p_)
+			if err != nil {
+				panic(err)
+			}
+			if strings.EqualFold(self.Title,p_.Title){
+				if len(self.Content) > len(p_.Content) {
+					p_.Content = self.Content
+					fmt.Println(p_.Title)
+					p_.SaveDBBucket(pageb)
+					return nil
+				}else{
+					return fmt.Errorf("is same %s %s",self.Title,p_.Title)
+				}
+			}
+		}
+		var max float64 = 0
+		for k,v := range IdMap {
+			if v > max {
+				max = v
+				maxID = k
+			}
+		}
+		pid := []byte(maxID)
+		db := pageb.Get(pid)
 		p_ := &Page{}
-		err := json.Unmarshal(db,p_)
+		err = json.Unmarshal(db,p_)
 		if err != nil {
 			panic(err)
 		}
-		if strings.EqualFold(self.Title,p_.Title){
-			if len(self.Content) > len(p_.Content) {
-				p_.Content = self.Content
-				fmt.Println(p_.Title)
-				p_.SaveDBBucket(pageb)
-				return nil
-			}else{
-				return fmt.Errorf("is same %s %s",self.Title,p_.Title)
-			}
-		}
+		self.Par = pid
+		p_.Children = append(p_.Children,self.Id...)
+		p_.SaveDBBucket(pageb)
 	}
 
-	var max float64 = 0
-	for k,v := range IdMap {
-		if v > max {
-			max = v
-			maxID = k
-		}
-	}
-	pid := []byte(maxID)
-	db := pageb.Get(pid)
-	p_ := &Page{}
-	err = json.Unmarshal(db,p_)
-	if err != nil {
-		panic(err)
-	}
-	self.Par = pid
-	p_.Children = append(p_.Children,self.Id...)
-	fmt.Println(self.Title)
 	self.SaveDBBucket(pageb)
-	p_.SaveDBBucket(pageb)
+	fmt.Println(self.Title)
 	for _,_k := range self.key{
+		if len([]rune(_k)) <2 {
+			continue
+		}
 		k := []byte(_k)
 		b_ :=wb.Get(k)
 		if len(b_) == 0 {
@@ -209,6 +216,27 @@ func (self *Pagevod)CheckToSaveVod()error{
 			wb.Put(k,append(b_,self.Id...))
 		}
 	}
+
+	key := map[string]int{}
+	for _,l := range regT.FindAllString(self.Title,-1){
+		lr := regK.FindAllString(l,-1)
+		for j:=0;j<len(lr);j++{
+			for _j:=j+1;_j<len(lr);_j++ {
+				k :=strings.ToLower(strings.Join(lr[j:_j],""))
+				if len([]rune(k))>1{
+					key[k]+=1
+				}
+			}
+		}
+	}
+	for k_,_ := range key {
+		k:=[]byte(k_)
+		b_ :=wb.Get(k)
+		if len(b_)>0 {
+			wb.Put(k,append(b_,self.Id...))
+		}
+	}
+
 	return nil
 }
 
@@ -220,7 +248,8 @@ func syncRunPageVod(){
 }
 func findPageVod(){
 	i:=1
-	for c:=0;c<20000;{
+	//for c:=0;c<20;{
+	for c:=0;c<30000;{
 		err:= getList(i,func(u,d string)error{
 			//fmt.Println(u,d)
 			pv := NewPagevod()

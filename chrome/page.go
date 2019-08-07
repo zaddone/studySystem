@@ -20,6 +20,7 @@ import(
 var (
 	regTitle *regexp.Regexp = regexp.MustCompile(`[\p{Han}]+`)
 	regT *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|A-Z|\p{Han}]+`)
+	regK *regexp.Regexp = regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
 )
 func clearLocalDB(hand func([]string,[]string)error) error {
 
@@ -331,11 +332,11 @@ func (self *Page) ToWXString() (string) {
 	//fmt.Println(link)
 	par :=""
 	if len(self.Par)>0{
-		par = fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(self.Par))
+		par = fmt.Sprintf("%d",binary.BigEndian.Uint64(self.Par))
 	}
 
 	return fmt.Sprintf(
-		"{_id:\"%d\",par:%s,children:[%s],title:\"%s\",text:\"%s\"}",
+		"{_id:\"%d\",par:\"%s\",children:[%s],title:\"%s\",text:\"%s\"}",
 		binary.BigEndian.Uint64(self.Id),
 		par,
 		strings.Join(link,","),
@@ -361,17 +362,7 @@ func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
 	}
 
 	WXDBChan<-self.ToWXString()
-	//err  = DbPage.Batch(func(tx *bolt.Tx)error{
-	//	b,err := tx.CreateBucketIfNotExists(pageListBucket)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	tag := []byte(self.Tag)
-	//	return b.Put(tag,append(b.Get([]byte(self.Tag)),self.Id...,))
-	//})
-	//if err != nil {
-	//	return err
-	//}
+
 	return b.Put(self.Id,v)
 }
 
@@ -381,23 +372,6 @@ func (self *Page) SaveDB() error {
 	if err != nil {
 		return err
 	}
-
-	//err  = DbPage.Update(func(tx *bolt.Tx)error{
-	//	b,err := tx.CreateBucketIfNotExists(pageListBucket)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	tag := []byte(self.Tag)
-	//	return b.Put(tag,append(b.Get([]byte(self.Tag)),self.Id...,))
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//db,err := bolt.Open(PageDB,0600,nil)
-	//if err != nil {
-	//	return err
-	//}
-	//defer db.Close()
 	err = DbPage.Update(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(pageBucket)
 		if err != nil {
@@ -506,10 +480,13 @@ func split_(li []string)(map[string]int){
 
 	key := map[string]int{}
 	for _,l := range li {
-		lr := []rune(l)
+		lr := regK.FindAllString(l,-1)
 		for j:=0;j<len(lr);j++{
-			for _j:=j+2;_j<=len(lr);_j++ {
-				key[string(lr[j:_j])]+=1
+			for _j:=j+1;_j<=len(lr);_j++ {
+				k :=strings.ToLower(strings.Join(lr[j:_j],""))
+				if len([]rune(k))>1{
+					key[k]+=1
+				}
 			}
 		}
 	}
@@ -623,13 +600,14 @@ func (self *Page) getSplitWord() (m map[string]int) {
 	if float64(len(self.Title))/float64(len(self.Content)) > 0.1 {
 		return
 	}
-	titl := regTitle.FindAllString(self.Title,-1)
+	titl := regT.FindAllString(self.Title,-1)
 	newTi := make([]string,0,len(titl))
 	for _,t := range titl{
 		if len(t)>2 {
 			newTi = append(newTi,t)
 		}
 	}
+	//self.Title = strings.Join(titl," ")
 	//for 
 	outkey,err :=regexp.Compile(config.Conf.OutKey)
 	if err != nil {
@@ -649,6 +627,6 @@ func (self *Page) getSplitWord() (m map[string]int) {
 		con = append(con,s)
 	}
 	self.Content = strings.Join(con,"\n")
-	return split_(append(newTi,regTitle.FindAllString(self.Content,-1)...))
+	return split_(append(newTi,regT.FindAllString(self.Content,-1)...))
 
 }

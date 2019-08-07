@@ -1,0 +1,16 @@
+<video style="width:100%" id="myVideo" src="{{src}}"  bindended="next"   controls autoplay   ></video>
+  <scroll-view class="vodlist" scroll-y>  
+  <view class="li {{item.played}}" wx:for="{{vodlist}}" wx:key="title"  id="{{index}}" bindtap="playshow"  >{{item.title}}</view>
+  </scroll-view>
+
+  <view style="padding:20rpx"   bindtap='onShareAppMessage'  >
+           <button   open-type="share" >分享转发</button>
+    </view>
+    
+  <view class="link">
+  <view  hover-class="hover" bindtap="loadVod" wx:for="{{vod}}" wx:key="_id"  id="{{item._id}}" >{{item.title}}►</view>
+  <view  hover-class="hover" bindtap="loadDB" wx:for="{{link}}" wx:key="_id"  id="{{item._id}}" >{{item.title}}</view>
+  </view>
+  
+  <official-account style="color: grey;"></official-account>
+  <ad ad-intervals="30" unit-id="{{adId}}"></ad>

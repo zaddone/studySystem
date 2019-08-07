@@ -1,0 +1,142 @@
+/**index.wxss**/
+@import '/towxml/style/main.wxss';
+
+/**如果页面有动态主题切换，则需要将使用到的样式全部引入**/
+
+/**主题配色（浅色样式）**/
+@import '/towxml/style/theme/light.wxss'; 
+@import '/towxml/style/theme/light_big.wxss';
+
+/**主题配色（深色样式）**/
+@import '/towxml/style/theme/dark.wxss';
+@import '/towxml/style/theme/dark_big.wxss';
+/** 
+page{
+  background-color:#000;
+  color: #fff;
+}
+**/
+
+.share-img-button{
+  background: none;
+  border: none;
+}
+.share-img-button::after{
+  border: none
+}
+.search {
+border:0;
+text-align: center;
+
+}
+.search_dark_big{
+  font-size:33rpx;
+  border-radius: 15rpx;
+  background:rgba(0,0,0,0.3);
+  color: #f1f1f1;
+}
+.search_dark_big button{
+  color: #f1f1f1;
+}
+.search_light_big{
+  font-size:33rpx;
+  border-radius: 15rpx;
+  background-color:rgba(255,255,255,0.5);
+  color: grey;
+}
+.search_light_big button{
+  color: grey;
+}
+.lt{
+  position:absolute;
+    width: 30rpx;  
+    height: 30rpx;  
+    -webkit-transform: translate(0,-50%) rotate(45deg);  
+    transform: translate(0,-50%) rotate(45deg);  
+    border-left: 5rpx solid #fff;  
+    border-bottom: 5rpx solid #fff;  
+}
+.nav image{
+    position:absolute;
+}
+.nav{
+  top:0;
+  font-size:43rpx;
+  padding-left:20rpx;
+  
+  position:fixed;
+  width:100%;
+  z-index:99;
+  background-color:rgba(0,0,0,0.35);
+  color:#f1f1f1;
+} 
+
+.dark_big{
+ background: grey;
+ color:#f1f1f1;
+}
+.light_big{
+  background-color:#f1f1f1;
+ color: grey;
+}
+.link view{
+  padding:5rpx 20rpx 0 20rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+       font-size: 34rpx;
+
+}
+.link  .hover{
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.set_button {
+
+  border: 0rpx;
+  height: 50rpx;
+  right: 0rpx;
+  bottom: 0rpx;
+  position: fixed;
+
+  width: 100%;
+  text-align: center;
+  font-size: 44rpx;
+
+}
+.hover_button{
+  visibility: hidden;
+}
+.sign{
+  border: 0rpx;
+  height: 50rpx;
+  width: 100%;
+  padding-bottom:120rpx;
+  text-align: center;
+  font-size: 44rpx;
+}
+.zan-dialog__mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+} 
+.zan-dialog__container {
+  position: fixed;
+  bottom: 0;
+  width: 750rpx;
+  background:rgb(52, 53, 51);
+  color:#fff;
+  transform: translateY(150%);
+  transition: all 0.4s ease;
+  z-index: 12;
+}
+ .zan-dialog--show .zan-dialog__container {
+  transform: translateY(0);
+}
+ .zan-dialog--show .zan-dialog__mask {
+  display: block;
+}

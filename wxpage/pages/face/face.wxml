@@ -1,0 +1,18 @@
+<image style="width: {{width}}px; height:{{height}}px; " mode="aspectFill" src="{{src}}"></image>
+
+<movable-area class="area"  style="width: {{width}}px; height:{{height}}px;">
+<scroll-view class="back"  style="max-height:{{height}}px;" scroll-y    scroll-into-view="{{bottomid}}"  >
+<view class="translation {{item.self}}" wx:for="{{text}}" wx:key="index" >
+<navigator wx:if="{{item.vod}}" url="../vod/vodshow?id={{item.id}}" class="titletag link"  style="width:{{width*0.8}}px">{{item.txt}}►</navigator>
+<navigator wx:elif="{{item.id}}" url="../page/index?id={{item.id}}"   class="titletag link"  style="width:{{width*0.8}}px">{{item.txt}}</navigator>
+<view wx:else  class="titletag"  style="width:{{width*0.8}}px">{{item.txt}}</view>
+<view style="height:10rpx" ></view>
+</view>
+ <view style="height:20rpx" id="bottomid"></view>
+
+</scroll-view>
+
+<movable-view x="{{width}}"  y="{{height/2}}" bindchange="touchMove" class="speak" direction="all" inertia   bindtouchstart="touchStart" bindtouchend="touchEnd"> 
+ <image class="ttsimg" style='width: 60px; height:60px;' mode="aspectFit" src="/images/tts_light_big.png"></image>
+</movable-view>
+</movable-area>

@@ -1,0 +1,34 @@
+<view style="min-height:{{windowsHeight}}px;" class="{{theme}}">
+  <view class="head">
+    <view class="nav" style="height:{{narHeight}}px;" bindtap="navBotton">
+      <view wx:if="{{pageLen > 1}}" bindtap="goBack" class="lt" style="left:30rpx;top:{{natTop}}px;"></view>
+      <image wx:else class="home" bindtap="toStart" style='width:60rpx;height:60rpx;top:{{top}}px' mode="aspectFit" src="../../images/logo_{{theme}}.png"></image>
+    </view>
+
+    <view class="back">
+      <view class="search search_{{theme}}" style=''>
+        <input id="search" class="titletag" confirm-type="search" placeholder="搜索" type="text" bindconfirm="onSearch" auto-focus bindfocus="showtts" value="{{input}}" />
+        <image bindtap="inputid" class="titletag searchtag" style='' mode="aspectFit" src="../../images/search_{{theme}}.png"></image>
+      </view>
+      <view class="tts" style="display: {{show}};" bindtouchstart="touchStart" bindtouchend="touchEnd">
+
+        <image class="titletag ttsimg" style='' mode="aspectFit" src="../../images/tts_{{theme}}.png"></image>
+        <view>按住说话</view>
+
+      </view>
+    </view>
+  </view>
+
+  <view class="pagelist" style="padding-top:{{head}}px">
+    <view class="li"></view>
+    <navigator class="li" url="../vod/vodshow?id={{item._id}}" wx:for="{{vod}}" wx:key="_id" bindtap="">{{item.title}}►</navigator>
+    <navigator class="li" open-type="navigate" url="../page/index?id={{item._id}}" wx:for="{{list}}" wx:key="_id" bindtap="">{{item.title}}</navigator>
+
+
+  </view>
+
+
+
+  <official-account style="color: grey;"></official-account>
+  <ad ad-intervals="30" unit-id="{{adId}}"></ad>
+</view>

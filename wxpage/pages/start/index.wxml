@@ -1,0 +1,44 @@
+<view style="height:{{windowsHeight}}px" class="{{theme}}">
+<image  bindtap='onLoad'  class="home"  style='width:60rpx;height:60rpx;top:{{top}}px'  mode="aspectFit"  src="../../images/logo_{{theme}}.png"></image>
+  <view class="home u" bindtap="openMap"  style='top:{{top}}px;left:100rpx'>{{cityname}} [地图]</view>
+
+  <view class="scroll-view_H" style="top:{{top}}px;padding-top:120rpx;visibility:{{show}}">
+        <scroll-view style="width:{{windowsWidth}}px" scroll-x>
+            <view class="title titletag" style="padding-left:50rpx;padding-right:70rpx">
+                  
+           <view class="titletag png40_{{theme}} {{w.weather_code}}"></view>           
+      <view class="titletag" style="padding-right:0;font-size:100rpx;font-weight:bold;">{{w.degree}}</view>
+      <view class="titletag u" style="padding-left:0">℃ </view>
+            <navigator  open-type="redirect" url="../start/index" class="u" style="font-weight:normal;">{{tips}} </navigator>
+    </view>
+      <view class="scroll-view-item_H " style="" wx:for="{{hd}}" wx:key="index">
+       <view class="titletag u"> {{item.time_tag}}<view class="titletag" style="padding:0;font-size: 35rpx;font-weight:bold;">{{item.update_time}}</view>:00</view>
+        <view class="png40_{{theme}} {{item.weather_code}}"></view>
+        <view><view class="titletag" style="font-size:35rpx;font-weight:bold;">{{item.degree}}℃</view>{{item.wind}}</view>
+      </view>
+    </scroll-view>       
+ <scroll-view style="width:{{windowsWidth}}px;padding-bottom:30rpx" scroll-x >
+      <view class="scroll-view-item_H {{item.today}}" style="" wx:for="{{dayW}}" wx:key="index">
+         <view  >{{item.date}}{{item.week}}</view>
+        <view class="png40_{{theme}} d{{item.day_weather_code}}"></view>
+        <view class="png40_{{theme}} n{{item.night_weather_code}}"></view>
+        <view>{{item.max_degree}}/{{item.min_degree}}℃</view>
+      </view>
+    </scroll-view>
+    <view style="padding-left:20rpx;padding-right:20rpx;">
+          <view  class="search search_{{theme}}"   bindtap='toSearch'    >
+    <image   class="titletag"   style='width:50rpx;height:50rpx'  mode="aspectFit"  src="../../images/search_{{theme}}.png"></image>  
+    <!--  <view class="titletag" style='height:50rpx;'> 搜索</view>-->
+    </view>
+    </view>
+      </view>
+
+  <scroll-view style="height:{{pagelistheight}}px;" scroll-y  class="pagelist" >     
+  <view style="height:50rpx"></view>
+     <official-account style="color: grey;"></official-account>
+   <ad ad-intervals="30" unit-id="{{adId}}" ></ad>
+     <view class="alarm" wx:for="{{alarm}}" wx:key="index" bindtap="showModle"  data-item="{{item}}">{{item.title}}</view>
+   <view style="height:50rpx"></view>
+</scroll-view>
+
+  </view>

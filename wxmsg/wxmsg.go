@@ -225,6 +225,7 @@ func UpDBToWX(coll,uri string)error{
 		//panic(err)
 		return err
 	}
+	fmt.Println(fp,pid)
 	var res map[string]interface{}
 	err = PostRequest(
 		"https://api.weixin.qq.com/tcb/databasemigrateimport",
@@ -242,6 +243,7 @@ func UpDBToWX(coll,uri string)error{
 		//panic(err)
 		return err
 	}
+	fmt.Println("databasemigrateimport",res)
 	if res["errcode"].(float64) != 0 {
 		return fmt.Errorf(res["errmsg"].(string))
 	}
@@ -260,8 +262,13 @@ func UpDBToWX(coll,uri string)error{
 			return err
 			//log.Println(err)
 		}
+		fmt.Println("info",res)
 		if res["errcode"].(float64) != 0 {
 			return fmt.Errorf(res["errmsg"].(string))
+		}
+
+		if strings.EqualFold(res["status"].(string),"fail"){
+			panic(res)
 		}
 		if strings.EqualFold(res["status"].(string),"success"){
 			fmt.Println(res)
@@ -277,6 +284,8 @@ func UpDBToWX(coll,uri string)error{
 			func(body io.Reader)error{
 			return json.NewDecoder(body).Decode(&res)
 		})
+
+	fmt.Println("del",res)
 	if res["errcode"].(float64) != 0 {
 		fmt.Println(res)
 		return fmt.Errorf(res["errmsg"].(string))

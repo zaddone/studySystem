@@ -1,0 +1,5 @@
+<map id="myMap" 
+show-location  bindtap="handmap" 
+callout="{{callinfo}}"
+  longitude="{{longitude}}" 
+  latitude="{{latitude}}" scale="14" controls="{{controls}}" bindcallouttap="markertap" markers="{{markers}}" bindmarkertap="markertap" polyline="{{polyline}}" bindregionchange="regionchange"  style="width: 100%; height: {{windowsHeight}}px;"> <cover-image class="home" bindtap="gohome"   style='width:60rpx;height:60rpx;top:{{top}}px'  mode="aspectFit"  src="../../images/logo_{{theme}}.png"></cover-image></map>

@@ -1,0 +1,24 @@
+<view  class="{{theme}}" style="min-height:{{windowsHeight}}px"  >
+ <view style="height:120rpx"></view>
+  <import src="/towxml/entry.wxml" />
+  <template is="entry" data="{{...db.article}}" />
+
+    <view style="padding-left:20rpx;padding-right:20rpx;padding-bottom:20rpx"   >
+          <view  class="search search_{{theme}}"   ><button class="share-img-button" open-type="share" >分享转发</button></view>  
+    </view>
+
+  <view class="link  {{theme}}">
+   
+   
+  <view  hover-class="hover" bindtap="loadVod" wx:for="{{vod}}" wx:key="_id"  id="{{item._id}}" >{{item.title}}►</view>
+  <view  hover-class="hover" bindtap="loadDB" wx:for="{{link}}" wx:key="_id"  id="{{item._id}}" >{{item.title}}</view>
+   <official-account style="color: grey;"></official-account>
+   <ad ad-intervals="30" unit-id="{{adId}}" ></ad>
+  </view>
+  
+    <view style="height:120rpx"></view>
+<view animation="{{animationData}}" class="nav" style="height:{{narHeight}}px;" bindtap="onPullDownRefresh">
+<view  wx:if="{{pageLen > 1}}"   bindtap="goBack" class="lt" style="left:30rpx;top:{{natTop}}px;"></view>
+<image wx:else class="home" bindtap="toSearch"   style='width:60rpx;height:60rpx;top:{{top}}px'  mode="aspectFit"  src="../../images/search_{{theme}}.png"></image>
+</view>
+</view>

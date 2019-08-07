@@ -1,0 +1,48 @@
+/* miniprogram/pages/face/face.wxss */
+image{
+   position:fixed;
+   z-index:0;
+}
+.translation{
+  padding-left:20rpx;
+  padding-right:20rpx;
+  
+   font-size:33rpx;
+  z-index:3;
+
+}
+
+.titletag{
+    display:inline-block;
+     background-color:rgba(0,0,0,0.6);
+     padding:20rpx;
+     text-align: left;
+     border-radius: 10rpx;
+}
+.link{
+  text-decoration:underline;
+  font-style:oblique;
+}
+.self{
+   text-align: right;
+
+}
+.area{
+position:fixed;
+}
+
+.speak{
+  background-color:rgba(255,255,255,0.5);
+  height: 60px;
+  width:60px;
+  border-radius: 15rpx;
+  z-index:4;
+
+}
+.back{
+   position:absolute;
+   color:#f1f1f1;
+  width:100%;
+  bottom:0;
+  z-index:1;
+}

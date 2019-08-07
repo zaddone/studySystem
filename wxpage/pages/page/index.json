@@ -1,0 +1,6 @@
+{
+      "enablePullDownRefresh": true,
+      "disableSwipeBack": true,
+      "onReachBottomDistance": 50,
+  "usingComponents": {}
+}

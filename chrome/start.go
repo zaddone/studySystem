@@ -178,6 +178,7 @@ func init(){
 	//go syncRunPageVod()
 	//fmt.Println("run vod")
 	//return
+	//updateFileToWX()
 	go start(func(in string)error{
 		//findPageVod()
 		//UpWord()
@@ -200,7 +201,7 @@ func init(){
 			log.Println("UpdatefileToWX")
 			updateFileToWX()
 			log.Println("wait 5")
-			<-time.After(5 * time.Minute)
+			<-time.After(1 * time.Hour)
 
 		}
 		return nil

@@ -1,0 +1,6 @@
+/* miniprogram/pages/map/map.wxss */
+.home{
+  position:fixed;
+  border:0rpx;
+  left:20rpx;
+}

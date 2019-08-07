@@ -1,0 +1,127 @@
+page{
+  background-color:grey;
+  color: #f1f1f1;
+}
+.head{
+  width:100%;
+}
+.tts{
+  text-align: center;
+  margin: 0 auto;
+  width:100%;
+  font-weight: bold;
+  z-index:99;
+  font-size: 30rpx;
+  padding-top:20rpx;
+ 
+}
+.ttsimg{
+  border:0rpx;
+  width:100rpx;
+  height:100rpx;
+  z-index:1;
+  
+}
+.circular_light_big{
+  width:120rpx; 
+  height:120rpx; 
+  border-radius:50%; 
+  overflow:hidden;  
+   background-color:rgba(0,0,0,0.35);   
+}
+.circular_dark_big{
+  width:120rpx; 
+  height:120rpx; 
+  border-radius:50%; 
+  overflow:hidden;  
+    
+     background-color:rgba(255,255,255,0.35);   
+}
+.lt{
+  position:absolute;
+    width: 30rpx;  
+    height: 30rpx;  
+    -webkit-transform: translate(0,-50%) rotate(45deg);  
+    transform: translate(0,-50%) rotate(45deg);  
+    border-left: 5rpx solid #fff;  
+    border-bottom: 5rpx solid #fff;  
+}
+.nav image{
+    position:absolute;
+}
+.nav{
+  top:0;
+  font-size:43rpx;
+  
+  height:200rpx;
+  width:100%;
+  z-index:99;
+  background-color:rgba(0,0,0,0.35);
+  color:#f1f1f1;
+} 
+
+.back{
+  padding-left:20rpx;
+  padding-right:20rpx;
+  padding-top:20rpx;
+}
+.dark_big{
+  background-color:grey;
+color: #f1f1f1;
+
+}
+.pagelist{
+  height:100%;
+  font-size:35rpx;
+}
+.pagelist .li{
+padding-top:30rpx;
+padding-left:20rpx;
+padding-right:20rpx;
+}
+.light_big{
+  background-color:#f1f1f1;
+  color: grey;
+}
+.home{
+  border:0rpx;
+  left:20rpx;
+}
+
+.searchtag{  
+  
+  position:absolute;
+  border:0rpx;
+  right:40rpx;
+  width:59rpx;
+  height:59rpx;
+  z-index:99;
+}
+.titletag{
+    display:inline-block;
+}
+.search input{
+  text-align: center;
+    font-size:55rpx;
+    height:70rpx;
+}
+.search{
+  text-align: center;
+  width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  padding-top:15rpx;
+}
+.search_dark_big{
+  font-size:33rpx;
+  border-radius: 20rpx;
+  background:rgba(0,0,0,0.3);
+  color: #f1f1f1;
+}
+.search_light_big{
+    font-size:33rpx;
+    border-radius: 15rpx;
+  background-color:rgba(255,255,255,0.8);
+  color: grey;
+}
