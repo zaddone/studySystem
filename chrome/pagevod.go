@@ -75,7 +75,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 			return fmt.Errorf("find Not vod")
 		}
 
-		return self.CheckOldVod()
+		return self.CheckToSaveVod()
 
 	})
 }
@@ -117,45 +117,101 @@ func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 
 
 }
-
-func (self *Pagevod)CheckOldVod()error{
-
+func (self *Pagevod)CheckToSaveVod()error{
+	self.Content = contentTag + strings.Join(self.vod,"|")
 	tx_,err := DbWord.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx_.Commit()
-	wordb := tx_.Bucket(WordBucket)
 	tx,err := DbPage.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx.Commit()
+
+	wb := tx_.Bucket(WordBucket)
+	IdMap := map[string]float64{}
+	IdMapN := map[string]int{}
+	for _,_k := range self.key{
+		k := []byte(_k)
+		d_ := wb.Get(k)
+		if d_ == nil {
+			//IdMap[_k]
+			//wb.Put(k,self.Id)
+			continue
+		}
+		//wb.Put(k,append(d_,self.Id...))
+		led := len(d_)
+		leds := float64(led)
+		for i:=0;i<led;{
+			I := i+8
+			IdMap[string(d_[i:I])]+=leds/1
+			IdMapN[string(d_[i:I])]++
+			i = I
+		}
+	}
+	var maxN int = 0
+	var maxID string
+	for k,v := range IdMapN {
+		if v > maxN {
+			maxN = v
+			maxID = k
+		}
+	}
+
+
 	pageb := tx.Bucket(pageBucket)
-
-	kt := wordb.Get([]byte(self.Title))
-	if kt == nil{
-		return self.SaveVod(wordb,pageb)
+	if maxN == len(self.key){
+		db := pageb.Get([]byte(maxID))
+		p_ := &Page{}
+		err := json.Unmarshal(db,p_)
+		if err != nil {
+			panic(err)
+		}
+		if strings.EqualFold(self.Title,p_.Title){
+			if len(self.Content) > len(p_.Content) {
+				p_.Content = self.Content
+				fmt.Println(p_.Title)
+				p_.SaveDBBucket(pageb)
+				return nil
+			}else{
+				return fmt.Errorf("is same %s %s",self.Title,p_.Title)
+			}
+		}
 	}
-	for i:=0; i<len(kt); i+=8 {
-		err = json.Unmarshal(pageb.Get(kt[i:i+8]),self)
-		if err != nil{
-			log.Println(err)
-			continue
-		}
-		if !strings.HasPrefix(self.Content,contentTag){
-			continue
-		}
-		if len(self.vod)==(len(strings.Split(self.Content,"|"))-1) {
-			return fmt.Errorf("is Same")
-		}
 
-		self.update = true
-		break
+	var max float64 = 0
+	for k,v := range IdMap {
+		if v > max {
+			max = v
+			maxID = k
+		}
 	}
-	return self.SaveVod(nil,pageb)
-
+	pid := []byte(maxID)
+	db := pageb.Get(pid)
+	p_ := &Page{}
+	err = json.Unmarshal(db,p_)
+	if err != nil {
+		panic(err)
+	}
+	self.Par = pid
+	p_.Children = append(p_.Children,self.Id...)
+	fmt.Println(self.Title)
+	self.SaveDBBucket(pageb)
+	p_.SaveDBBucket(pageb)
+	for _,_k := range self.key{
+		k := []byte(_k)
+		b_ :=wb.Get(k)
+		if len(b_) == 0 {
+			wb.Put(k,self.Id)
+		}else{
+			wb.Put(k,append(b_,self.Id...))
+		}
+	}
+	return nil
 }
+
 func syncRunPageVod(){
 	for{
 		findPageVod()
