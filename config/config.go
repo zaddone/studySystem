@@ -28,6 +28,7 @@ type Config struct {
 	WXAppid string
 	WXSec string
 	CollPageName string
+	CollWordName string
 	ToutiaoUri []string
 	//UserInfo *url.Values
 	OutKey string
@@ -67,7 +68,8 @@ func NewConfig(fileName string)  *Config {
 		c.WeixinUrl = "https://weixin.sogou.com/weixin?type=1&s_from=input&query=longquanjy&ie=utf8"
 		c.WXAppid = "wx92ebd09c7b0d944f"
 		c.WXSec = "b3005d3c298e27b60ee1f90d188a9d86"
-		c.CollPageName = "pageColl"
+		c.CollPageName = "page"
+		c.CollWordName = "word"
 		c.OutKey="头条客户端|头条号|公众号|打赏|转载|订购|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
 		c.ToutiaoUri = []string{
 			//"https://www.toutiao.com",

@@ -1,7 +1,7 @@
 package chrome
 import(
 	"io"
-	"os"
+	//"os"
 	"fmt"
 	"log"
 	"regexp"
@@ -174,18 +174,18 @@ func findPageVod(){
 			}
 			c++
 			//fmt.Println(pv)
-			body,ids := pv.ToWXString()
+			//body,ids := pv.ToWXString()
 			//fmt.Println(pv.Title)
-			WXDBChan<-&UpdateId{pv.GetId(),ids}
-			f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-			if err != nil{
-				return err
-			}
-			defer f.Close()
-			_,err = f.WriteString(body)
-			if err != nil {
-				return err
-			}
+			//WXDBChan<-&UpdateId{pv.GetId(),ids}
+			//f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			//if err != nil{
+			//	return err
+			//}
+			//defer f.Close()
+			//_,err = f.WriteString(pv.ToWXString())
+			//if err != nil {
+			//	return err
+			//}
 			return pv.SaveToList()
 		})
 		if err == io.EOF {

@@ -1,5 +1,6 @@
 package main
 import(
+	//"fmt"
 	_ "github.com/zaddone/studySystem/chrome"
 
 )
@@ -7,6 +8,5 @@ import(
 
 func main(){
 	select{}
-
-
+	//fmt.Println("test")
 }

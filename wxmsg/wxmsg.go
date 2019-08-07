@@ -36,6 +36,9 @@ func setToken() int {
 		panic(err)
 	}
 	if db["access_token"]==nil {
+
+		fmt.Println(db)
+		time.Sleep(1*time.Hour)
 		return setToken()
 	}
 	toKen = db["access_token"].(string)
@@ -286,12 +289,13 @@ func UpDBToWX(coll,uri string)error{
 func UpFileToWX(uri string) (string,string,error) {
 
 	//fmt.Println(uri)
+	//setToken()
 	fi,err := os.Stat(uri)
 	if err != nil {
 		return "","",err
 	}
 
-	fileName := fmt.Sprintf("%s_%d",fi.Name(),time.Now().UnixNano())
+	fileName := fmt.Sprintf("%s/%d",fi.Name(),time.Now().Unix())
 	var res  map[string]interface{}
 	err = PostRequest(
 		"https://api.weixin.qq.com/tcb/uploadfile",
@@ -307,7 +311,7 @@ func UpFileToWX(uri string) (string,string,error) {
 	}
 	params := map[string]io.Reader{
 		"key":strings.NewReader(fileName),
-		"Signature":strings.NewReader(res["authorization"].(string)),
+		"signature":strings.NewReader(res["authorization"].(string)),
 		"x-cos-security-token":strings.NewReader(res["token"].(string)),
 		"x-cos-meta-fileid":strings.NewReader(res["cos_file_id"].(string)),
 		"file":mustOpen(uri),
@@ -315,7 +319,8 @@ func UpFileToWX(uri string) (string,string,error) {
 	//client := http.DefaultClient
 	err = Upload(res["url"].(string), params,fileName)
 	if err != nil {
-		panic(err)
+		return "","",err
+		//panic(err)
 	}
 	//fmt.Println(res["file_id"].(string))
 	//return res["file_id"].(string),nil
@@ -383,7 +388,7 @@ func Upload(url string, values map[string]io.Reader,fileName string) (err error)
     }
     req.Header.Set("Content-Type", w.FormDataContentType())
     //fmt.Println()
-	Cli := &http.Client{}
+    Cli := &http.Client{}
     res, err := Cli.Do(req)
     if err != nil {
         return

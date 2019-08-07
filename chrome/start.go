@@ -75,10 +75,10 @@ type DelId struct{
 func NewDelId(c string,i []string) *DelId {
 	return &DelId{coll:c,ids:i}
 }
-type UpdateId struct{
-	id uint64
-	ids []string
-}
+//type UpdateId struct{
+//	id uint64
+//	ids []string
+//}
 type UpdateFile struct{
 	coll string
 	uri string
@@ -88,23 +88,38 @@ func syncPushWXDB(){
 	for{
 		p := <-WXDBChan
 		switch rs := p.(type) {
+		case string:
+			f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			if err != nil {
+				//return err
+				panic(err)
+			}
+			_,err = f.WriteString(rs)
+			if err != nil {
+				panic(err)
+			}
+			f.Close()
+
 		case *DelId:
 			fmt.Println("del")
 			err := wxmsg.DBDelete(rs.coll,rs.ids)
 			if err != nil {
 				log.Println("del",err)
 			}
-		case *UpdateId:
-			fmt.Println("update")
-			err := wxmsg.UpdateToWXDB(rs.id,rs.ids)
-			if err != nil {
-				log.Println("update",err)
-			}
+		//case *UpdateId:
+		//	fmt.Println("update")
+		//	err := wxmsg.UpdateToWXDB(rs.id,rs.ids)
+		//	if err != nil {
+		//		log.Println("update",err)
+		//	}
 		case *UpdateFile:
-			fmt.Println("file")
+			fmt.Println("file",rs)
 			err := wxmsg.UpDBToWX(rs.coll,rs.uri)
 			if err != nil {
-				log.Println("file",err)
+				log.Println(err)
+				if _,err = os.Stat(rs.uri);err== nil {
+					WXDBChan<-rs
+				}
 			}
 		default:
 			log.Println("default",p,rs)
@@ -122,7 +137,7 @@ func syncPushWXDB(){
 }
 
 func init(){
-	//fmt.Println("init")
+	fmt.Println("chrome init")
 	var err error
 	DbPage,err = bolt.Open(PageDB,0600,nil)
 	if err != nil {
@@ -176,9 +191,16 @@ func init(){
 				w.Wait()
 			}
 			findPageVod()
-			ClearDB()
+			err = ClearDB()
+			if err != nil {
+				fmt.Println(err)
+			}
+			//fmt.Println("updatefile")
+
+			log.Println("UpdatefileToWX")
 			updateFileToWX()
-			<-time.After(15 * time.Minute)
+			log.Println("wait 5")
+			<-time.After(5 * time.Minute)
 
 		}
 		return nil
@@ -187,17 +209,17 @@ func init(){
 }
 func updateFileToWX() error {
 
-	_,err := os.Stat(string(WordBucket))
+	//<-time.After(5 * time.Minute)
+	_,err := os.Stat(config.Conf.CollWordName)
 	if err != nil {
 		err = WordJsonFile()
 		if err != nil {
 			return err
 		}
 	}
-	WXDBChan<-&UpdateFile{string(pageBucket),string(pageBucket)}
-	<-time.After(1 * time.Minute)
-	WXDBChan<-&UpdateFile{string(WordBucket),string(WordBucket)}
-	//time.Sleep()
+	fmt.Println(len(WXDBChan))
+	WXDBChan<-&UpdateFile{config.Conf.CollWordName,config.Conf.CollWordName}
+	WXDBChan<-&UpdateFile{config.Conf.CollPageName,config.Conf.CollPageName}
 	return nil
 
 }
@@ -206,12 +228,13 @@ func updateFileToWX() error {
 func ClearDB() error {
 
 	fmt.Println("begin Clear")
+	defer fmt.Println("end Clear")
 
-	return wxmsg.CollectionClearDB(func()error{
+	return wxmsg.CollectionClearDB(func() error {
 		//return clearLocalDB(max,wxmsg.DBDelete)
 		return clearLocalDB(func(ids []string,idw []string)error{
 			WXDBChan<-&DelId{config.Conf.CollPageName,ids}
-			WXDBChan<-&DelId{string(WordBucket),idw}
+			WXDBChan<-&DelId{config.Conf.CollWordName,idw}
 			return nil
 		})
 
@@ -305,7 +328,6 @@ func Coll(uri string,w *sync.WaitGroup)error{
 				}
 				}
 				if count == 0 {
-
 					if stop != nil {
 						close(stop)
 						stop = nil
@@ -538,19 +560,20 @@ func extract(uri string) error {
 		if st != 200 {
 			return fmt.Errorf("%d %s",st,db)
 		}
-		err,p := _extract(db)
-		if err != nil {
-			return err
-		}
-		f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-		if err != nil {
-			panic(err)
-		}
-		s_,ids := p.ToWXString()
-		WXDBChan<-&UpdateId{p.GetId(),ids}
-		fmt.Println(p.Title)
-		_,err = f.WriteString(s_)
-		return f.Close()
+		err,_ = _extract(db)
+		return err
+		//if err != nil {
+		//	return err
+		//}
+		//f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+		//if err != nil {
+		//	panic(err)
+		//}
+		////s_ := p.ToWXString()
+		////WXDBChan<-&UpdateId{p.GetId(),ids}
+		//fmt.Println(p.Title)
+		//_,err = f.WriteString(p.ToWXString())
+		//return f.Close()
 		//err := wxmsg.SaveToWXDB(body)
 		//if (err == nil) && (len(ids)>0) {
 		//	err = wxmsg.UpdateToWXDB(binary.BigEndian.Uint64(p.Id),ids[:1])
@@ -729,7 +752,7 @@ func getFileTmpName(w []byte) string{
 }
 func WordJsonFile()error{
 	//WordTmp = getFileTmpName(WordBucket)
-	f,err := os.OpenFile(string(WordBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	f,err := os.OpenFile(config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
 	if err != nil {
 		return err
 	}
@@ -753,51 +776,52 @@ func WordJsonFile()error{
 }
 func PageJsonFile()error{
 
-	f,err := os.OpenFile(string(pageBucket),os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	p := &Page{}
-	//p_ := &Page{}
-	var list,vodlist []byte
-	err = EachDB(DbPage,pageBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
-		err = json.Unmarshal(v,p)
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(p.Content,contentTag){
-			vodlist = append(vodlist,k...)
-		}else{
-			list = append(list,k...)
-		}
-		p.relevant = append(p.Children,p.Par...)
-		p_db,_ := p.ToWXString()
-		_,err = f.WriteString(p_db)
-		return err
+	return nil
+	//f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	//if err != nil {
+	//	return err
+	//}
+	//defer f.Close()
+	//p := &Page{}
+	////p_ := &Page{}
+	//var list,vodlist []byte
+	//err = EachDB(DbPage,pageBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
+	//	err = json.Unmarshal(v,p)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if strings.HasPrefix(p.Content,contentTag){
+	//		vodlist = append(vodlist,k...)
+	//	}else{
+	//		list = append(list,k...)
+	//	}
+	//	p.relevant = append(p.Children,p.Par...)
+	//	p_db,_ := p.ToWXString()
+	//	_,err = f.WriteString(p_db)
+	//	return err
 
-	})
-	if err != nil {
-		return err
-	}
-	tx,err := DbPage.Begin(true)
-	if err != nil{
-		return err
-	}
-	bl,err := tx.CreateBucketIfNotExists(pageListBucket)
-	if err != nil{
-		return err
-	}
-	err = bl.Put([]byte("page"),list)
-	if err != nil {
-		return err
-	}
-	err = bl.Put([]byte("vod"),vodlist)
-	if err != nil {
-		return err
-	}
-	fmt.Println(len(list)/8,len(vodlist)/8)
-	return tx.Commit()
+	//})
+	//if err != nil {
+	//	return err
+	//}
+	//tx,err := DbPage.Begin(true)
+	//if err != nil{
+	//	return err
+	//}
+	//bl,err := tx.CreateBucketIfNotExists(pageListBucket)
+	//if err != nil{
+	//	return err
+	//}
+	//err = bl.Put([]byte("page"),list)
+	//if err != nil {
+	//	return err
+	//}
+	//err = bl.Put([]byte("vod"),vodlist)
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Println(len(list)/8,len(vodlist)/8)
+	//return tx.Commit()
 
 
 }

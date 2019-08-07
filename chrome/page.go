@@ -32,6 +32,7 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 	if err != nil {
 		return err
 	}
+	defer tx.Commit()
 	//tx.Commit()
 	b := tx.Bucket(pageListBucket)
 	if b == nil {
@@ -63,13 +64,15 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 	if err != nil {
 		return err
 	}
+	defer tx_.Commit()
 	b_ := tx_.Bucket(WordBucket)
 	if b_ == nil {
 		return fmt.Errorf("b == nil")
 	}
 
 	//WordTmp = getFileTmpName(WordBucket)
-	fn := string(WordBucket)
+	//fn := string(WordBucket)
+	fn := config.Conf.CollWordName
 	_,err = os.Stat(fn)
 	if err == nil {
 		os.Remove(fn)
@@ -105,16 +108,9 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 			}
 		}
 	}
-
 	f.Close()
-	err = hand(klinkStr,klinkWord)
+	return hand(klinkStr,klinkWord)
 	//fmt.Println("hand",err)
-	if err != nil {
-		return err
-	}
-	tx_.Commit()
-	tx.Commit()
-	return nil
 
 }
 func reverse(s string) (s_ []rune) {
@@ -132,7 +128,7 @@ type Page struct {
 	Content string
 	Par []byte
 	Children []byte
-	relevant []byte
+	//relevant []byte
 	//class []byte
 	update bool
 	Tag string
@@ -260,19 +256,9 @@ func (self *Page) linkBucket(lid []byte,b *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
-	//P := findSetPage(
-	//	lid,
-	//	b,
-	//	func(p *Page) bool {
-	//		self.relevant = append(self.relevant,p.Id...)
-	//		return len(self.relevant)<=10
-	//	},
-	//)
-	//if P == nil {
-	//	return fmt.Errorf("Not Find Page")
-	//}
+
 	self.Par = lid
-	self.relevant = append(p.Id,p.Children...)
+	//self.relevant = append(p.Id,p.Children...)
 	p.Children = append(p.Children,self.Id...)
 	return p.SaveDBBucket(b)
 }
@@ -294,7 +280,7 @@ func (self *Page) link(lid []byte) error {
 		//	return nil
 		//}
 		//bytes.Replace(
-		self.relevant = append(p.Id,p.Children...)
+		//self.relevant = append(p.Id,p.Children...)
 		//p = findSetPage(
 		//	lid,
 		//	b,
@@ -331,24 +317,30 @@ func NewPage(title,content,tag string) (p *Page) {
 }
 
 
-func (self *Page) ToWXString() (string,[]string) {
+func (self *Page) ToWXString() (string) {
 	var link []string
-	for i:=0;i<len(self.relevant);i+=8{
+	for i:=0;i<len(self.Children);i+=8{
 		link = append(
 		link,
 		fmt.Sprintf("\"%d\"",
-		binary.BigEndian.Uint64(self.relevant[i:i+8])))
+		binary.BigEndian.Uint64(self.Children[i:i+8])))
 	}
 	//if len(link)>10{
 	//	link = link[:10]
 	//}
 	//fmt.Println(link)
+	par :=""
+	if len(self.Par)>0{
+		par = fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(self.Par))
+	}
+
 	return fmt.Sprintf(
-		"{_id:\"%d\",link:[%s],title:\"%s\",text:\"%s\"}",
+		"{_id:\"%d\",par:%s,children:[%s],title:\"%s\",text:\"%s\"}",
 		binary.BigEndian.Uint64(self.Id),
+		par,
 		strings.Join(link,","),
 		strings.Join(regT.FindAllString(self.Title,-1)," "),
-		url.QueryEscape(self.Content)),link
+		url.QueryEscape(self.Content))
 
 }
 func (self *Page) SaveToList()error{
@@ -367,6 +359,8 @@ func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
 	if err != nil {
 		return err
 	}
+
+	WXDBChan<-self.ToWXString()
 	//err  = DbPage.Batch(func(tx *bolt.Tx)error{
 	//	b,err := tx.CreateBucketIfNotExists(pageListBucket)
 	//	if err != nil {
@@ -382,6 +376,7 @@ func (self *Page) SaveDBBucket(b *bolt.Bucket) error {
 }
 
 func (self *Page) SaveDB() error {
+
 	v,err := json.Marshal(self)
 	if err != nil {
 		return err
@@ -413,6 +408,9 @@ func (self *Page) SaveDB() error {
 	if err != nil {
 		return err
 	}
+
+	WXDBChan <- self.ToWXString()
+
 	return self.SaveToList()
 
 }
@@ -446,7 +444,6 @@ func (self *Page) CheckUpdateWork() error {
 		}
 		return nil
 	})
-
 	vm := map[string]int{}
 	vm_ := map[string]float64{}
 	for k,v := range W {
