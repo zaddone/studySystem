@@ -1,0 +1,24 @@
+{
+  "pages": [
+    "pages/start/index",
+    "pages/search/search",
+    "pages/face/face",    
+    "pages/vod/vodshow",
+    "pages/page/index",
+    "pages/map/map"
+   
+  ],
+  "window": {
+    "navigationStyle": "custom"
+  },
+  "resizable": true,
+  "permission": {
+    "scope.userLocation": {
+      "desc": "米果推荐请求获取您的位置信息"
+    }
+  },
+  "networkTimeout": {
+    "request": 5000
+  },
+  "sitemapLocation": "sitemap.json"
+}
