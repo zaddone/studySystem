@@ -99,6 +99,20 @@ func syncPushWXDB(){
 				panic(err)
 			}
 			f.Close()
+		case []string:
+			f,err := os.OpenFile(config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			if err != nil {
+				//return err
+				panic(err)
+			}
+			for _,r := range rs{
+				_,err = f.WriteString(r)
+				if err != nil {
+					panic(err)
+				}
+			}
+			f.Close()
+
 
 		case *DelId:
 			fmt.Println("del")
@@ -179,6 +193,9 @@ func init(){
 	//fmt.Println("run vod")
 	//return
 	//updateFileToWX()
+
+	findPageVod(50000)
+
 	go start(func(in string)error{
 		//findPageVod()
 		//UpWord()
@@ -191,7 +208,7 @@ func init(){
 				}
 				w.Wait()
 			}
-			findPageVod()
+			findPageVod(500)
 			err = ClearDB()
 			if err != nil {
 				fmt.Println(err)
@@ -211,14 +228,14 @@ func init(){
 func updateFileToWX() error {
 
 	//<-time.After(5 * time.Minute)
-	_,err := os.Stat(config.Conf.CollWordName)
-	if err != nil {
-		err = WordJsonFile()
-		if err != nil {
-			return err
-		}
-	}
-	fmt.Println(len(WXDBChan))
+	//_,err := os.Stat(config.Conf.CollWordName)
+	//if err != nil {
+	//	err = WordJsonFile()
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//fmt.Println(len(WXDBChan))
 	WXDBChan<-&UpdateFile{config.Conf.CollWordName,config.Conf.CollWordName}
 	WXDBChan<-&UpdateFile{config.Conf.CollPageName,config.Conf.CollPageName}
 	return nil
@@ -328,7 +345,7 @@ func Coll(uri string,w *sync.WaitGroup)error{
 					time.Sleep(1*time.Second)
 				}
 				}
-				if count == 0 {
+				//if count == 0 {
 					if stop != nil {
 						close(stop)
 						stop = nil
@@ -336,7 +353,7 @@ func Coll(uri string,w *sync.WaitGroup)error{
 					closePage(_vb["id"].(string))
 					return
 					//panic(0)
-				}
+				//}
 				go func (){
 					stop = make(chan bool)
 					for{
@@ -751,30 +768,37 @@ func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(b *bolt.Bucket,k
 func getFileTmpName(w []byte) string{
 	return fmt.Sprintf("%s_%d",w,time.Now().UnixNano())
 }
-func WordJsonFile()error{
-	//WordTmp = getFileTmpName(WordBucket)
-	f,err := os.OpenFile(config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return EachDB(DbWord,WordBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
-		le := len(v)
-		lev := le/8
-		if lev>50 {
-			return nil
-		}
-		nolist := make([]string,0,lev)
-		for i:=0;i<le;i+=8 {
-			pid := v[i:i+8]
-			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)))
-		}
-
-		 _,err = f.WriteString(fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
-		return err
-	})
-
-}
+//func WordJsonFile()error{
+//	//WordTmp = getFileTmpName(WordBucket)
+//	//f,err := os.OpenFile(config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+//	//if err != nil {
+//	//	return err
+//	//}
+//	//defer f.Close()
+//	var wordUp []string
+//	defer func(){
+//		WXDBChan<-wordUp
+//	}()
+//	return EachDB(DbWord,WordBucket,[]byte{0},func(b *bolt.Bucket,k,v []byte)error{
+//		le := len(v)
+//		lev := le/8
+//		if lev>50 {
+//			return nil
+//		}
+//		nolist := make([]string,0,lev)
+//		for i:=0;i<le;i+=8 {
+//			pid := v[i:i+8]
+//			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)))
+//		}
+//		if !bytes.HasPrefix(k,[]byte("vod")){
+//
+//		}
+//
+//		 _,err = f.WriteString(fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
+//		return err
+//	})
+//
+//}
 func PageJsonFile()error{
 
 	return nil

@@ -25,13 +25,13 @@ Page({
     this.animation = animation
   },
   onPageScroll: function (object) {
-    if (!this.data.isUp && (object.scrollTop - this.sTop) > 20) {
+    if (!this.data.isUp && (object.scrollTop - this.sTop) > 10) {
       this.animation.translate(0, -this.data.narHeight).step({ duration: 200 })
       this.setData({
         animationData: this.animation.export()
       })
       this.data.isUp = true;
-    } else if (this.data.isUp && ((this.sTop - object.scrollTop) > 20 || object.scrollTop === 0)) {
+    } else if (this.data.isUp && ((this.sTop - object.scrollTop) > 10 || object.scrollTop === 0)) {
 
       this.animation.translate(0, 0).step({ duration: 200 })
       this.setData({

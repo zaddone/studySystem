@@ -70,15 +70,28 @@ func NewConfig(fileName string)  *Config {
 		c.WXSec = "b3005d3c298e27b60ee1f90d188a9d86"
 		c.CollPageName = "page"
 		c.CollWordName = "word"
-		c.OutKey="头条客户端|头条号|公众号|打赏|转载|订购|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
+		c.OutKey="头条客户端|头条号|转载|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
 		c.ToutiaoUri = []string{
-			//"https://www.toutiao.com",
+			"https://www.toutiao.com",
 			"https://www.toutiao.com/ch/news_hot/",
-			//"https://www.toutiao.com/ch/news_finance/",
-			//"https://www.toutiao.com/ch/news_baby/",
-			//"https://www.toutiao.com/ch/news_regimen/",
-			//"https://www.toutiao.com/ch/news_sports/",
-			//"https://www.toutiao.com/ch/news_essay/",
+			"https://www.toutiao.com/ch/news_finance/",
+			"https://www.toutiao.com/ch/news_tech/",
+			"https://www.toutiao.com/ch/news_entertainment/",
+			"https://www.toutiao.com/ch/news_game/",
+			"https://www.toutiao.com/ch/news_car/",
+			"https://www.toutiao.com/ch/funny/",
+			"https://www.toutiao.com/ch/news_baby/",
+			"https://www.toutiao.com/ch/news_regimen/",
+			"https://www.toutiao.com/ch/news_sports/",
+			"https://www.toutiao.com/ch/news_essay/",
+			"https://www.toutiao.com/ch/news_military/",
+			"https://www.toutiao.com/ch/news_fashion/",
+			"https://www.toutiao.com/ch/news_discovery/",
+			"https://www.toutiao.com/ch/news_regimen/",
+			"https://www.toutiao.com/ch/news_history/",
+			"https://www.toutiao.com/ch/news_world/",
+			"https://www.toutiao.com/ch/news_travel/",
+			"https://www.toutiao.com/ch/news_food/",
 		}
 		c.Header = http.Header{
 			//"Content-Type":[]string{"application/x-www-form-urlencoded","multipart/form-data"},

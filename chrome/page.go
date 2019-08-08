@@ -9,7 +9,7 @@ import(
 	"encoding/binary"
 	"encoding/json"
 	"net/url"
-	"os"
+	//"os"
 	//"sync"
 	"github.com/boltdb/bolt"
 	"github.com/zaddone/studySystem/config"
@@ -73,15 +73,16 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 
 	//WordTmp = getFileTmpName(WordBucket)
 	//fn := string(WordBucket)
-	fn := config.Conf.CollWordName
-	_,err = os.Stat(fn)
-	if err == nil {
-		os.Remove(fn)
-	}
-	f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-	if err != nil {
-		return err
-	}
+	//fn := config.Conf.CollWordName
+	//_,err = os.Stat(fn)
+	//if err == nil {
+	//	os.Remove(fn)
+	//}
+	//f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+	//if err != nil {
+	//	return err
+	//}
+	var saveKey []string
 	c_ := b_.Cursor()
 	var klinkWord []string
 	for k,v := c_.First();k!= nil;k,v = c_.Next(){
@@ -105,11 +106,14 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		}else{
 			if lenv != vlen {
 				b_.Put(k,nv)
-				_,err = f.WriteString(fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
+				if !bytes.HasPrefix(nv,[]byte("vod")){
+					saveKey = append(saveKey,fmt.Sprintf("{_id:\"%s\",link:[%s]}",string(k),strings.Join(nolist,",")))
+				}
 			}
 		}
 	}
-	f.Close()
+	WXDBChan<-saveKey
+	//f.Close()
 	return hand(klinkStr,klinkWord)
 	//fmt.Println("hand",err)
 
@@ -143,70 +147,70 @@ func(self *Page) GetId() uint64 {
 func (self *Page)GetUpdate() bool {
 	return self.update
 }
-func getWord() (wordlist map[string][]string,err error) {
-	wordlist = make(map[string][]string)
-	err = DbWord.Update(func(tx *bolt.Tx)error{
-		b := tx.Bucket(WordBucket)
-		if b == nil {
-			return fmt.Errorf("b = nil")
-		}
-		c := b.Cursor()
-		for k,v := c.First(); k!= nil ; k,v = c.Next() {
-			le := len(v)
-			//lev := le/8
-			noId := map[string][]byte{}
-			for i:=0;i<le;i+=8 {
-				pid := v[i:i+8]
-				noId[fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid))] = pid
-			}
-
-			nolist := make([]string,0,len(noId))
-			v_ := make([]byte,0,le)
-			for k,t := range noId {
-				nolist = append(nolist,k)
-				v_ = append(v_,t...)
-			}
-			if len(v_) < le {
-				b.Put(k,v_)
-			}
-			if len(noId)>50 {
-				continue
-			}
-			wordlist[string(k)] = nolist
-		}
-		return nil
-	})
-	return
-
-}
-func getWord_() (wordlist map[string][]string,err error) {
-	wordlist = make(map[string][]string)
-	err = DbWord.View(func(tx *bolt.Tx)error{
-		b := tx.Bucket(WordBucket)
-		if b == nil {
-			return fmt.Errorf("b = nil")
-		}
-		c := b.Cursor()
-		for k,v := c.First(); k!= nil ; k,v = c.Next() {
-			le := len(v)
-			lev := le/8
-			if lev>50 {
-				continue
-			}
-			var noId []string
-			for i:=0;i<le;i+=8 {
-				pid := v[i:i+8]
-				noId = append(
-					noId,
-				fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)) )
-			}
-			wordlist[string(k)] = noId
-		}
-		return nil
-	})
-	return
-
-}
+//func getWord() (wordlist map[string][]string,err error) {
+//	wordlist = make(map[string][]string)
+//	err = DbWord.Update(func(tx *bolt.Tx)error{
+//		b := tx.Bucket(WordBucket)
+//		if b == nil {
+//			return fmt.Errorf("b = nil")
+//		}
+//		c := b.Cursor()
+//		for k,v := c.First(); k!= nil ; k,v = c.Next() {
+//			le := len(v)
+//			//lev := le/8
+//			noId := map[string][]byte{}
+//			for i:=0;i<le;i+=8 {
+//				pid := v[i:i+8]
+//				noId[fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid))] = pid
+//			}
+//
+//			nolist := make([]string,0,len(noId))
+//			v_ := make([]byte,0,le)
+//			for k,t := range noId {
+//				nolist = append(nolist,k)
+//				v_ = append(v_,t...)
+//			}
+//			if len(v_) < le {
+//				b.Put(k,v_)
+//			}
+//			if len(noId)>50 {
+//				continue
+//			}
+//			wordlist[string(k)] = nolist
+//		}
+//		return nil
+//	})
+//	return
+//
+//}
+//func getWord_() (wordlist map[string][]string,err error) {
+//	wordlist = make(map[string][]string)
+//	err = DbWord.View(func(tx *bolt.Tx)error{
+//		b := tx.Bucket(WordBucket)
+//		if b == nil {
+//			return fmt.Errorf("b = nil")
+//		}
+//		c := b.Cursor()
+//		for k,v := c.First(); k!= nil ; k,v = c.Next() {
+//			le := len(v)
+//			lev := le/8
+//			if lev>50 {
+//				continue
+//			}
+//			var noId []string
+//			for i:=0;i<le;i+=8 {
+//				pid := v[i:i+8]
+//				noId = append(
+//					noId,
+//				fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(pid)) )
+//			}
+//			wordlist[string(k)] = noId
+//		}
+//		return nil
+//	})
+//	return
+//
+//}
 
 func ViewPageBucket(Bucket []byte,hand func(*bolt.Bucket)error) error {
 	return DbPage.View(func(t *bolt.Tx)error{
@@ -452,8 +456,9 @@ func (self *Page) CheckUpdateWork() error {
 	if err != nil {
 		log.Println(err)
 	}
+	var upWord []string
 
-	return DbWord.Update(func(tx *bolt.Tx)error{
+	err = DbWord.Update(func(tx *bolt.Tx)error{
 
 		b,err := tx.CreateBucketIfNotExists(WordBucket)
 		if err != nil {
@@ -464,15 +469,31 @@ func (self *Page) CheckUpdateWork() error {
 			//if lk>255 {
 			//	lk = 255
 			//}
+			v = append(v,self.Id...)
 
-			err:= b.Put([]byte(k),append(v,self.Id...))
+			err:= b.Put([]byte(k),v)
 			if err != nil {
 				return err
 			}
+			lev := len(v)
+			nolist := make([]string,0,lev/8)
+			for i:=0;i<lev;i+=8{
+				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(v[i:i+8])))
+			}
+			//if !strings.HasPrefix(k,"vod"){
+			upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k,strings.Join(nolist,",")))
+			//}
+
 
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	WXDBChan<-upWord
+
+	return nil
 
 }
 

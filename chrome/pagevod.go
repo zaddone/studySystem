@@ -2,6 +2,7 @@ package chrome
 import(
 	"io"
 	//"os"
+	"bytes"
 	"fmt"
 	"log"
 	"regexp"
@@ -51,7 +52,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 			return err
 		}
 		self.Title = doc.Find(".vodInfo .vodh h2").Text()
-		keyMap := map[string]int{}
+		keyMap := map[string]int{"vod"+self.Title:1}
 		ts := regT.FindAllString(self.Title,-1)
 		//self.Title = strings.Join(ts," ")
 		for _,l := range ts{
@@ -126,17 +127,45 @@ func (self *Pagevod)CheckToSaveVod()error{
 		return err
 	}
 	defer tx_.Commit()
-	wb := tx_.Bucket(WordBucket)
+	wb,err := tx_.CreateBucketIfNotExists(WordBucket)
+	if err != nil {
+		return err
+	}
+	//wb := tx_.Bucket(WordBucket)
+
 
 	tx,err := DbPage.Begin(true)
 	if err != nil {
 		return err
 	}
 	defer tx.Commit()
-	pageb := tx.Bucket(pageBucket)
+	pageb,err := tx.CreateBucketIfNotExists(pageBucket)
+	if err != nil {
+		return err
+	}
+
+	oldid := wb.Get([]byte("vod"+self.Title))
+
+	if len(oldid)>0 {
+		db := pageb.Get([]byte(oldid))
+		p_ := &Page{}
+		err := json.Unmarshal(db,p_)
+		if err != nil {
+			panic(err)
+		}
+		if strings.EqualFold(self.Title,p_.Title){
+			if len(self.Content) > len(p_.Content) {
+				p_.Content = self.Content
+				fmt.Println(p_.Title)
+				p_.SaveDBBucket(pageb)
+				return nil
+			}else{
+				return fmt.Errorf("is same %s %s",self.Title,p_.Title)
+			}
+		}
+	}
 
 	IdMap := map[string]float64{}
-	IdMapN := map[string]int{}
 	for _,_k := range self.key{
 		k := []byte(_k)
 		d_ := wb.Get(k)
@@ -151,38 +180,12 @@ func (self *Pagevod)CheckToSaveVod()error{
 		for i:=0;i<led;{
 			I := i+8
 			IdMap[string(d_[i:I])]+=leds/1
-			IdMapN[string(d_[i:I])]++
 			i = I
 		}
 	}
 
 	if len(IdMap) >0 {
-		var maxN int = 0
 		var maxID string
-		for k,v := range IdMapN {
-			if v > maxN {
-				maxN = v
-				maxID = k
-			}
-		}
-		if maxN == len(self.key){
-			db := pageb.Get([]byte(maxID))
-			p_ := &Page{}
-			err := json.Unmarshal(db,p_)
-			if err != nil {
-				panic(err)
-			}
-			if strings.EqualFold(self.Title,p_.Title){
-				if len(self.Content) > len(p_.Content) {
-					p_.Content = self.Content
-					fmt.Println(p_.Title)
-					p_.SaveDBBucket(pageb)
-					return nil
-				}else{
-					return fmt.Errorf("is same %s %s",self.Title,p_.Title)
-				}
-			}
-		}
 		var max float64 = 0
 		for k,v := range IdMap {
 			if v > max {
@@ -204,6 +207,7 @@ func (self *Pagevod)CheckToSaveVod()error{
 
 	self.SaveDBBucket(pageb)
 	fmt.Println(self.Title)
+	var upWord []string
 	for _,_k := range self.key{
 		if len([]rune(_k)) <2 {
 			continue
@@ -211,17 +215,35 @@ func (self *Pagevod)CheckToSaveVod()error{
 		k := []byte(_k)
 		b_ :=wb.Get(k)
 		if len(b_) == 0 {
-			wb.Put(k,self.Id)
+			b_=self.Id
+			//wb.Put(k,self.Id)
 		}else{
-			wb.Put(k,append(b_,self.Id...))
+			b_ = append(b_,self.Id...)
+			//wb.Put(k,append(b_,self.Id...))
 		}
+		err := wb.Put(k,b_)
+		if err != nil {
+			panic(err)
+		}
+		if strings.HasPrefix(_k,"vod"){
+			continue
+		}
+		lev := len(b_)
+		nolist := make([]string,0,lev/8)
+		for i:=0;i<lev;i+=8{
+			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(b_[i:i+8])))
+		}
+
+		upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",_k,strings.Join(nolist,",")))
+
 	}
+
 
 	key := map[string]int{}
 	for _,l := range regT.FindAllString(self.Title,-1){
 		lr := regK.FindAllString(l,-1)
 		for j:=0;j<len(lr);j++{
-			for _j:=j+1;_j<len(lr);_j++ {
+			for _j:=j+1;_j<=len(lr);_j++ {
 				k :=strings.ToLower(strings.Join(lr[j:_j],""))
 				if len([]rune(k))>1{
 					key[k]+=1
@@ -232,24 +254,36 @@ func (self *Pagevod)CheckToSaveVod()error{
 	for k_,_ := range key {
 		k:=[]byte(k_)
 		b_ :=wb.Get(k)
-		if len(b_)>0 {
-			wb.Put(k,append(b_,self.Id...))
+		if len(b_)>0 && !bytes.Contains(b_,self.Id) {
+			b_ = append(b_,self.Id...)
+			err = wb.Put(k,b_)
+			if err != nil {
+				panic(err)
+			}
+			lev := len(b_)
+			nolist := make([]string,0,lev/8)
+			for i:=0;i<lev;i+=8{
+				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(b_[i:i+8])))
+			}
+
+			upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k_,strings.Join(nolist,",")))
 		}
 	}
+	WXDBChan<-upWord
 
 	return nil
 }
 
-func syncRunPageVod(){
+func syncRunPageVod(max int){
 	for{
-		findPageVod()
+		findPageVod(max)
 		<-time.After(1*time.Hour)
 	}
 }
-func findPageVod(){
+func findPageVod(max int){
 	i:=1
-	//for c:=0;c<20;{
-	for c:=0;c<30000;{
+	for c:=0;c<max;{
+	//for c:=0;c<30000;{
 		err:= getList(i,func(u,d string)error{
 			//fmt.Println(u,d)
 			pv := NewPagevod()

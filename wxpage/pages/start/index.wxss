@@ -14,13 +14,42 @@ padding:20rpx 0rpx 10rpx 50rpx;
   border:0rpx;
   left:20rpx;
 }
+.face_img_light_big{
+  width: 100%;
+   height:200rpx; 
+   border-radius: 10rpx;
+   mix-blend-mode:darken; 
+   opacity:.3;
+}
+.face_img_dark_big{
+  width: 100%;
+   height:200rpx; 
+   border-radius: 10rpx;
+   mix-blend-mode:lighten; 
+   opacity:.9;
+}
+
 .today{
   font-weight:bold;
   font-size:33rpx;
 }
+.face {
+  position:relative;
+}
+
+.text{
+  position:absolute;
+  padding:20rpx;
+  top:0;  
+  right:0;
+  font-weight:bold;
+  font-size:35rpx;
+}
+
 .search {
 border:0;
 text-align: center;
+padding-top:10rpx;
 
 }
 .search_dark_big{

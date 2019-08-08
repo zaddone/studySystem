@@ -41,12 +41,20 @@ Page({
         })
     })
   },
+  toFace(){
+    wx.navigateTo({ url: "../face/face" })
+  },
   onLoad(obj) {
 
     let that = this   
     app.getDBColl(function(){
       that.setData({
         adId: app.globalData.adId,
+      })
+    })
+    app.getToday(function(t){
+      that.setData({
+        today:t
       })
     })
     //that.setIndexList()

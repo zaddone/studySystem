@@ -5,8 +5,8 @@ var qqmapsdk = new QQMapWX({
   key: 'DFPBZ-F7YKX-QBQ4Z-TIIXH-VSLRE-JFFGJ'
 });
 var path = `${wx.env.USER_DATA_PATH}/tts.wav`
-var patt1=/[a-zA-Z0-9]+|[\u3007\u3400-\u4DB5\u4E00-\u9FCB\uE815-\uE864]/g;
-var patt2=/[^\u3007\u3400-\u4DB5\u4E00-\u9FCB\uE815-\uE864a-zA-z0-9]/g;
+var patt1 = /[a-zA-Z0-9]+|[\u3007\u3400-\u4DB5\u4E00-\u9FCB\uE815-\uE864]/g;
+var patt2 = /[^\u3007\u3400-\u4DB5\u4E00-\u9FCB\uE815-\uE864a-zA-z0-9]/g;
 //var api_key ="wx0124084220537d9f"
 //var secret_key = "2076410d21b7ce51244ea0b0e7cd8c08"
 //var App_ID =2119096253
@@ -40,7 +40,7 @@ App({
     let that = this
     this.innerAudioContext.onEnded(function () {
       console.log("end", path)
-     
+
       that.fm.stat({
         path: path,
         success: res => {
@@ -72,7 +72,27 @@ App({
     this.clearStorageDB()
     //this.getKey()
   },
-
+  getToday: function (hand) {
+    if (this.globalData.today) {
+      if (new Date().getDate() == this.globalData.today[2]) {
+        hand(this.globalData.today)
+        return
+      }
+    }
+    let that = this
+    wx.request({
+      url: "https://rest.shanbay.com/api/v2/quote/quotes/today/",
+      success: function (res) {
+        console.log(res)
+        that.globalData.today = {
+          img: res.data.data.origin_img_urls[0].replace(/png.*/, "png"),
+          text: res.data.data.translation,
+          date: res.data.data.assign_date.split("-"),
+        }
+        hand(that.globalData.today)
+      },
+    })
+  },
   getDBColl(handle) {
     let that = this;
     if (this.globalData.dbColl != "") {
@@ -91,7 +111,7 @@ App({
     })
   },
   theme_start: function () {
-    //return "light_big";
+   // return "dark_big";
     var h = (new Date()).getHours();
     if (h > this.globalData.rz && h < this.globalData.rw) {
       return "light_big";
@@ -100,7 +120,7 @@ App({
     }
   },
   theme: function () {
-    //return "light_big";
+    //return "dark_big";
     var h = (new Date()).getHours();
     if (h > this.globalData.rz && h < this.globalData.rw) {
       wx.setBackgroundTextStyle({
@@ -158,12 +178,12 @@ App({
 
   },
   //https://api.ai.qq.com/fcgi-bin/nlp/nlp_textchat
-  textChat(txt,hand){
+  textChat(txt, hand) {
     //this.session = this.randomString(32)
     let req = {
       app_id: this.globalData.appid,
       time_stamp: Date.parse(new Date()) / 1000,
-      nonce_str: this.randomString(12),      
+      nonce_str: this.randomString(12),
       session: "wxxiaochengxu",
       question: txt,
     }
@@ -226,7 +246,7 @@ App({
 
   playtts(txt) {
     txt = txt.replace(/ |~|"|'/g, ',')
-    console.log(txt)    
+    console.log(txt)
     let req = {
       app_id: this.globalData.appid,
       time_stamp: Date.parse(new Date()) / 1000,
@@ -293,7 +313,7 @@ App({
       this.getPageDBE(l, function (_db) {
         hand(_db)
       })
-    }    
+    }
     if (!d.par) return
     let that = this
     that.getPageDBE(d.par, function (_db) {
@@ -371,21 +391,21 @@ App({
       })
     })
   },
-  clearStorageDB(){
-    let o = (Date.parse(new Date()) / 1000) 
+  clearStorageDB() {
+    let o = (Date.parse(new Date()) / 1000)
     wx.getStorageInfo({
       success(res) {
-        for (let l of res.keys){
+        for (let l of res.keys) {
           wx.getStorage({
-            key:l,
-            success(r){
-              if (r.data.timeOut && o > r.data.timeOut ){
-                wx.removeStorage({key:l})
+            key: l,
+            success(r) {
+              if (r.data.timeOut && o > r.data.timeOut) {
+                wx.removeStorage({ key: l })
               }
-          }
+            }
           })
         }
-        
+
       }
     })
   },
@@ -582,6 +602,7 @@ App({
     })
   },
   objToArray(map) {
+    if (map.length===0)return;
     let resstr = [];
     for (let w of map) {
       resstr.push(w)
@@ -601,7 +622,7 @@ App({
   },
   getSearchKey(w) {
     let word = new Set(w.toLowerCase().split(patt2))
-    //console.log(word)
+    console.log(word)
     for (let x of word) {
       if (x.length <= 1) {
         word.delete(x)
@@ -610,8 +631,8 @@ App({
       let _x = x.match(patt1);
       for (let i = 0; i < _x.length; i++) {
         let str = _x[i]
-        if (str.length>1)
-        word.add(str)
+        if (str.length > 1)
+          word.add(str)
         for (let _i = i + 1; _i < _x.length; _i++) {
           str += _x[_i]
           word.add(str)

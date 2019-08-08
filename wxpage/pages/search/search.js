@@ -17,6 +17,7 @@ Page({
     //listshow: "hidden",
     theme: app.theme_start(),
     top: app.globalData.sysinfo.statusBarHeight + 10,
+    focus:true,
   },
 
   /**
@@ -28,6 +29,12 @@ Page({
     this.setData({ show: "block" })
     //console.log("showtts", app.globalData.access_token)
 
+  },
+  inputid(){
+    this.setData({
+      input:"",
+      focus: true,
+    })
   },
   navBotton() {
     if (getCurrentPages().length > 1)
@@ -281,9 +288,7 @@ Page({
    * 页面相关事件处理函数--监听用户下拉动作
    */
   onPullDownRefresh: function () {
-    wx.reLaunch({
-      url:"/pages/face/face",
-    })
+    this.navBotton()
   },
 
   /**

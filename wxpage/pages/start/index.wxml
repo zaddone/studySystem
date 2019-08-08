@@ -1,4 +1,4 @@
-<view style="height:{{windowsHeight}}px" class="{{theme}}">
+<view style="min-height:{{windowsHeight}}px" class="{{theme}}">
 <image  bindtap='onLoad'  class="home"  style='width:60rpx;height:60rpx;top:{{top}}px'  mode="aspectFit"  src="../../images/logo_{{theme}}.png"></image>
   <view class="home u" bindtap="openMap"  style='top:{{top}}px;left:100rpx'>{{cityname}} [地图]</view>
 
@@ -25,20 +25,25 @@
         <view>{{item.max_degree}}/{{item.min_degree}}℃</view>
       </view>
     </scroll-view>
-    <view style="padding-left:20rpx;padding-right:20rpx;">
-          <view  class="search search_{{theme}}"   bindtap='toSearch'    >
+    
+      </view>
+<view style="padding-left:20rpx;padding-right:20rpx;">
+   
+    <view  class="search search_{{theme}}"   bindtap='toSearch'    >
     <image   class="titletag"   style='width:50rpx;height:50rpx'  mode="aspectFit"  src="../../images/search_{{theme}}.png"></image>  
     <!--  <view class="titletag" style='height:50rpx;'> 搜索</view>-->
     </view>
+    <view style="height:20rpx"></view>
+     <view class="face "   bindtap='toFace' >
+    <image class="face_img_{{theme}}"  mode="aspectFill" src="{{today.img}}"></image>
+    <view class="text">{{today.text}}</view>
     </view>
-      </view>
 
-  <scroll-view style="height:{{pagelistheight}}px;" scroll-y  class="pagelist" >     
-  <view style="height:50rpx"></view>
+   
      <official-account style="color: grey;"></official-account>
    <ad ad-intervals="30" unit-id="{{adId}}" ></ad>
      <view class="alarm" wx:for="{{alarm}}" wx:key="index" bindtap="showModle"  data-item="{{item}}">{{item.title}}</view>
-   <view style="height:50rpx"></view>
-</scroll-view>
+  
+</view>
 
   </view>

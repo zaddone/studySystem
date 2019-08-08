@@ -1,11 +1,11 @@
-<image style="width: {{width}}px; height:{{height}}px; " mode="aspectFill" src="{{src}}"></image>
+<image style="width: 100%; height:100%; " mode="aspectFill" src="{{src}}"></image>
 
 <movable-area class="area"  style="width: {{width}}px; height:{{height}}px;">
-<scroll-view class="back"  style="max-height:{{height}}px;" scroll-y    scroll-into-view="{{bottomid}}"  >
+<scroll-view   class="back"  style="max-height:{{height}}px;" scroll-y    scroll-into-view="{{bottomid}}"  >
 <view class="translation {{item.self}}" wx:for="{{text}}" wx:key="index" >
-<navigator wx:if="{{item.vod}}" url="../vod/vodshow?id={{item.id}}" class="titletag link"  style="width:{{width*0.8}}px">{{item.txt}}►</navigator>
-<navigator wx:elif="{{item.id}}" url="../page/index?id={{item.id}}"   class="titletag link"  style="width:{{width*0.8}}px">{{item.txt}}</navigator>
-<view wx:else  class="titletag"  style="width:{{width*0.8}}px">{{item.txt}}</view>
+<navigator wx:if="{{item.vod}}" url="../vod/vodshow?id={{item.id}}" class="titletag link"  style="max-width:{{width*0.8}}px">{{item.txt}}►</navigator>
+<navigator wx:elif="{{item.id}}" url="../page/index?id={{item.id}}"   class="titletag link"  style="max-width:{{width*0.8}}px">{{item.txt}}</navigator>
+<view wx:else  class="titletag"  style="max-width:{{width*0.8}}px">{{item.txt}}</view>
 <view style="height:10rpx" ></view>
 </view>
  <view style="height:20rpx" id="bottomid"></view>

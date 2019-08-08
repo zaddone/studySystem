@@ -7,7 +7,7 @@
 
     <view class="back">
       <view class="search search_{{theme}}" style=''>
-        <input id="search" class="titletag" confirm-type="search" placeholder="搜索" type="text" bindconfirm="onSearch" auto-focus bindfocus="showtts" value="{{input}}" />
+        <input id="search" class="titletag" confirm-type="search" placeholder="搜索" type="text" bindconfirm="onSearch" auto-focus focus="{{focus}}" bindfocus="showtts" value="{{input}}" />
         <image bindtap="inputid" class="titletag searchtag" style='' mode="aspectFit" src="../../images/search_{{theme}}.png"></image>
       </view>
       <view class="tts" style="display: {{show}};" bindtouchstart="touchStart" bindtouchend="touchEnd">

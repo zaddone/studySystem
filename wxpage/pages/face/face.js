@@ -1,9 +1,5 @@
 var app = getApp();
 Page({
-
-  /**
-   * Page initial data
-   */
   data: {
     height: app.globalData.sysinfo.windowHeight,
     width: app.globalData.sysinfo.windowWidth,
@@ -27,15 +23,17 @@ Page({
         if (input.length > 30) break
       }
     }
-
     if (input.length === 0) return
+    let w = app.getSearchKey(input)
+    if (w.length===0)return
     wx.cloud.callFunction({
       name: 'searcheasy',
       data: {
-        words: app.getSearchKey(input),
+        words:w,
       },
       success: function (res) {
-        if (res.result.length === 0) return
+        if (!res.result || res.result.length === 0) return
+        //let lk = Math.floor(Math.random() * res.result.length )
         let id_ = res.result[0]
         for (let l of that.data.text) {
           if (l.id) {
@@ -140,24 +138,15 @@ Page({
   },
   onLoad: function (options) {
     let that = this
-    wx.request({
-      url: "https://rest.shanbay.com/api/v2/quote/quotes/today/",
-      success: function (res) {
-        console.log(res)
-        //let src = res.data.data.origin_img_urls[0].replace(/png.*/, "png");
-        //console.log(src)
-        //let textlist = []         
-        //that.data.text.push({ txt: res.data.data.translation, self: "" })        
-        that.setData({
-          src: res.data.data.origin_img_urls[0].replace(/png.*/, "png"),
-          text: [{ txt: res.data.data.translation, self: "" }],
-
-          //scrollTop: that.data.height,
-        }, that.toSearch())
-
-      },
-
+    app.getToday(function(today){
+      that.data.text = [{ txt: today.text, self: "" }]
+      that.setData({
+        src: today.img,
+        text: that.data.text ,
+      })
+      that.toSearch()
     })
+    
     //https://rest.shanbay.com/api/v2/quote/quotes/today/
   },
   scrolltolower: function (e) {
@@ -197,7 +186,7 @@ Page({
    */
 
   onPullDownRefresh: function () {
-    wx.reLaunch({
+    wx.navigateTo({
       url: "/pages/search/search",
     })
   },
