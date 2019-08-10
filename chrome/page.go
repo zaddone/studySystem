@@ -60,6 +60,7 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		err = b.Delete(k)
 		i = I
 	}
+	b.Put([]byte("page"),li[pli:])
 
 	tx_,err := DbWord.Begin(true)
 	if err != nil {
@@ -470,12 +471,17 @@ func (self *Page) CheckUpdateWork() error {
 			//	lk = 255
 			//}
 			v = append(v,self.Id...)
+			lev := len(v)
+			if lev/8 > 20 {
+				v= v[8:]
+				//continue
+			}
 
 			err:= b.Put([]byte(k),v)
 			if err != nil {
 				return err
 			}
-			lev := len(v)
+
 			nolist := make([]string,0,lev/8)
 			for i:=0;i<lev;i+=8{
 				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(v[i:i+8])))
@@ -491,7 +497,7 @@ func (self *Page) CheckUpdateWork() error {
 	if err != nil {
 		return err
 	}
-	WXDBChan<-upWord
+	WXDBChan <- upWord
 
 	return nil
 

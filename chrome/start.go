@@ -194,7 +194,10 @@ func init(){
 	//return
 	//updateFileToWX()
 
-	findPageVod(50000)
+	//findPageVod(50000)
+	//updateFileToWX()
+	//return
+	//<-time.After(30 * time.Minute)
 
 	go start(func(in string)error{
 		//findPageVod()
@@ -208,7 +211,7 @@ func init(){
 				}
 				w.Wait()
 			}
-			findPageVod(500)
+			findPageVod(1000)
 			err = ClearDB()
 			if err != nil {
 				fmt.Println(err)

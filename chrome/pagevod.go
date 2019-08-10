@@ -82,6 +82,7 @@ func (self *Pagevod) loadPage(uri string,) error {
 
 	})
 }
+
 func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 
 	self.Content = contentTag + strings.Join(self.vod,"|")
@@ -118,8 +119,8 @@ func (self *Pagevod) SaveVod(wb,pb *bolt.Bucket)error{
 	}
 	return self.SaveDBBucket(pb)
 
-
 }
+
 func (self *Pagevod)CheckToSaveVod()error{
 	self.Content = contentTag + strings.Join(self.vod,"|")
 	tx_,err := DbWord.Begin(true)
@@ -147,64 +148,28 @@ func (self *Pagevod)CheckToSaveVod()error{
 	oldid := wb.Get([]byte("vod"+self.Title))
 
 	if len(oldid)>0 {
-		db := pageb.Get([]byte(oldid))
-		p_ := &Page{}
+		db := pageb.Get(oldid)
+		p_ := &Pagevod{}
 		err := json.Unmarshal(db,p_)
 		if err != nil {
 			panic(err)
 		}
-		if strings.EqualFold(self.Title,p_.Title){
-			if len(self.Content) > len(p_.Content) {
-				p_.Content = self.Content
-				fmt.Println(p_.Title)
-				p_.SaveDBBucket(pageb)
-				return nil
-			}else{
-				return fmt.Errorf("is same %s %s",self.Title,p_.Title)
-			}
+		self.Id = p_.Id
+		if !strings.EqualFold(self.Content,p_.Content){
+			self.SaveDBBucket(pageb)
+			self.getTitleKey(wb)
+			self.getTitlePar(wb,pageb)
+			return nil
 		}
+		self.getTitleKey(wb)
+		if !self.getTitlePar(wb,pageb){
+			return fmt.Errorf("is same %s %s",self.Title,p_.Title)
+		}
+		self.SaveDBBucket(pageb)
+		return nil
+		//}
 	}
-
-	IdMap := map[string]float64{}
-	for _,_k := range self.key{
-		k := []byte(_k)
-		d_ := wb.Get(k)
-		if d_ == nil {
-			//IdMap[_k]
-			//wb.Put(k,self.Id)
-			continue
-		}
-		//wb.Put(k,append(d_,self.Id...))
-		led := len(d_)
-		leds := float64(led)
-		for i:=0;i<led;{
-			I := i+8
-			IdMap[string(d_[i:I])]+=leds/1
-			i = I
-		}
-	}
-
-	if len(IdMap) >0 {
-		var maxID string
-		var max float64 = 0
-		for k,v := range IdMap {
-			if v > max {
-				max = v
-				maxID = k
-			}
-		}
-		pid := []byte(maxID)
-		db := pageb.Get(pid)
-		p_ := &Page{}
-		err = json.Unmarshal(db,p_)
-		if err != nil {
-			panic(err)
-		}
-		self.Par = pid
-		p_.Children = append(p_.Children,self.Id...)
-		p_.SaveDBBucket(pageb)
-	}
-
+	self.getTitlePar(wb,pageb)
 	self.SaveDBBucket(pageb)
 	fmt.Println(self.Title)
 	var upWord []string
@@ -221,6 +186,10 @@ func (self *Pagevod)CheckToSaveVod()error{
 			b_ = append(b_,self.Id...)
 			//wb.Put(k,append(b_,self.Id...))
 		}
+		lev := len(b_)
+		if lev/8 > 20 {
+			b_ = b_[8:]
+		}
 		err := wb.Put(k,b_)
 		if err != nil {
 			panic(err)
@@ -228,17 +197,72 @@ func (self *Pagevod)CheckToSaveVod()error{
 		if strings.HasPrefix(_k,"vod"){
 			continue
 		}
-		lev := len(b_)
 		nolist := make([]string,0,lev/8)
 		for i:=0;i<lev;i+=8{
 			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(b_[i:i+8])))
 		}
-
 		upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",_k,strings.Join(nolist,",")))
-
 	}
+	WXDBChan<-upWord
+	self.getTitleKey(wb)
+
+	return nil
+}
+func (self *Pagevod)getTitlePar(wb,pageb *bolt.Bucket)bool{
+	IdMap := map[string]float64{}
+	for _,_k := range self.key{
+		k := []byte(_k)
+		d_ := wb.Get(k)
+		if d_ == nil {
+			//IdMap[_k]
+			//wb.Put(k,self.Id)
+			continue
+		}
+		//wb.Put(k,append(d_,self.Id...))
+		led := len(d_)
+		leds := float64(led)
+		for i:=0;i<led;{
+			I := i+8
+			_id := d_[i:I]
+			if !bytes.Equal(_id,self.Id){
+				IdMap[string(_id)]+=leds/1
+			}
+			i = I
+		}
+	}
+	if len(IdMap) ==0 {
+		return false
+	}
+	var maxID string
+	var max float64 = 0
+	for k,v := range IdMap {
+		if v > max {
+			max = v
+			maxID = k
+		}
+	}
+	pid := []byte(maxID)
+	if len(self.Par)>0 && bytes.Equal(self.Par,pid){
+		return false
+	}
+	if len(self.Children)>0 && bytes.Contains(self.Children,pid){
+		return false
+	}
+	db := pageb.Get(pid)
+	p_ := &Page{}
+	err := json.Unmarshal(db,p_)
+	if err != nil {
+		panic(err)
+	}
+	self.Par = pid
+	p_.Children = append(p_.Children,self.Id...)
+	p_.SaveDBBucket(pageb)
+	return true
 
 
+}
+func (self *Pagevod)getTitleKey(wb *bolt.Bucket){
+	var upWord []string
 	key := map[string]int{}
 	for _,l := range regT.FindAllString(self.Title,-1){
 		lr := regK.FindAllString(l,-1)
@@ -251,27 +275,37 @@ func (self *Pagevod)CheckToSaveVod()error{
 			}
 		}
 	}
+	keyStr := strings.Join(self.key,",")
 	for k_,_ := range key {
 		k:=[]byte(k_)
 		b_ :=wb.Get(k)
-		if len(b_)>0 && !bytes.Contains(b_,self.Id) {
-			b_ = append(b_,self.Id...)
-			err = wb.Put(k,b_)
-			if err != nil {
-				panic(err)
-			}
-			lev := len(b_)
-			nolist := make([]string,0,lev/8)
-			for i:=0;i<lev;i+=8{
-				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(b_[i:i+8])))
-			}
-
-			upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k_,strings.Join(nolist,",")))
+		if len(b_)==0 || bytes.Contains(b_,self.Id) {
+			continue
 		}
+		//self.key
+		if !strings.Contains(keyStr,k_){
+			self.key = append(self.key,k_)
+		}
+		b_ = append(b_,self.Id...)
+
+		lev := len(b_)
+		out := lev/8 > 20
+		if out {
+			b_ = b_[8:]
+		}
+		err := wb.Put(k,b_)
+		if err != nil {
+			panic(err)
+		}
+		nolist := make([]string,0,lev/8)
+		for i:=0;i<lev;i+=8{
+			nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(b_[i:i+8])))
+		}
+		upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k_,strings.Join(nolist,",")))
+
 	}
 	WXDBChan<-upWord
 
-	return nil
 }
 
 func syncRunPageVod(max int){
