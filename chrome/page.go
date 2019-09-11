@@ -441,7 +441,7 @@ func (self *Page) CheckUpdateWork() error {
 		}
 	}
 	//fmt.Println(max,len(vm),len(W))
-	if (float64(max)/float64(len(W))) > 0.9 {
+	if (float64(max)/float64(len(W))) > 0.7 {
 		return fmt.Errorf("is Same %d %d",max,len(W))
 	}
 	var max_ float64
@@ -470,24 +470,29 @@ func (self *Page) CheckUpdateWork() error {
 			//if lk>255 {
 			//	lk = 255
 			//}
+
+			if bytes.Contains(v,self.Id){
+				continue
+			}
 			v = append(v,self.Id...)
 			lev := len(v)
 			if lev/8 > 20 {
 				v= v[8:]
 				//continue
 			}
-
+			nolist := make([]string,0,lev/8)
+			for i:=0;i<lev;i+=8{
+				v_ := v[i:i+8]
+				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(v_)))
+			}
+			//if !strings.HasPrefix(k,"vod"){
+			if len(nolist)>0{
+			upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k,strings.Join(nolist,",")))
+			}
 			err:= b.Put([]byte(k),v)
 			if err != nil {
 				return err
 			}
-
-			nolist := make([]string,0,lev/8)
-			for i:=0;i<lev;i+=8{
-				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(v[i:i+8])))
-			}
-			//if !strings.HasPrefix(k,"vod"){
-			upWord =append(upWord,fmt.Sprintf("{_id:\"%s\",link:[%s]}",k,strings.Join(nolist,",")))
 			//}
 
 

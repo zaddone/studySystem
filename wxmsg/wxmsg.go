@@ -294,6 +294,43 @@ func UpDBToWX(coll,uri string)error{
 
 }
 
+func UpFileToWX_(uri,fileName string) (string,string,error) {
+	_,err := os.Stat(uri)
+	if err != nil {
+		return "","",err
+	}
+
+	//fileName := fmt.Sprintf("%d.mp3",time.Now().Unix())
+	var res  map[string]interface{}
+	err = PostRequest(
+		"https://api.weixin.qq.com/tcb/uploadfile",
+		map[string]interface{}{
+			"path":fileName,
+		},
+		func(body io.Reader)error{
+		return json.NewDecoder(body).Decode(&res)
+	})
+	if err != nil {
+		panic(err)
+		return "","",err
+	}
+	params := map[string]io.Reader{
+		"key":strings.NewReader(fileName),
+		"signature":strings.NewReader(res["authorization"].(string)),
+		"x-cos-security-token":strings.NewReader(res["token"].(string)),
+		"x-cos-meta-fileid":strings.NewReader(res["cos_file_id"].(string)),
+		"file":mustOpen(uri),
+	}
+	//client := http.DefaultClient
+	err = Upload(res["url"].(string), params,fileName)
+	if err != nil {
+		return "","",err
+		//panic(err)
+	}
+	//fmt.Println(res["file_id"].(string))
+	//return res["file_id"].(string),nil
+	return fileName,res["file_id"].(string),nil
+}
 
 func UpFileToWX(uri string) (string,string,error) {
 
@@ -421,6 +458,7 @@ func mustOpen(f string) *os.File {
     }
     return r
 }
+
 func NewUploadRequest(link string, params map[string]string, name, path string) (*http.Request, error) {
 	fp, err := os.Open(path)
 	if err != nil {

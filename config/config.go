@@ -11,7 +11,7 @@ var(
 )
 func init(){
 	//EntryList = make(chan *Entry,1000)
-	flag.Parse()
+	//flag.Parse()
 	Conf = NewConfig(*LogFileName)
 }
 type Config struct {
@@ -29,6 +29,7 @@ type Config struct {
 	WXSec string
 	CollPageName string
 	CollWordName string
+	CollPath string
 	ToutiaoUri []string
 	//UserInfo *url.Values
 	OutKey string
@@ -51,25 +52,24 @@ func NewConfig(fileName string)  *Config {
 	var c Config
 	_,err := os.Stat(fileName)
 	if err != nil {
-		//c.UserInfo=&url.Values{
-		//"username":[]string{""},
-		//"password":[]string{""},
-		//"randCode":[]string{""}}
-		//c.UserArr=[]string{"lqylqjd","lqylxhsq","lqyyhsq","lqyjpc"}
 		c.Coll = true
 		c.Proxy = ""
-		c.MaxPage = 300
-		c.KvDbPath="MyKV.db"
-		c.DeduPath="dedu.db"
+		c.MaxPage = 60000
 		c.Static = "static"
 		c.Port=":8080"
-		c.DbPath = "foo.db"
 		c.Templates = "./templates/*"
-		c.WeixinUrl = "https://weixin.sogou.com/weixin?type=1&s_from=input&query=longquanjy&ie=utf8"
 		c.WXAppid = "wx92ebd09c7b0d944f"
 		c.WXSec = "b3005d3c298e27b60ee1f90d188a9d86"
 		c.CollPageName = "page"
 		c.CollWordName = "word"
+		c.CollPath = "/data"
+		_,err = os.Stat(c.CollPath)
+		if err != nil {
+			err = os.MkdirAll(c.CollPath,0777)
+			if err != nil {
+				panic(err)
+			}
+		}
 		c.OutKey="头条客户端|头条号|转载|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
 		c.ToutiaoUri = []string{
 			"https://www.toutiao.com",

@@ -17,8 +17,8 @@ import(
 func main(){
 
 	Router := gin.Default()
-	Router.Static("/static","./static")
-	Router.LoadHTMLGlob("./templates/*")
+	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
+	Router.LoadHTMLGlob(config.Conf.Templates+"/*")
 	Router.GET("/",func(c *gin.Context){
 		c.HTML(http.StatusOK,"index.tmpl",nil)
 	})
@@ -61,14 +61,15 @@ func main(){
 	Router.GET("/showlist/:max",func(c *gin.Context){
 		be := c.DefaultQuery("begin","")
 		var err error
-		beg := make([]byte,8)
+		var beg []byte
 		if be != "" {
+			//beg = make([]byte,8)
 			beg,err = base64.StdEncoding.DecodeString(be)
 			if err != nil {
 				c.String(http.StatusNotFound,fmt.Sprintln(err))
 				return
 			}
-			binary.BigEndian.PutUint64(beg,binary.BigEndian.Uint64(beg)+1)
+			//binary.BigEndian.PutUint64(beg,binary.BigEndian.Uint64(beg))
 		}
 		max,err := strconv.Atoi(c.Param("max"))
 		if err != nil {

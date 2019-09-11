@@ -48,8 +48,8 @@ var (
 	//WXDBPushChan = make(chan *UpdateId,100)
 	//WXDBDeleteChan = make(chan *DelId,100)
 	WXDBChan = make(chan interface{},100)
-	WordDB = "word.db"
-	PageDB = "page.db"
+	WordDB = config.Conf.CollPath+"/"+config.Conf.CollWordName+".db"
+	PageDB = config.Conf.CollPath+"/"+config.Conf.CollPageName+".db"
 	pageBucket = []byte("page")
 	pageListBucket = []byte("pageList")
 	//pageVodBucket = []byte("pageVod")
@@ -89,7 +89,7 @@ func syncPushWXDB(){
 		p := <-WXDBChan
 		switch rs := p.(type) {
 		case string:
-			f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			f,err := os.OpenFile(config.Conf.CollPath+"/"+config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
 			if err != nil {
 				//return err
 				panic(err)
@@ -100,7 +100,7 @@ func syncPushWXDB(){
 			}
 			f.Close()
 		case []string:
-			f,err := os.OpenFile(config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
+			f,err := os.OpenFile(config.Conf.CollPath+"/"+config.Conf.CollWordName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
 			if err != nil {
 				//return err
 				panic(err)
@@ -128,10 +128,11 @@ func syncPushWXDB(){
 		//	}
 		case *UpdateFile:
 			fmt.Println("file",rs)
-			err := wxmsg.UpDBToWX(rs.coll,rs.uri)
+			uri := config.Conf.CollPath+"/"+rs.uri
+			err := wxmsg.UpDBToWX(rs.coll,uri)
 			if err != nil {
 				log.Println(err)
-				if _,err = os.Stat(rs.uri);err== nil {
+				if _,err = os.Stat(uri);err== nil {
 					WXDBChan<-rs
 				}
 			}
@@ -211,11 +212,13 @@ func init(){
 				}
 				w.Wait()
 			}
-			findPageVod(1000)
+
 			err = ClearDB()
 			if err != nil {
 				fmt.Println(err)
 			}
+
+			findPageVod(1000)
 			//fmt.Println("updatefile")
 
 			log.Println("UpdatefileToWX")
@@ -248,8 +251,8 @@ func updateFileToWX() error {
 
 func ClearDB() error {
 
-	fmt.Println("begin Clear")
-	defer fmt.Println("end Clear")
+	//fmt.Println("begin Clear")
+	//defer fmt.Println("end Clear")
 
 	return wxmsg.CollectionClearDB(func() error {
 		//return clearLocalDB(max,wxmsg.DBDelete)
@@ -751,6 +754,31 @@ func SearchPage(key string,hand func(p *Page)) error {
 
 }
 
+func EachDBf(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(b *bolt.Bucket,k,v []byte)error)error{
+
+	return db.View(func(tx *bolt.Tx)error{
+		b := tx.Bucket(Bucket)
+		if b == nil {
+			return fmt.Errorf("%s ==nil",Bucket)
+		}
+		c := b.Cursor()
+		var k,v []byte
+		if len(beginkey) == 0 {
+			k,v = c.Last()
+		}else{
+			k,v = c.Seek(beginkey)
+		}
+		for ;k!= nil;k,v = c.Prev(){
+			err := hand(b,k,v)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+}
+
 func EachDB(db *bolt.DB,Bucket []byte,beginkey []byte,hand func(b *bolt.Bucket,k,v []byte)error)error{
 
 	return db.View(func(tx *bolt.Tx)error{
@@ -856,10 +884,10 @@ func PageJsonFile()error{
 
 func ReadPageList(begin []byte,max int) (list []*Page,err error){
 	list = make([]*Page,0,max)
-	err = EachDB(DbPage,pageBucket,begin,func(b *bolt.Bucket,k,v []byte)error{
+	err = EachDBf(DbPage,pageBucket,begin,func(b *bolt.Bucket,k,v []byte)error{
 		p := &Page{}
 		er := json.Unmarshal(v,p)
-		if er == nil {
+		if er == nil && !strings.HasPrefix(p.Content,contentTag) {
 			p.Title += fmt.Sprintln(binary.BigEndian.Uint64(k))
 			list = append(list,p)
 			if len(list)>=max {

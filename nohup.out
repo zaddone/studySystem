@@ -1,0 +1,26 @@
+setToKen 7100
+chrome init
+2019/09/10 15:39:40 run
+[GIN-debug] [WARNING] Now Gin requires Go 1.6 or later and Go 1.7 will be required soon.
+
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /static/*filepath         --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /static/*filepath         --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] Loaded HTML Templates (2): 
+	- 
+	- index.tmpl
+
+[GIN-debug] GET    /                         --> main.main.func1 (3 handlers)
+[GIN-debug] GET    /del                      --> main.main.func2 (3 handlers)
+[GIN-debug] GET    /search/:key              --> main.main.func3 (3 handlers)
+[GIN-debug] GET    /pagejson                 --> main.main.func4 (3 handlers)
+[GIN-debug] GET    /showlist/:max            --> main.main.func5 (3 handlers)
+[GIN-debug] Listening and serving HTTP on :8080
+https://www.toutiao.com
+map[id:1.568101187e+09 method:Network.getResponseBody params:map[requestId:1000005008.33]]
+b==nil

@@ -21,6 +21,39 @@ func init(){
 		panic(err)
 	}
 }
+func ClientHttp__(path string,ty string,r io.Reader,h http.Header, hand func(io.Reader,*http.Response)error) error {
+	Req, err := http.NewRequest(ty,path,r)
+	if err != nil {
+		return err
+	}
+	if h != nil {
+		for k,v := range h {
+			for _,_v := range v{
+				Req.Header.Add(k,_v)
+			}
+		}
+	}
+	Cli := &http.Client{Jar:Jar}
+	res, err := Cli.Do(Req)
+	if err != nil {
+		return err
+	}
+	var reader io.ReadCloser
+	switch res.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, _ = gzip.NewReader(res.Body)
+	case "deflate":
+		reader = flate.NewReader(res.Body)
+		//defer reader.Close()
+	default:
+		reader = res.Body
+	}
+	if hand != nil {
+		err = hand(reader,res)
+	}
+	reader.Close()
+	return err
+}
 
 func ClientHttp_(path string,ty string,r io.Reader,h http.Header, hand func(io.Reader,int)error) error {
 	//time.Sleep(time.Second*5)

@@ -183,6 +183,9 @@ func (self *Pagevod)CheckToSaveVod()error{
 			b_=self.Id
 			//wb.Put(k,self.Id)
 		}else{
+			if bytes.Contains(k,self.Id){
+				continue
+			}
 			b_ = append(b_,self.Id...)
 			//wb.Put(k,append(b_,self.Id...))
 		}
@@ -253,6 +256,9 @@ func (self *Pagevod)getTitlePar(wb,pageb *bolt.Bucket)bool{
 	err := json.Unmarshal(db,p_)
 	if err != nil {
 		panic(err)
+	}
+	if bytes.Contains(p_.Children,self.Id) {
+		return false
 	}
 	self.Par = pid
 	p_.Children = append(p_.Children,self.Id...)
