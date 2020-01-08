@@ -41,6 +41,8 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		return fmt.Errorf("b == nil")
 	}
 	li := b.Get([]byte("page"))
+
+	fmt.Println("clear db",len(li)/8)
 	pli := len(li)  - config.Conf.MaxPage*8
 
 	if pli < 1  {
@@ -48,11 +50,16 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 	}
 
 	klink:=li[:pli]
+	klinkcp := make([]byte,0,len(klink))
 	var klinkStr []string
 	cTag := []byte(contentTag)
 	for i:=0;i<pli;{
 		I := i+8
 		k := li[i:I]
+
+		fmt.Println(pli,i)
+
+		i = I
 		cou := b.Get(k)
 		if cou== nil {
 			continue
@@ -60,14 +67,14 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		if bytes.Contains(cou,cTag){
 			continue
 		}
+
+		fmt.Println("del")
 		err = b.Delete(k)
 		if err != nil {
 			panic(err)
 		}
+		klinkcp = append(klinkcp,k...)
 		klinkStr = append(klinkStr,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(k)))
-
-		//err = b.Delete(k)
-		i = I
 	}
 	b.Put([]byte("page"),li[pli:])
 
@@ -89,7 +96,7 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		nolist := make([]string,0,vlen/8)
 		for i:=0;i<vlen;i+=8{
 			_v := v[i:i+8]
-			if !bytes.Contains(klink,_v){
+			if !bytes.Contains(klinkcp,_v){
 				nv=append(nv,_v...)
 				nolist = append(nolist,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(_v)))
 			}

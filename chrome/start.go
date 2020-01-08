@@ -208,6 +208,12 @@ func init(){
 		w:=new(sync.WaitGroup)
 		for{
 
+			err = ClearDB()
+			if err != nil {
+				panic(err)
+				fmt.Println(err)
+			}
+
 			for _,u := range uris {
 				err = Coll(u,w)
 				if err != nil {
@@ -215,11 +221,7 @@ func init(){
 				}
 				w.Wait()
 			}
-			err = ClearDB()
-			if err != nil {
-				panic(err)
-				fmt.Println(err)
-			}
+
 
 
 			findPageVod(config.Conf.MaxPage)

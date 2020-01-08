@@ -44,7 +44,7 @@ func NewPagevod() (v *Pagevod) {
 	return
 
 }
-func (self *Pagevod) loadPage(uri string,) error {
+func (self *Pagevod) loadPage(uri string) error {
 
 	return request.ClientHttp(fmt.Sprintf("%s%s",rootUrl,uri),"GET",[]int{304,200},nil,func(body io.Reader)error{
 		doc,err := goquery.NewDocumentFromReader(body)
@@ -334,19 +334,6 @@ func findPageVod(max int){
 			}
 			c++
 			j++
-			//fmt.Println(pv)
-			//body,ids := pv.ToWXString()
-			//fmt.Println(pv.Title)
-			//WXDBChan<-&UpdateId{pv.GetId(),ids}
-			//f,err := os.OpenFile(config.Conf.CollPageName,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-			//if err != nil{
-			//	return err
-			//}
-			//defer f.Close()
-			//_,err = f.WriteString(pv.ToWXString())
-			//if err != nil {
-			//	return err
-			//}
 			return nil
 			//return pv.SaveToList()
 		})
@@ -361,6 +348,7 @@ func findPageVod(max int){
 			return
 		}
 		i++
+		fmt.Println(i,j)
 	}
 
 }
