@@ -324,7 +324,7 @@ func findPageVod(max int){
 	i:=1
 	for c:=0;c<max;{
 	//for c:=0;c<30000;{
-		//j :=0
+		j :=0
 		err:= getList(i,func(u,d string)error{
 			//fmt.Println(u,d)
 			pv := NewPagevod()
@@ -333,7 +333,7 @@ func findPageVod(max int){
 				return err
 			}
 			c++
-			//j++
+			j++
 			//fmt.Println(pv)
 			//body,ids := pv.ToWXString()
 			//fmt.Println(pv.Title)
@@ -355,6 +355,9 @@ func findPageVod(max int){
 		}
 		if err != nil {
 			fmt.Println(err)
+			return
+		}
+		if j ==0 {
 			return
 		}
 		i++

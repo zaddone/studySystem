@@ -49,9 +49,17 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 
 	klink:=li[:pli]
 	var klinkStr []string
+	cTag := []byte(contentTag)
 	for i:=0;i<pli;{
 		I := i+8
 		k := li[i:I]
+		cou := b.Get(k)
+		if cou== nil {
+			continue
+		}
+		if bytes.Contains(cou,cTag){
+			continue
+		}
 		err = b.Delete(k)
 		if err != nil {
 			panic(err)
@@ -72,18 +80,6 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 	if b_ == nil {
 		return fmt.Errorf("b == nil")
 	}
-
-	//WordTmp = getFileTmpName(WordBucket)
-	//fn := string(WordBucket)
-	//fn := config.Conf.CollWordName
-	//_,err = os.Stat(fn)
-	//if err == nil {
-	//	os.Remove(fn)
-	//}
-	//f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-	//if err != nil {
-	//	return err
-	//}
 	var saveKey []string
 	c_ := b_.Cursor()
 	var klinkWord []string

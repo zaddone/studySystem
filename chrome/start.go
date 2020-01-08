@@ -222,7 +222,7 @@ func init(){
 			}
 
 
-			findPageVod(50000)
+			findPageVod(config.Conf.MaxPage)
 			//fmt.Println("updatefile")
 
 			log.Println("UpdatefileToWX")
