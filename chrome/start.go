@@ -288,7 +288,7 @@ func requestPageList(uri,_uri string) error{
 			return nil
 		}
 		for _,d := range db["data"].([]interface{}){
-			fmt.Println(d)
+			//fmt.Println(d)
 			if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
 				fmt.Println(err)
 			}
