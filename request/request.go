@@ -55,15 +55,43 @@ func ClientHttp__(path string,ty string,r io.Reader,h http.Header, hand func(io.
 	return err
 }
 
+func ClientHttpR_(path string,ty string,r io.Reader,referer string,h http.Header, hand func(io.Reader,int)error) error {
+	Req, err := http.NewRequest(ty,path,r)
+	if err != nil {
+		return err
+	}
+	if h != nil {
+		for k,v := range h {
+			for _,_v := range v{
+				Req.Header.Add(k,_v)
+			}
+		}
+	}
+	Req.Header.Add("Referer",referer)
+	Cli := &http.Client{Jar:Jar}
+	res, err := Cli.Do(Req)
+	if err != nil {
+		return err
+	}
+
+	var reader io.ReadCloser
+	switch res.Header.Get("Content-Encoding") {
+	case "gzip":
+		reader, _ = gzip.NewReader(res.Body)
+	case "deflate":
+		reader = flate.NewReader(res.Body)
+		//defer reader.Close()
+	default:
+		reader = res.Body
+	}
+	if hand != nil {
+		err = hand(reader,res.StatusCode)
+	}
+	reader.Close()
+	return err
+
+}
 func ClientHttp_(path string,ty string,r io.Reader,h http.Header, hand func(io.Reader,int)error) error {
-	//time.Sleep(time.Second*5)
-	//var r io.Reader
-	//if body == nil {
-	//	r = nil
-	//}else{
-	//	//fmt.Println(body.Encode())
-	//	r = strings.NewReader(body.Encode())
-	//}
 	Req, err := http.NewRequest(ty,path,r)
 	if err != nil {
 		return err
@@ -80,12 +108,7 @@ func ClientHttp_(path string,ty string,r io.Reader,h http.Header, hand func(io.R
 	if err != nil {
 		return err
 	}
-	//if res.StatusCode != statu {
-	//	var da [1024]byte
-	//	n,err := res.Body.Read(da[0:])
-	//	res.Body.Close()
-	//	return fmt.Errorf("status code %d %s %s", res.StatusCode, path,string(da[:n]),err)
-	//}
+
 	var reader io.ReadCloser
 	switch res.Header.Get("Content-Encoding") {
 	case "gzip":

@@ -20,7 +20,7 @@ var (
 )
 func init(){
 	regS = regexp.MustCompile("\\s+")
-	regG = regexp.MustCompile("伦理|福利|色情")
+	regG = regexp.MustCompile("解说|福利|色情")
 }
 type page struct {
 	title string

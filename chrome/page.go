@@ -22,6 +22,7 @@ var (
 	regT *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|A-Z|\p{Han}]+`)
 	regK *regexp.Regexp = regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
 )
+
 func clearLocalDB(hand func([]string,[]string)error) error {
 
 	//db,err := bolt.Open(PageDB,0600,nil)
@@ -57,7 +58,7 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 		}
 		klinkStr = append(klinkStr,fmt.Sprintf("\"%d\"",binary.BigEndian.Uint64(k)))
 
-		err = b.Delete(k)
+		//err = b.Delete(k)
 		i = I
 	}
 	b.Put([]byte("page"),li[pli:])
@@ -102,7 +103,7 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 			//fmt.Println("-",string(k))
 			b_.Delete(k)
 			if lenv/8 < 50 {
-				klinkWord = append(klinkWord,string(k))
+				klinkWord = append(klinkWord,fmt.Sprintf("\"%s\"",string(k)))
 			}
 		}else{
 			if lenv != vlen {
@@ -281,23 +282,6 @@ func (self *Page) link(lid []byte) error {
 		if err != nil {
 			return err
 		}
-		//self.relevant = append(self.relevant,p.Id...)
-		//if !handle(p){
-		//	return nil
-		//}
-		//bytes.Replace(
-		//self.relevant = append(p.Id,p.Children...)
-		//p = findSetPage(
-		//	lid,
-		//	b,
-		//	func(p *Page)bool{
-		//		self.relevant = append(self.relevant,p.Id...)
-		//		return len(self.relevant)<=10
-		//	},
-		//)
-		//if p == nil {
-		//	return fmt.Errorf("Not Find Page")
-		//}
 		return nil
 	})
 	if err != nil {

@@ -15,7 +15,7 @@ import(
 	"encoding/binary"
 )
 var (
-	regG *regexp.Regexp = regexp.MustCompile("伦理|福利|色情")
+	regG *regexp.Regexp = regexp.MustCompile("伦理|福利|色情|解说")
 	//regW *regexp.Regexp = regexp.MustCompile(`[0-9|a-z|\p{Han}]+`)
 	regM *regexp.Regexp = regexp.MustCompile(`[0-9]+`)
 	regS = regexp.MustCompile(`\S+\$\S+\.m3u8`)
@@ -324,6 +324,7 @@ func findPageVod(max int){
 	i:=1
 	for c:=0;c<max;{
 	//for c:=0;c<30000;{
+		//j :=0
 		err:= getList(i,func(u,d string)error{
 			//fmt.Println(u,d)
 			pv := NewPagevod()
@@ -332,6 +333,7 @@ func findPageVod(max int){
 				return err
 			}
 			c++
+			//j++
 			//fmt.Println(pv)
 			//body,ids := pv.ToWXString()
 			//fmt.Println(pv.Title)
@@ -345,7 +347,8 @@ func findPageVod(max int){
 			//if err != nil {
 			//	return err
 			//}
-			return pv.SaveToList()
+			return nil
+			//return pv.SaveToList()
 		})
 		if err == io.EOF {
 			break
