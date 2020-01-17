@@ -46,7 +46,8 @@ func clearLocalDB(hand func([]string,[]string)error) error {
 	pli := len(li)  - config.Conf.MaxPage*8
 
 	if pli < 1  {
-		return fmt.Errorf("%d",pli)
+		return nil
+		//return fmt.Errorf("%d",pli)
 	}
 
 	klink:=li[:pli]
