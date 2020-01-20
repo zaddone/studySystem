@@ -3,6 +3,7 @@ import(
 	"fmt"
 	"os/exec"
 	"io"
+	"regexp"
 	//"net/url"
 	"bytes"
 	"strings"
@@ -14,6 +15,7 @@ import(
 	"time"
 	"github.com/zaddone/studySystem/request"
 	//"github.com/zaddone/wxbot/util"
+	//"github.com/zaddone/studySystem/wxmsg"
 	"github.com/gorilla/websocket"
 
 )
@@ -44,6 +46,8 @@ var(
 	DialogueMap =map[string]chan *Msg {}
 	//RunDialog = make(chan string)
 	writeChan = make(chan interface{},5)
+
+	regK *regexp.Regexp = regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
 )
 
 func main(){
@@ -317,31 +321,37 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 }
 
 
-func toChrldren_(node map[string]interface{},hand func(map[string]interface{},map[string]interface{})bool){
+func toChrldren_(node map[string]interface{},hand func(map[string]interface{},map[string]interface{})bool)bool{
 	cnode := node["children"]
 	if cnode == nil {
-		return
+		return true
 	}
 	for _,d := range cnode.([]interface{}){
 		d_ := d.(map[string]interface{})
 		if !hand(d_,node){
-			return
+			return false
 		}
-		toChrldren_(d_,hand)
+		if !toChrldren_(d_,hand){
+			return false
+		}
 	}
+	return true
 }
-func toChrldren(node map[string]interface{},hand func(map[string]interface{})bool){
+func toChrldren(node map[string]interface{},hand func(map[string]interface{})bool)bool{
 	cnode := node["children"]
 	if cnode == nil {
-		return
+		return true
 	}
 	for _,d := range cnode.([]interface{}){
 		d_ := d.(map[string]interface{})
 		if !hand(d_){
-			return
+			return false
 		}
-		toChrldren(d_,hand)
+		if !toChrldren(d_,hand){
+			return false
+		}
 	}
+	return true
 }
 
 func findMsgUserNode(userName string,root map[string]interface{},hand func(map[string]interface{})) {
@@ -410,11 +420,11 @@ func ClickBoxModel(node map[string]interface{},hand func()){
 		}
 
 	}
-	writeChan<-map[string]interface{}{
-		"method":"DOM.focus",
-		"id":0,
-		"params":map[string]interface{}{"nodeId":node["nodeId"]},
-	}
+	//writeChan<-map[string]interface{}{
+	//	"method":"DOM.focus",
+	//	"id":0,
+	//	"params":map[string]interface{}{"nodeId":node["nodeId"]},
+	//}
 	writeChan<-map[string]interface{}{
 		"method":"DOM.getContentQuads",
 		"id":Num,
@@ -455,7 +465,23 @@ func findText(node map[string]interface{},hand func(string)){
 		return true
 	})
 }
+
+func checkKeyNode(n map[string]interface{},k string) (bool){
+	attr := n["attributes"]
+	if attr == nil {
+		return false
+	}
+	for _,d := range attr.([]interface{}){
+		if !strings.Contains(d.(string),k){
+			continue
+		}
+		return true
+	}
+	return false
+
+}
 func checkMsgNode(n map[string]interface{},m *Msg) (bool){
+	//return checkKeyNode(n,m.MsgId)
 	attr := n["attributes"]
 	if attr == nil {
 		return false
@@ -472,7 +498,7 @@ func checkMsgNode(n map[string]interface{},m *Msg) (bool){
 	return false
 }
 
-func findDialogue(msg chan *Msg,success func(*Msg),complete func()) {
+func findDialogue(msg chan *Msg,success func(*Msg),complete func(map[string]interface{})) {
 	var root map[string]interface{} = nil
 	findD := func(node_r map[string]interface{},_m *Msg){
 		//fmt.Println("d",_m)
@@ -518,14 +544,76 @@ func findDialogue(msg chan *Msg,success func(*Msg),complete func()) {
 					continue G
 				}
 			default:
-				complete()
+				complete(root)
 				continue G
 			}
 		}
 	}
 }
-func OpenDialogue(uid string,msg chan *Msg) {
+func BackMsg(uid string,root map[string]interface{}){
+	//btn btn_send
+	var sendbtn,editArea map[string]interface{}
+	toChrldren(root,func(node map[string]interface{})bool{
+		if checkKeyNode(node,"btn btn_send"){
+			sendbtn = node
+			return false
+		}
+		return true
+	})
+	toChrldren(root,func(node map[string]interface{})bool{
+		if checkKeyNode(node,"editArea"){
+			editArea = node
+			return false
+		}
+		return true
+	})
+	words := make(map[string]int)
+	n:=0
+	GetMsgf(uid,func(m *Msg)error{
+		lr := regK.FindAllString(m.Content,-1)
+		for j:=0;j<len(lr);j++{
+			for _j:=j+2;_j<=len(lr);_j++ {
+				words[strings.Join(lr[j:_j],"") ]+=1
+			}
+		}
+		n++
+		if n>5 {
+			return io.EOF
+		}
+		return nil
+	})
+	str := ""
+	for k,_ := range words{
+		str += k
+		if len(str)>10 {
+			break
+		}
+	}
+	Num++
+	handMap[Num]= func(id_ float64,req map[string]interface{}){
+		delete(handMap,id_)
+		Num++
+		handMap[Num] = func(id__ float64,req_ map[string]interface{}){
+			delete(handMap,id__)
+			ClickBoxModel(sendbtn,func(){
+				fmt.Println(sendbtn)
+			})
 
+		}
+		writeChan<-map[string]interface{}{
+			"method":"Input.insertText",
+			"id":Num,
+			"params":map[string]interface{}{"text":str},
+		}
+	}
+	writeChan<-map[string]interface{}{
+		"method":"DOM.focus",
+		"id":Num,
+		"params":map[string]interface{}{"nodeId":editArea["nodeId"]},
+	}
+
+}
+func OpenDialogue(uid string,msg chan *Msg) {
 
 	if NowUserName == uid {
 		findDialogue(
@@ -535,11 +623,8 @@ func OpenDialogue(uid string,msg chan *Msg) {
 					panic(err)
 				}
 			},
-			func(){
-				GetMsg(uid,func(m *Msg)error{
-					fmt.Println(m)
-					return nil
-				})
+			func(r map[string]interface{}){
+				BackMsg(uid,r)
 				delete(DialogueMap,uid)
 				close(msg)
 			},
@@ -560,11 +645,8 @@ func OpenDialogue(uid string,msg chan *Msg) {
 					panic(err)
 				}
 			},
-			func(){
-				GetMsg(uid,func(m *Msg)error{
-					fmt.Println(m)
-					return nil
-				})
+			func(r map[string]interface{}){
+				BackMsg(uid,r)
 				delete(DialogueMap,uid)
 				close(msg)
 				w.Done()

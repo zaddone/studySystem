@@ -1,6 +1,6 @@
 package main
 import(
-	//"github.com/zaddone/studySystem/config"
+	//"github.com/zaddone/studySystem/wxmsg"
 	"github.com/boltdb/bolt"
 	"github.com/gin-gonic/gin"
 	"encoding/binary"
@@ -66,7 +66,8 @@ func GetMsgf(userid string,hand func(*Msg)error ) (err error) {
 			return fmt.Errorf("%s not found for db",name)
 		}
 		c := b.Cursor()
-		for k,v := c.Last();k==nil;k,v = c.Prev(){
+		c.Bucket()
+		for k,v := c.Last();k!=nil;k,v = c.Prev(){
 			msg := &Msg{}
 			err = msg.LoadByte(v)
 			if err != nil {

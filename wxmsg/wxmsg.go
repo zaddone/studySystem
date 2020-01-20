@@ -65,6 +65,22 @@ func init(){
 	}()
 
 }
+func RunYunFunction(funName string,words []string,h func(io.Reader)error)error{
+	uri := fmt.Sprintf("https://api.weixin.qq.com/tcb/invokecloudfunction?access_token=%s&env=%s&name=%s",toKen,env,funName)
+	db,err :=json.Marshal(map[string]interface{}{"words":words})
+	if err != nil {
+		panic(err)
+	}
+	return request.ClientHttp_(uri,"POST",bytes.NewReader(db),http.Header{"Content-Type":[]string{"application/x-www-form-urlencoded","multipart/form-data"}},func(body io.Reader,st int)error{
+		if st == 200 {
+			return h(body)
+		}
+		var da [8192]byte
+		n,err := body.Read(da[:])
+		return fmt.Errorf("status code %d %s %s", st, uri,string(da[:n]),err)
+	})
+
+}
 func PostRequest(url string,PostBody map[string]interface{},h func(io.Reader)error) error {
 	url = fmt.Sprintf("%s?access_token=%s",url,toKen)
 	PostBody["env"]=env
