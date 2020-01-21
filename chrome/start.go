@@ -202,39 +202,35 @@ func init(){
 	//return
 	//<-time.After(30 * time.Minute)
 
-	go start(func(in string)error{
-		//findPageVod()
-		//UpWord()
-		w:=new(sync.WaitGroup)
-		for{
-
-			err = ClearDB()
-			if err != nil {
-				panic(err)
-				fmt.Println(err)
-			}
-
-			for _,u := range uris {
+	go func(){
+	//findPageVod()
+	//UpWord()
+	w:=new(sync.WaitGroup)
+	for{
+		err = ClearDB()
+		if err != nil {
+			panic(err)
+			fmt.Println(err)
+		}
+		for _,u := range uris {
+			start(u,func(in string)error{
 				err = Coll(u,w)
 				if err != nil {
 					return err
 				}
 				w.Wait()
-			}
-
-
-
-			findPageVod(config.Conf.MaxPage)
-			//fmt.Println("updatefile")
-
-			log.Println("UpdatefileToWX")
-			updateFileToWX()
-			log.Println("wait 5")
-			<-time.After(24 * time.Hour)
-
+				return nil
+			})
 		}
-		return nil
-	})
+		findPageVod(config.Conf.MaxPage)
+		//fmt.Println("updatefile")
+
+		log.Println("UpdatefileToWX")
+		updateFileToWX()
+		log.Println("wait 5")
+		<-time.After(24 * time.Hour)
+	}
+	}()
 	log.Println("run")
 }
 func updateFileToWX() error {
@@ -306,13 +302,8 @@ func requestPageList(uri,_uri string) error{
 
 }
 func Coll(uri string,w *sync.WaitGroup)error{
-	//err := request.ClientHttp_(uri,"GET",nil,config.Conf.Header,nil)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println(uri)
 	var id_1 float64 = 999
-	return openPage(uri,func(v interface{})error{
+	return openPage_(func(v interface{})error{
 		_vb := v.(map[string]interface{})
 		var _uri_ string = ""
 		runStream(_vb["webSocketDebuggerUrl"].(string),w,func(_v interface{},writeChan chan interface{},wc *websocket.Conn){
@@ -382,36 +373,6 @@ func Coll(uri string,w *sync.WaitGroup)error{
 				"method":"Network.getAllCookies",
 				"id":id_1,
 			}
-
-			//err := request.ClientHttp_(_uri,"GET",nil,config.Conf.Header,
-			//func(body io.Reader,st int)error {
-			//	db,err := ioutil.ReadAll(body)
-			//	if err != nil {
-			//		return err
-			//	}
-			//	fmt.Println(st,string(db))
-			//	//time.Sleep(5*time.Second)
-			//	return nil
-			//	//return fmt.Errorf("%d %s",st,db)
-
-			//})
-			//if err != nil {
-			//	panic(err)
-			//}
-			//fmt.Println("close")
-			//err = wc.Close()
-			//if err != nil {
-			//	panic(err)
-			//}
-
-			//closePage(_vb["id"].(string))
-
-			//requestId = u["requestId"].(string)
-			//step = 1
-			//if stop != nil {
-			//	close(stop)
-			//	stop = nil
-			//}
 			return
 		})
 		return nil
@@ -419,126 +380,7 @@ func Coll(uri string,w *sync.WaitGroup)error{
 
 }
 
-func Coll_(uri string,w *sync.WaitGroup)error{
-	//runStream(in,func(v interface{},bc *websocket.Conn){
-	//	fmt.Println("b",v)
-	//})
-
-	err := request.ClientHttp_(uri,"GET",nil,config.Conf.Header,nil)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(uri)
-
-	return openPage(uri,func(v interface{})error{
-		requestId:=""
-		//count :=0
-		step:=0
-		id:=float64(time.Now().Unix())
-		var id_1 float64 = 0
-		_vb := v.(map[string]interface{})
-		var stop chan bool = nil
-		runStream(_vb["webSocketDebuggerUrl"].(string),w,func(_v interface{},writeChan chan interface{},wc *websocket.Conn){
-		//runStream(_vb["webSocketDebuggerUrl"].(string),w,func(_v interface{},writeChan chan interface{}){
-			//timeOut = time.After(time.Minute*2)
-			__v :=_v.(map[string]interface{})
-			//fmt.Println(__v)
-			if step == 0 {
-				if __v["method"] !="Network.responseReceived"{
-					return
-				}
-				u := (__v["params"].(map[string]interface{}))
-				_u := u["response"].(map[string]interface{})
-				//_uri:= _u["url"].(string)
-				if !strings.Contains(_u["url"].(string),"/api/pc/feed/"){
-					return
-				}
-
-				fmt.Println(_u)
-
-				requestId = u["requestId"].(string)
-				step = 1
-				if stop != nil {
-					close(stop)
-					stop = nil
-				}
-				return
-			}else if step ==1 {
-				if __v["method"] !="Network.loadingFinished"{
-					return
-				}
-				if !strings.EqualFold((__v["params"].(map[string]interface{}))["requestId"].(string),requestId){
-					return
-				}
-				fmt.Println(__v)
-				writeChan<-map[string]interface{}{
-					"method":"Network.getResponseBody",
-					"id":id,
-					"params":map[string]interface{}{"requestId":requestId},
-				}
-				step = 2
-				return
-			}else if step ==2 {
-				_id := __v["id"]
-				if _id==nil {
-					return
-				}
-				if id != __v["id"].(float64){
-					return
-				}
-				//fmt.Println(__v)
-				body := __v["result"].(map[string]interface{})["body"].(string)
-				body_:= map[string]interface{}{}
-				json.Unmarshal([]byte(body),&body_)
-				count := 0
-				d__ :=  body_["data"]
-				if d__ != nil {
-				for _,d := range d__.([]interface{}){
-					if err := extract(rooturl + d.(map[string]interface{})["source_url"].(string)); err != nil {
-						fmt.Println(err)
-					}else{
-						count++
-					}
-					time.Sleep(1*time.Second)
-				}
-				}
-				//if count == 0 {
-					if stop != nil {
-						close(stop)
-						stop = nil
-					}
-					closePage(_vb["id"].(string))
-					return
-					//panic(0)
-				//}
-				go func (){
-					stop = make(chan bool)
-					for{
-						select{
-							case <-time.After(5 * time.Second):
-								writeChan<-map[string]interface{}{
-									"method":"Input.dispatchKeyEvent",
-									"id":id_1,
-									"params":map[string]interface{}{
-										"type":"keyDown",
-										"windowsVirtualKeyCode":int(0x22),
-										"nativeVirtualKeyCode":int(0x22),
-									},
-								}
-							case <- stop:
-								return
-						}
-					}
-				}()
-				step = 0
-			}
-		})
-		return nil
-	})
-
-}
-
-func start(hand func(string)error){
+func start(uri string,hand func(string)error){
 	runout := func(r io.Reader){
 		var db [8192]byte
 		for{
@@ -559,26 +401,29 @@ func start(hand func(string)error){
 			}
 		}
 	}
-	for{
-		cmd := exec.Command("google-chrome",op... )
-		out,err := cmd.StdoutPipe()
-		if err != nil {
-			log.Fatal(err)
-		}
-		outerr,err := cmd.StderrPipe()
-		if err != nil {
-			log.Fatal(err)
-		}
-		go runout(out)
-		go runout(outerr)
-		err = cmd.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-		cmd.Wait()
-		out.Close()
-		outerr.Close()
-		log.Println("cmd end")
+	op = append(op,uri)
+	cmd := exec.Command("google-chrome",op... )
+	out,err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	outerr,err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go runout(out)
+	go runout(outerr)
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd.Wait()
+	out.Close()
+	outerr.Close()
+	log.Println("cmd end")
+	err = exec.Command("pkill","chrome").Run()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	//select{}
@@ -598,6 +443,32 @@ func closePage(id string){
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func openPage_(hand func(interface{})error) error {
+	return request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
+		if st != 200 {
+			db,err := ioutil.ReadAll(body)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("%d %s",st,db)
+		}
+		var k interface{}
+		err := json.NewDecoder(body).Decode(&k)
+		if err != nil {
+			return err
+		}
+		//fmt.Println(k)
+		for _,v := range k.([]interface{}){
+			er := hand(v)
+			if er != nil {
+				panic(er)
+			}
+		}
+		return nil
+
+	})
 }
 func openPage(u string,hand func(interface{})error) error {
 	return request.ClientHttp_(Ourl+"/json/new/?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
@@ -903,7 +774,6 @@ func SearchPage(key string,hand func(p *Page)) error {
 	//if len(pa)==0 {
 	//	return fmt.Errorf("page == 0 ")
 	//}
-
 
 }
 

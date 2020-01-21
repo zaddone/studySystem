@@ -4,6 +4,7 @@ import(
 	"bytes"
 )
 
+
 type Msg struct {
 	FromUserName string
 	ToUserName string

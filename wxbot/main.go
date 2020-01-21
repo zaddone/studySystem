@@ -43,6 +43,7 @@ var(
 	Num float64 = 100
 	//Mx,My float64
 	NowUserName string
+	SelfUserName  string
 	DialogueMap =map[string]chan *Msg {}
 	//RunDialog = make(chan string)
 	writeChan = make(chan interface{},5)
@@ -321,22 +322,22 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 }
 
 
-func toChrldren_(node map[string]interface{},hand func(map[string]interface{},map[string]interface{})bool)bool{
-	cnode := node["children"]
-	if cnode == nil {
-		return true
-	}
-	for _,d := range cnode.([]interface{}){
-		d_ := d.(map[string]interface{})
-		if !hand(d_,node){
-			return false
-		}
-		if !toChrldren_(d_,hand){
-			return false
-		}
-	}
-	return true
-}
+//func toChrldren_(node map[string]interface{},hand func(map[string]interface{},map[string]interface{})bool)bool{
+//	cnode := node["children"]
+//	if cnode == nil {
+//		return true
+//	}
+//	for _,d := range cnode.([]interface{}){
+//		d_ := d.(map[string]interface{})
+//		if !hand(d_,node){
+//			return false
+//		}
+//		if !toChrldren_(d_,hand){
+//			return false
+//		}
+//	}
+//	return true
+//}
 func toChrldren(node map[string]interface{},hand func(map[string]interface{})bool)bool{
 	cnode := node["children"]
 	if cnode == nil {
@@ -433,14 +434,16 @@ func ClickBoxModel(node map[string]interface{},hand func()){
 }
 
 func handSyncMsg(_db *Msg){
-
-	msglist := DialogueMap[_db.FromUserName]
+	from := _db.FromUserName
+	if from == SelfUserName {
+		from = _db.ToUserName
+	}
+	msglist := DialogueMap[from]
 	if msglist == nil {
 		msglist = make(chan *Msg,100)
-		DialogueMap[_db.FromUserName] = msglist
+		DialogueMap[from] = msglist
 	}
 	_db.Content = ""
-	//fmt.Println(_db)
 	msglist<-_db
 
 }
@@ -456,12 +459,20 @@ func GetDoc(h func(map[string]interface{})){
 		"params":map[string]interface{}{"depth":-1},
 	}
 }
-func findText(node map[string]interface{},hand func(string)){
+func findText(uid string,node map[string]interface{},hand func(string)){
+	//fmt.Println(node)
 	toChrldren(node,func(node map[string]interface{})bool{
-		if strings.EqualFold(node["nodeName"].(string),"#text"){
-			hand(node["nodeValue"].(string))
+		if checkKeyNode(node,"chatContact.MMDigest"){
+			toChrldren(node,func(node map[string]interface{})bool{
+				if strings.EqualFold(node["nodeName"].(string),"#text"){
+					hand(node["nodeValue"].(string))
+					return false
+				}
+				return true
+			})
 			return false
 		}
+
 		return true
 	})
 }
@@ -480,33 +491,35 @@ func checkKeyNode(n map[string]interface{},k string) (bool){
 	return false
 
 }
-func checkMsgNode(n map[string]interface{},m *Msg) (bool){
-	//return checkKeyNode(n,m.MsgId)
-	attr := n["attributes"]
-	if attr == nil {
-		return false
-	}
-	for _,d := range attr.([]interface{}){
-		if !strings.Contains(d.(string),m.MsgId){
-			continue
-		}
-		findText(n,func(t string){
-			m.Content = t
-		})
-		return true
-	}
-	return false
-}
+//func checkMsgNode(n map[string]interface{},m *Msg,) (bool){
+//	//return checkKeyNode(n,m.MsgId)
+//	attr := n["attributes"]
+//	if attr == nil {
+//		return false
+//	}
+//	for _,d := range attr.([]interface{}){
+//		if !strings.Contains(d.(string),m.MsgId){
+//			continue
+//		}
+//		findText(n,func(t string){
+//			m.Content = t
+//		})
+//		return true
+//	}
+//	return false
+//}
 
-func findDialogue(msg chan *Msg,success func(*Msg),complete func(map[string]interface{})) {
+func findDialogue(uid string,msg chan *Msg,success func(*Msg),complete func(map[string]interface{})) {
 	var root map[string]interface{} = nil
 	findD := func(node_r map[string]interface{},_m *Msg){
 		//fmt.Println("d",_m)
 		toChrldren(node_r,func(node map[string]interface{})bool{
-			if checkMsgNode(node,_m){
+			if checkKeyNode(node,uid){
+				findText(uid,node,func(t string){
+					_m.Content = t
+				})
 				fmt.Println("find",_m)
 				success(_m)
-				//root = fnode
 				return false
 			}
 			return true
@@ -518,7 +531,7 @@ func findDialogue(msg chan *Msg,success func(*Msg),complete func(map[string]inte
 	//for {
 	for m:= range msg {
 
-		time.Sleep(100*time.Millisecond)
+		time.Sleep(500*time.Millisecond)
 		w.Add(1)
 		GetDoc(func(result map[string]interface{}){
 			root = result["root"].(map[string]interface{})
@@ -526,7 +539,7 @@ func findDialogue(msg chan *Msg,success func(*Msg),complete func(map[string]inte
 			w.Done()
 		})
 		w.Wait()
-		fmt.Println("-----------")
+		//fmt.Println("-----------")
 		if m.Content == "" {
 			//fmt.Println(m)
 			//panic(0)
@@ -550,6 +563,9 @@ func findDialogue(msg chan *Msg,success func(*Msg),complete func(map[string]inte
 		}
 	}
 }
+func GetLocalDBMsg(words map[string]int) string{
+	return "oh my god"
+}
 func BackMsg(uid string,root map[string]interface{}){
 	//btn btn_send
 	var sendbtn,editArea map[string]interface{}
@@ -568,8 +584,10 @@ func BackMsg(uid string,root map[string]interface{}){
 		return true
 	})
 	words := make(map[string]int)
+	var list []string
 	n:=0
 	GetMsgf(uid,func(m *Msg)error{
+		list = append(list,m.Content)
 		lr := regK.FindAllString(m.Content,-1)
 		for j:=0;j<len(lr);j++{
 			for _j:=j+2;_j<=len(lr);_j++ {
@@ -582,13 +600,8 @@ func BackMsg(uid string,root map[string]interface{}){
 		}
 		return nil
 	})
-	str := ""
-	for k,_ := range words{
-		str += k
-		if len(str)>10 {
-			break
-		}
-	}
+	str := GetLocalDBMsg(words)
+
 	Num++
 	handMap[Num]= func(id_ float64,req map[string]interface{}){
 		delete(handMap,id_)
@@ -617,10 +630,13 @@ func OpenDialogue(uid string,msg chan *Msg) {
 
 	if NowUserName == uid {
 		findDialogue(
+			uid,
 			msg,
 			func(m *Msg){
+				//fmt.Println(m)
 				if err := UpdateMsg(m); err != nil {
-					panic(err)
+					fmt.Println(err)
+					//panic(err)
 				}
 			},
 			func(r map[string]interface{}){
@@ -639,10 +655,12 @@ func OpenDialogue(uid string,msg chan *Msg) {
 	ClickBoxModel(node,func(){
 		NowUserName = uid
 		findDialogue(
+			uid,
 			msg,
 			func(m *Msg){
 				if err := UpdateMsg(m); err != nil {
-					panic(err)
+					fmt.Println(err)
+					//panic(err)
 				}
 			},
 			func(r map[string]interface{}){
@@ -689,17 +707,43 @@ func GetWebwxsync(_db interface{}){
 	})
 }
 
+func GetInit(_db interface{}){
+	//https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit
+	getBody(_db,"https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit",
+	func(__id float64,__db map[string]interface{}){
+		//fmt.Println(__db)
+		body := __db["body"]
+		if body == nil {
+			return
+		}
+		var body_ map[string]interface{}
+		json.Unmarshal([]byte(body.(string)),&body_)
+		//for k,_ := range body_{
+		//	fmt.Println(k)
+		//}
+
+		user := body_["User"].(map[string]interface{})
+		SelfUserName = user["UserName"].(string)
+		//fmt.Println(__db)
+
+	})
+}
+
 func GetContactList(_db interface{}){
 
-	getBody(_db,"https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact",
+	if !getBody(_db,"https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact",
 	func(__id float64,__db map[string]interface{}){
 		//fmt.Println(__db)
 		go HandDialogueMap()
 		HandleWXContact(__db)
 		handleResponse = GetWebwxsync
-	})
+	}){
+		GetInit(_db)
+	}
 
 }
+
+
 func HandDialogueMap(){
 	for{
 		for u,m := range DialogueMap {
