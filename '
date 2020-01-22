@@ -36,7 +36,7 @@ var (
 		"--disable-gpu",
 		"--no-sandbox",
 		"--no-default-browser-check",
-		"https://www.toutiao.com/",
+		//"https://www.toutiao.com/ch/news_baby/",
 	}
 	Ourl = "http://127.0.0.1:"+port
 	k = []byte{10,68,101,118,84,111,111,108,115,32}
@@ -61,8 +61,6 @@ var (
 	DbPage *bolt.DB
 	//WordTmp string
 	//pageTmp string
-	HandIDFunc = map[float64]func(i float64,db interface{}){}
-	Num float64 = 1
 
 )
 type pageInterface interface {
@@ -194,114 +192,48 @@ func init(){
 	}
 
 	go syncPushWXDB()
-	go func(){
-	for{
+	//go syncRunPageVod()
+	//fmt.Println("run vod")
+	//return
+	//updateFileToWX()
 
+	//findPageVod(50000)
+	//updateFileToWX()
+	//return
+	//<-time.After(30 * time.Minute)
+
+	go func(){
+	//findPageVod()
+	//UpWord()
+	w:=new(sync.WaitGroup)
+	for{
 		err = ClearDB()
 		if err != nil {
 			panic(err)
 			fmt.Println(err)
 		}
-		findPageVod(config.Conf.MaxPage)
-		urls_:=make([]string,0,len(uris))
-		for _,u := range uris{
-			urls_ = append(urls_,u)
-		}
-		runStart(func(u string)error{
-		//fmt.Println(u)
-		return openPage_(func(v interface{})error{
-		_vb := v.(map[string]interface{})
-		runStream_(_vb["webSocketDebuggerUrl"].(string),func(db interface{},write chan interface{},wc *websocket.Conn){
-			db_ :=db.(map[string]interface{})
-			id_ := db_["id"]
-			if  id_ != nil {
-				id__ := id_.(float64)
-				fun :=HandIDFunc[id__]
-				if fun != nil {
-					fun(id__,db)
+		for _,u := range uris {
+			start(u,func(in string)error{
+				//fmt.Println(in)
+				err = Coll(u,w)
+				if err != nil {
+					return err
 				}
-				return
-			}
-			if db_["method"] !="Network.responseReceived"{
-				return
-			}
-			u := (db_["params"].(map[string]interface{}))
-			_u := u["response"].(map[string]interface{})
-			_uri := _u["url"].(string)
-			if !strings.Contains(_uri,"/api/pc/feed/"){
-				return
-			}
-			GetPageCookies(write,_vb["url"].(string),_uri,func(){
-				if len(urls_) == 0 {
-					wc.Close()
-					return
-				}
-				PageNavigate(write,urls_[0])
-				urls_ = urls_[1:]
+				w.Wait()
+				return nil
 			})
+		}
+		findPageVod(config.Conf.MaxPage)
+		//fmt.Println("updatefile")
 
-
-		})
-		return nil
-		})
-		})
-		<-time.After(2 * time.Hour)
+		log.Println("UpdatefileToWX")
+		updateFileToWX()
+		log.Println("wait 5")
+		<-time.After(24 * time.Hour)
 	}
 	}()
-
-
 	log.Println("run")
 }
-func runStart(hand func(string)error){
-	runout := func(r io.Reader){
-		//defer wait.Done()
-		var db [8192]byte
-		for{
-
-			n,err := r.Read(db[:])
-			if err != nil {
-				if err != io.EOF{
-					log.Println(err)
-				}
-				return
-			}
-			if bytes.HasPrefix(db[:n],k){
-				err = hand(string(db[23:n-1]))
-				if err != nil {
-					log.Println(err)
-					return
-				}
-			}
-		}
-	}
-	cmd := exec.Command("google-chrome",op...)
-	//cmd := exec.Command("google-chrome",append(op,uri)... )
-	out,err := cmd.StdoutPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-	outerr,err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-	go runout(out)
-	go runout(outerr)
-	//err = cmd.Start()
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println(err)
-	}
-	//cmd.Wait()
-	out.Close()
-	outerr.Close()
-	fmt.Println("over start")
-}
-//func runPage(){
-//	runStart(func(u string)error{
-//		fmt.Println(u)
-//		return nil
-//	})
-//}
 func updateFileToWX() error {
 
 	//<-time.After(5 * time.Minute)
@@ -344,12 +276,11 @@ func requestPageList(uri,_uri string) error{
 		//	return err
 		//}
 		if st !=  200 {
-			return fmt.Errorf("s = %d",st)
+			return nil
 		}
 		db:= map[string]interface{}{}
 		err:= json.NewDecoder(body).Decode(&db)
 		if err != nil {
-			panic(err)
 			return err
 		}
 		if db["data"] == nil {
@@ -371,162 +302,88 @@ func requestPageList(uri,_uri string) error{
 	})
 
 }
-func AddAction(write chan interface{},info map[string]interface{},h func(interface{})){
-	Num++
-	HandIDFunc[Num] = func(i float64,db interface{}){
-		delete(HandIDFunc,i)
-		h(db)
-	}
-	info["id"] = Num
-	write <- info
-}
-func GetPageCookies(write chan interface{},u string,u_ string,success func()){
-	AddAction(
-		write,
-		map[string]interface{}{
-			"method":"Network.getAllCookies",
-		},
-		func(db_ interface{}){
-		cookies :=(((db_.(map[string]interface{}))["result"].(map[string]interface{}))["cookies"]).([]interface{})
-		var cos []*http.Cookie = make([]*http.Cookie,0,len(cookies))
-		ur,err := url.Parse(u)
-		if err != nil {
-			panic(err)
-		}
-		for _,_c_ := range cookies {
-			c_ := _c_.(map[string]interface{})
-			domain := c_["domain"].(string)
+func Coll(uri string,w *sync.WaitGroup)error{
+	var id_1 float64 = 999
+	//fmt.Println("coll")
+	return openPage_(func(v interface{})error{
+		_vb := v.(map[string]interface{})
+		var _uri_ string = ""
+		runStream(_vb["webSocketDebuggerUrl"].(string),w,func(_v interface{},writeChan chan interface{},wc *websocket.Conn){
+			__v :=_v.(map[string]interface{})
+			if _uri_ != "" {
+				if (__v["id"] == nil) ||
+				(__v["id"].(float64) != id_1) {
+					return
+				}
+				defer wc.Close()
+				//fmt.Println(_uri_)
+				//fmt.Println(__v)
+				ur,err := url.Parse(_uri_)
+				if err != nil {
+					panic(err)
+				}
+				if __v["result"] == nil {
+					return
+				}
+				cookies :=((__v["result"].(map[string]interface{}))["cookies"]).([]interface{})
+				var cos []*http.Cookie = make([]*http.Cookie,0,len(cookies))
+				for _,_c_ := range cookies {
+					c_ := _c_.(map[string]interface{})
+					domain := c_["domain"].(string)
+					if !strings.Contains(ur.Hostname(),domain){
+						continue
+					}
+					cos = append(cos,&http.Cookie{
+						Name:c_["name"].(string),
+						Value:c_["value"].(string),
+						Domain:domain,
+						Path:c_["path"].(string),
+						Expires:time.Unix(int64(c_["expires"].(float64)),0),
+						HttpOnly:c_["httpOnly"].(bool),
+						Secure:c_["secure"].(bool),
+						//SameSite:c_["sameSite"].(http.SameSite),
+					})
+				}
+				request.Jar.SetCookies(ur,cos)
 
-			if !strings.Contains(ur.Hostname(),domain){
-				continue
+				requestPageList(uri,_uri_)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println("close")
+				err = wc.Close()
+				if err != nil {
+					panic(err)
+				}
+				//http.Cookie.Domain
+				return
 			}
-			cos = append(cos,&http.Cookie{
-				Name:c_["name"].(string),
-				Value:c_["value"].(string),
-				Domain:domain,
-				Path:c_["path"].(string),
-				Expires:time.Unix(int64(c_["expires"].(float64)),0),
-				HttpOnly:c_["httpOnly"].(bool),
-				Secure:c_["secure"].(bool),
-				//SameSite:c_["sameSite"].(http.SameSite),
-			})
-
-		}
-		request.Jar.SetCookies(ur,cos)
-		err = requestPageList(u,u_)
-		if err != nil {
-			panic(err)
-		}else{
-			success()
-		}
-		//fmt.Println(db)
-		},
-	)
-}
-func PageNavigate(write chan interface{},u string){
-	fmt.Println(u)
-	AddAction(
-		write,
-		map[string]interface{}{
-			"method":"Page.navigate",
-			"params":map[string]interface{}{
-				"url":u,
-			},
-		},
-		func(db interface{}){
-			fmt.Println(db)
-		},
-	)
+			if __v["method"] !="Network.responseReceived"{
+				return
+			}
+			u := (__v["params"].(map[string]interface{}))
+			_u := u["response"].(map[string]interface{})
+			_uri := _u["url"].(string)
+			if !strings.Contains(_uri,"/api/pc/feed/"){
+				return
+			}
+			//fmt.Println(_u["headers"])
+			//fmt.Println(__v)
+			_uri_ = _uri
+			//fmt.Println(_uri)
+			writeChan<-map[string]interface{}{
+				"method":"Network.getAllCookies",
+				"id":id_1,
+			}
+			return
+		})
+		return nil
+	})
 
 }
-//func Coll(uri string)error{
-//	var id_1 float64 = 999
-//	return openPage_(uri,func(v interface{})error{
-//		_vb := v.(map[string]interface{})
-//		var _uri_ string = ""
-//		runStream(_vb["webSocketDebuggerUrl"].(string),func(_v interface{},writeChan chan interface{},wc *websocket.Conn){
-//			__v :=_v.(map[string]interface{})
-//			if _uri_ != "" {
-//				if (__v["id"] == nil) ||
-//				(__v["id"].(float64) != id_1) {
-//					return
-//				}
-//				defer wc.Close()
-//				ur,err := url.Parse(_uri_)
-//				if err != nil {
-//					panic(err)
-//				}
-//				if __v["result"] == nil {
-//					return
-//				}
-//				cookies :=((__v["result"].(map[string]interface{}))["cookies"]).([]interface{})
-//				var cos []*http.Cookie = make([]*http.Cookie,0,len(cookies))
-//				for _,_c_ := range cookies {
-//					c_ := _c_.(map[string]interface{})
-//					domain := c_["domain"].(string)
-//					if !strings.Contains(ur.Hostname(),domain){
-//						continue
-//					}
-//					cos = append(cos,&http.Cookie{
-//						Name:c_["name"].(string),
-//						Value:c_["value"].(string),
-//						Domain:domain,
-//						Path:c_["path"].(string),
-//						Expires:time.Unix(int64(c_["expires"].(float64)),0),
-//						HttpOnly:c_["httpOnly"].(bool),
-//						Secure:c_["secure"].(bool),
-//						//SameSite:c_["sameSite"].(http.SameSite),
-//					})
-//				}
-//				request.Jar.SetCookies(ur,cos)
-//				err = requestPageList(uri,_uri_)
-//				if err != nil {
-//					panic(err)
-//				}
-//				fmt.Println("close")
-//				err = wc.Close()
-//				if err != nil {
-//					panic(err)
-//				}
-//			}
-//			if __v["method"] !="Network.responseReceived"{
-//				return
-//			}
-//			u := (__v["params"].(map[string]interface{}))
-//			_u := u["response"].(map[string]interface{})
-//			_uri := _u["url"].(string)
-//			if !strings.Contains(_uri,"/api/pc/feed/"){
-//				return
-//			}
-//			//err := requestPageList(uri,_uri)
-//			//if err != nil {
-//			//	panic(err)
-//			//}
-//			//fmt.Println("close")
-//			//err = wc.Close()
-//			//if err != nil {
-//			//	panic(err)
-//			//}
-//
-//			//fmt.Println(_u["headers"])
-//			//fmt.Println(__v)
-//			_uri_ = _uri
-//			writeChan<-map[string]interface{}{
-//				"method":"Network.getAllCookies",
-//				"id":id_1,
-//			}
-//			return
-//		})
-//		return nil
-//	})
-//
-//}
 
 func start(uri string,hand func(string)error){
-	//var wait sync.WaitGroup
-	//wait.Add(2)
 	runout := func(r io.Reader){
-		//defer wait.Done()
 		var db [8192]byte
 		for{
 
@@ -534,8 +391,8 @@ func start(uri string,hand func(string)error){
 			if err != nil {
 				if err != io.EOF{
 					log.Println(err)
+					return
 				}
-				return
 			}
 			if bytes.HasPrefix(db[:n],k){
 				err = hand(string(db[23:n-1]))
@@ -546,7 +403,8 @@ func start(uri string,hand func(string)error){
 			}
 		}
 	}
-	cmd := exec.Command("google-chrome",append(op,uri)... )
+	op = append(op,uri)
+	cmd := exec.Command("google-chrome",op... )
 	out,err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -557,18 +415,19 @@ func start(uri string,hand func(string)error){
 	}
 	go runout(out)
 	go runout(outerr)
-	err = cmd.Run()
-	//err = cmd.Start()
+	err = cmd.Start()
 	if err != nil {
-		fmt.Println(err)
-		//panic(err)
-		//log.Fatal(err)
+		log.Fatal(err)
 	}
-	//wait.Wait()
-	//cmd.Wait()
+	cmd.Wait()
 	out.Close()
 	outerr.Close()
-	fmt.Println("over start")
+	log.Println("cmd end")
+	err = exec.Command("pkill","chrome").Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//select{}
 }
 func closePage(id string){
@@ -589,10 +448,8 @@ func closePage(id string){
 }
 
 func openPage_(hand func(interface{})error) error {
-	for{
-	//	fmt.Println(Ourl)
-	err := request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
-		fmt.Println(st)
+	time.Sleep(1*time.Second)
+	return request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
 		if st != 200 {
 			db,err := ioutil.ReadAll(body)
 			if err != nil {
@@ -605,28 +462,16 @@ func openPage_(hand func(interface{})error) error {
 		if err != nil {
 			return err
 		}
-		//fmt.Println(k)
-		k_ := k.([]interface{})
-		if len(k_) == 0 {
-			return fmt.Errorf("find not")
-		}
-		for _,v_ := range k_ {
-			if er := hand(v_); er != nil {
+		fmt.Println(k)
+		for _,v := range k.([]interface{}){
+			er := hand(v)
+			if er != nil {
 				panic(er)
 			}
-			break
 		}
 		return nil
+
 	})
-	if err == nil {
-		log.Println("cmd end")
-		err = exec.Command("pkill","chrome").Run()
-		if err != nil {
-			fmt.Println(err)
-		}
-		return nil
-	}
-	}
 }
 func openPage(u string,hand func(interface{})error) error {
 	return request.ClientHttp_(Ourl+"/json/new/?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
@@ -691,49 +536,7 @@ func openPage(u string,hand func(interface{})error) error {
 //
 //}
 
-func runStream_(u string,hand func(interface{},chan interface{},*websocket.Conn)){
-	c, _, err := websocket.DefaultDialer.Dial(u, nil)
-	if err != nil {
-		log.Fatal("dial:", err)
-	}
-	err = c.WriteJSON(map[string]interface{}{"method":"Network.enable","id":1})
-	if err != nil {
-		log.Fatal("w:", err)
-	}
-	writeChan := make(chan interface{},5)
-	//PageNavigate(writeChan,
-	var wait sync.WaitGroup
-	wait.Add(2)
-	go func(){
-		defer wait.Done()
-		var db interface{}
-		for{
-			err = c.ReadJSON(&db)
-			if err != nil {
-				close(writeChan)
-				log.Println("stream",err)
-				break
-			}
-			c.SetReadDeadline(time.Now().Add(time.Minute*2))
-			go hand(db,writeChan,c)
-		}
-	}()
-	go func(){
-		defer wait.Done()
-		for w := range writeChan{
-			err := c.WriteJSON(w)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
-	}()
-	wait.Wait()
-	fmt.Println("runStream")
-	return
-
-}
-func runStream(u string,hand func(interface{},chan interface{},*websocket.Conn)){
+func runStream(u string,w *sync.WaitGroup,hand func(interface{},chan interface{},*websocket.Conn)){
 //func runStream(u string,hand func(interface{}))*websocket.Conn{
 	c, _, err := websocket.DefaultDialer.Dial(u, nil)
 	if err != nil {
@@ -750,10 +553,10 @@ func runStream(u string,hand func(interface{},chan interface{},*websocket.Conn))
 	//if err != nil {
 	//	log.Fatal("w:", err)
 	//}
-	var wait sync.WaitGroup
-	wait.Add(2)
+	//w.Add(2)
 	go func(){
-		defer wait.Done()
+		//fmt.Println(u)
+		//defer w.Done()
 		var db interface{}
 		for{
 			err = c.ReadJSON(&db)
@@ -766,21 +569,32 @@ func runStream(u string,hand func(interface{},chan interface{},*websocket.Conn))
 			}
 			c.SetReadDeadline(time.Now().Add(time.Minute*2))
 			go hand(db,writeChan,c)
+
+			//fmt.Println(db)
 		}
 	}()
 	go func(){
-		defer wait.Done()
-		for w := range writeChan{
-			err := c.WriteJSON(w)
-			if err != nil {
-				fmt.Println(err)
+		//fmt.Println(u,"w")
+		//defer w.Done()
+		for{
+			select{
+			case w:= <-writeChan:
+				if w == nil {
+					log.Println("stream w")
+					return
+				}
+				log.Println(w)
+				err := c.WriteJSON(w)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			case <-stop:
+				log.Println("stop stream w")
 				return
 			}
 		}
 	}()
-	wait.Wait()
-
-
 	//c.Close()
 	return
 }
@@ -1094,7 +908,6 @@ func PageJsonFile()error{
 }
 
 func ReadPageList(begin []byte,max int) (list []*Page,err error){
-
 	list = make([]*Page,0,max)
 	err = EachDBf(DbPage,pageBucket,begin,func(b *bolt.Bucket,k,v []byte)error{
 		p := &Page{}

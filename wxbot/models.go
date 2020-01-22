@@ -3,12 +3,16 @@ import(
 	"encoding/gob"
 	"bytes"
 )
-
+type SelfUser struct {
+	UserName string
+	NickName string
+}
 
 type Msg struct {
 	FromUserName string
 	ToUserName string
 	Content string
+	old string
 	MsgId string
 	MsgType float64
 	CreateTime float64

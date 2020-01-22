@@ -43,12 +43,15 @@ var(
 	Num float64 = 100
 	//Mx,My float64
 	NowUserName string
-	SelfUserName  string
-	DialogueMap =map[string]chan *Msg {}
+	SelfUserName = SelfUser{}
+	DialogueMap = map[string]chan *Msg {}
+	DialogueMapLast= map[string]*Msg {}
+	//DialogueMapLast = sync.Map{}
 	//RunDialog = make(chan string)
 	writeChan = make(chan interface{},5)
 
 	regK *regexp.Regexp = regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
+	TmpGroup map[string]bool
 )
 
 func main(){
@@ -56,6 +59,7 @@ func main(){
 	start(func(u string)error{
 		w := new(sync.WaitGroup)
 		handleResponse = CheckWXLogin
+		time.Sleep(100*time.Millisecond)
 		return openPage_(func(db interface{})error{
 		//return openPage(rooturl,func(db interface{})error{
 			_vb := db.(map[string]interface{})
@@ -303,7 +307,7 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 					log.Println("stream w")
 					return
 				}
-				fmt.Println(w)
+				//fmt.Println(w)
 				err := c.WriteJSON(w)
 				if err != nil {
 					fmt.Println(err)
@@ -435,7 +439,7 @@ func ClickBoxModel(node map[string]interface{},hand func()){
 
 func handSyncMsg(_db *Msg){
 	from := _db.FromUserName
-	if from == SelfUserName {
+	if from == SelfUserName.UserName {
 		from = _db.ToUserName
 	}
 	msglist := DialogueMap[from]
@@ -443,6 +447,7 @@ func handSyncMsg(_db *Msg){
 		msglist = make(chan *Msg,100)
 		DialogueMap[from] = msglist
 	}
+	_db.old = _db.Content
 	_db.Content = ""
 	msglist<-_db
 
@@ -460,17 +465,28 @@ func GetDoc(h func(map[string]interface{})){
 	}
 }
 func findText(uid string,node map[string]interface{},hand func(string)){
-	//fmt.Println(node)
+	//fmt.Println(node)chatContact.MMDigest
 	toChrldren(node,func(node map[string]interface{})bool{
 		if checkKeyNode(node,"chatContact.MMDigest"){
+			//fmt.Println(node)
+			isFind := true
 			toChrldren(node,func(node map[string]interface{})bool{
 				if strings.EqualFold(node["nodeName"].(string),"#text"){
-					hand(node["nodeValue"].(string))
+					text := node["nodeValue"]
+					if text == nil{
+						return true
+					}
+					t_ := text.(string)
+					if t_ == ""{
+						return true
+					}
+					hand(t_)
+					isFind = false
 					return false
 				}
 				return true
 			})
-			return false
+			return isFind
 		}
 
 		return true
@@ -491,23 +507,6 @@ func checkKeyNode(n map[string]interface{},k string) (bool){
 	return false
 
 }
-//func checkMsgNode(n map[string]interface{},m *Msg,) (bool){
-//	//return checkKeyNode(n,m.MsgId)
-//	attr := n["attributes"]
-//	if attr == nil {
-//		return false
-//	}
-//	for _,d := range attr.([]interface{}){
-//		if !strings.Contains(d.(string),m.MsgId){
-//			continue
-//		}
-//		findText(n,func(t string){
-//			m.Content = t
-//		})
-//		return true
-//	}
-//	return false
-//}
 
 func findDialogue(uid string,msg chan *Msg,success func(*Msg),complete func(map[string]interface{})) {
 	var root map[string]interface{} = nil
@@ -515,12 +514,15 @@ func findDialogue(uid string,msg chan *Msg,success func(*Msg),complete func(map[
 		//fmt.Println("d",_m)
 		toChrldren(node_r,func(node map[string]interface{})bool{
 			if checkKeyNode(node,uid){
+				//fmt.Println(node)
 				findText(uid,node,func(t string){
 					_m.Content = t
 				})
-				fmt.Println("find",_m)
+				//fmt.Println("find",_m)
 				success(_m)
-				return false
+				if len(_m.Content) >0{
+					return false
+				}
 			}
 			return true
 		})
@@ -531,7 +533,7 @@ func findDialogue(uid string,msg chan *Msg,success func(*Msg),complete func(map[
 	//for {
 	for m:= range msg {
 
-		time.Sleep(500*time.Millisecond)
+		time.Sleep(100*time.Millisecond)
 		w.Add(1)
 		GetDoc(func(result map[string]interface{}){
 			root = result["root"].(map[string]interface{})
@@ -543,6 +545,7 @@ func findDialogue(uid string,msg chan *Msg,success func(*Msg),complete func(map[
 		if m.Content == "" {
 			//fmt.Println(m)
 			//panic(0)
+
 			msg<-m
 			continue G
 		}
@@ -567,6 +570,12 @@ func GetLocalDBMsg(words map[string]int) string{
 	return "oh my god"
 }
 func BackMsg(uid string,root map[string]interface{}){
+
+	msg := DialogueMapLast[uid]
+	//fmt.Println(msg)
+	if strings.HasPrefix(uid,"@@") || strings.EqualFold(msg.FromUserName,SelfUserName.UserName){
+		return
+	}
 	//btn btn_send
 	var sendbtn,editArea map[string]interface{}
 	toChrldren(root,func(node map[string]interface{})bool{
@@ -609,7 +618,7 @@ func BackMsg(uid string,root map[string]interface{}){
 		handMap[Num] = func(id__ float64,req_ map[string]interface{}){
 			delete(handMap,id__)
 			ClickBoxModel(sendbtn,func(){
-				fmt.Println(sendbtn)
+				//fmt.Println(sendbtn)
 			})
 
 		}
@@ -634,6 +643,7 @@ func OpenDialogue(uid string,msg chan *Msg) {
 			msg,
 			func(m *Msg){
 				//fmt.Println(m)
+				DialogueMapLast[uid] = m
 				if err := UpdateMsg(m); err != nil {
 					fmt.Println(err)
 					//panic(err)
@@ -658,6 +668,7 @@ func OpenDialogue(uid string,msg chan *Msg) {
 			uid,
 			msg,
 			func(m *Msg){
+				DialogueMapLast[uid] = m
 				if err := UpdateMsg(m); err != nil {
 					fmt.Println(err)
 					//panic(err)
@@ -723,7 +734,10 @@ func GetInit(_db interface{}){
 		//}
 
 		user := body_["User"].(map[string]interface{})
-		SelfUserName = user["UserName"].(string)
+		//fmt.Println(user)
+		SelfUserName.UserName = user["UserName"].(string)
+		SelfUserName.NickName = user["NickName"].(string)
+
 		//fmt.Println(__db)
 
 	})
@@ -765,6 +779,7 @@ func HandleWXContact(result map[string]interface{}){
 	}
 
 	for _,d_ := range _body.MemberList{
+		//fmt.Println(d_.UserName)
 		NickName   := d_.NickName
 		RemarkName := d_.RemarkName
 		UserName := d_.UserName
@@ -804,17 +819,18 @@ func getBody(_db interface{},uri_ string, bodyMap func(float64,map[string]interf
 	//fmt.Println(_uri,rid)
 	handleFinish[rid] =func(id_ string ,db map[string]interface{}){
 		//id := float64(time.Now().Unix())
+		delete(handleFinish,id_)
 		Num++
 		handMap[Num] = func(__id float64,__db map[string]interface{}){
-			bodyMap(__id,__db)
 			delete(handMap,__id)
+			//fmt.Println(__db)
+			bodyMap(__id,__db)
 		}
 		writeChan<-map[string]interface{}{
 			"method":"Network.getResponseBody",
 			"id":Num,
 			"params":map[string]interface{}{"requestId":id_},
 		}
-		delete(handleFinish,id_)
 	}
 	return true
 

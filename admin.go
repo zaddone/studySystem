@@ -16,6 +16,7 @@ import(
 
 func main(){
 
+	gin.SetMode(gin.ReleaseMode)
 	Router := gin.Default()
 	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
 	Router.LoadHTMLGlob(config.Conf.Templates+"/*")
@@ -86,6 +87,6 @@ func main(){
 		}
 		c.JSON(http.StatusOK,gin.H{"dblist":list,"count":len(list)})
 	})
-	Router.Run(":8080")
+	Router.Run(config.Conf.Port)
 
 }

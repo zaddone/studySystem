@@ -166,7 +166,7 @@ func (self *Pagevod)CheckToSaveVod()error{
 			return fmt.Errorf("is same %s %s",self.Title,p_.Title)
 		}
 		self.SaveDBBucket(pageb)
-		return nil
+		return fmt.Errorf("not change")
 		//}
 	}
 	self.getTitlePar(wb,pageb)
