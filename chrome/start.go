@@ -245,6 +245,7 @@ func init(){
 		return nil
 		})
 		})
+		updateFileToWX()
 		<-time.After(2 * time.Hour)
 	}
 	}()
