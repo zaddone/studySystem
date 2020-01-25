@@ -202,7 +202,6 @@ func init(){
 			panic(err)
 			fmt.Println(err)
 		}
-		findPageVod(config.Conf.MaxPage)
 		urls_:=make([]string,0,len(uris))
 		for _,u := range uris{
 			urls_ = append(urls_,u)
@@ -218,7 +217,7 @@ func init(){
 				id__ := id_.(float64)
 				fun :=HandIDFunc[id__]
 				if fun != nil {
-					fun(id__,db)
+					go fun(id__,db)
 				}
 				return
 			}
@@ -245,12 +244,12 @@ func init(){
 		return nil
 		})
 		})
+
+		findPageVod(config.Conf.MaxPage)
 		updateFileToWX()
 		<-time.After(2 * time.Hour)
 	}
 	}()
-
-
 	log.Println("run")
 }
 func runStart(hand func(string)error){
@@ -350,7 +349,7 @@ func requestPageList(uri,_uri string) error{
 		db:= map[string]interface{}{}
 		err:= json.NewDecoder(body).Decode(&db)
 		if err != nil {
-			panic(err)
+			//panic(err)
 			return err
 		}
 		if db["data"] == nil {
@@ -416,7 +415,8 @@ func GetPageCookies(write chan interface{},u string,u_ string,success func()){
 		request.Jar.SetCookies(ur,cos)
 		err = requestPageList(u,u_)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			//panic(err)
 		}else{
 			success()
 		}

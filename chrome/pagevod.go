@@ -255,6 +255,7 @@ func (self *Pagevod)getTitlePar(wb,pageb *bolt.Bucket)bool{
 	p_ := &Page{}
 	err := json.Unmarshal(db,p_)
 	if err != nil {
+		return false
 		panic(err)
 	}
 	if bytes.Contains(p_.Children,self.Id) {
