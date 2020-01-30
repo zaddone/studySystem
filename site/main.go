@@ -18,7 +18,7 @@ var(
 )
 type ShoppingInterface interface{
 	SearchGoods(...string)interface{}
-	GoodsUrl(string)interface{}
+	GoodsUrl(string,bool)interface{}
 }
 func initShoppingMap(){
 	err := ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
@@ -135,7 +135,7 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
-			c.JSON(http.StatusOK,sh.GoodsUrl(keyword))
+			c.JSON(http.StatusOK,sh.GoodsUrl(keyword,true))
 			return
 		})
 		Router.GET("search/:py",func(c *gin.Context){

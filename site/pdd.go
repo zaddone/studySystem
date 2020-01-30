@@ -110,7 +110,7 @@ func (self *Pdd) pidQuery() interface{}{
 	return self.ClientHttp(u)
 }
 //pdd.ddk.goods.promotion.url.generate
-func (self *Pdd) GoodsUrl(goodsid string) interface{}{
+func (self *Pdd) GoodsUrl(goodsid string,multi bool) interface{}{
 	if len(self.PddPid) == 0 {
 		err := self.getPid()
 		if err != nil {
@@ -122,8 +122,13 @@ func (self *Pdd) GoodsUrl(goodsid string) interface{}{
 	u.Add("client_id",self.Info.Client_id)
 	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	u.Add("type","pdd.ddk.goods.promotion.url.generate")
-	u.Add("goods_id_list",goodsid)
+	u.Add("goods_id_list","["+goodsid+"]")
 	u.Add("p_id",self.PddPid[0])
+	u.Add("generate_short_url","true")
+	u.Add("generate_we_app","true")
+	if multi{
+		u.Add("multi_group","true")
+	}
 	return self.ClientHttp(u)
 
 }

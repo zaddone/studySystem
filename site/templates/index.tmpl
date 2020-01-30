@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh" class="h-100">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <title>米果推荐 网购查价 省钱返利返佣金</title>
+
+    <link rel="canonical" href="https://v4.bootcss.com/docs/examples/sticky-footer-navbar/">
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
+
+    <!-- Favicons
+<link rel="apple-touch-icon" href="/docs/assets/img/favicons/apple-touch-icon.png" sizes="180x180">
+<link rel="icon" href="/docs/assets/img/favicons/favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/docs/assets/img/favicons/favicon-16x16.png" sizes="16x16" type="image/png">
+<link rel="manifest" href="/docs/assets/img/favicons/manifest.json">
+<link rel="mask-icon" href="/docs/assets/img/favicons/safari-pinned-tab.svg" color="#563d7c">
+<link rel="icon" href="/docs/assets/img/favicons/favicon.ico">
+<meta name="msapplication-config" content="/docs/assets/img/favicons/browserconfig.xml">
+ -->
+<meta name="theme-color" content="#563d7c">
+<link href="/static/css/main.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+  </head>
+  <body class="d-flex flex-column h-100">
+    <header>
+  <!-- Fixed navbar -->
+  <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
+<div class="input-group mb-1">
+  <input type="text" id="searchKey" class="form-control" placeholder="网购查价省钱返利返佣" aria-label="Recipient's username" aria-describedby="button-addon2">
+  <div class="input-group-append">
+    <button class="btn btn-outline-secondary search" type="button" id="button-addon2">搜索</button>
+  </div>
+</div>
+  </nav>
+
+</header>
+
+<!-- Begin page content -->
+<main role="main" class="flex-shrink-0">
+<div class="container">
+<div class="row list">
+</div>
+
+<div class="row shopping">
+{{range .}}
+   <div class="col-sm-2 top" ><a href="{{.Uri}}"  target="_blank" class="card-link"><img src="{{.Img}}" class="card-img-top logo" alt="{{.Name}}"></a></div>
+{{end}}
+</div>
+
+<div class="row top">
+    <div class="col-sm-2"  >
+    <div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价返利返佣金"><div class="card-body"><p>米果推荐公众号</p></div></div>
+    </div>
+    <div class="col-sm-2" >
+    <div class="card"><img src="/static/img/xcx.jpeg" class="card-img-top" alt="i米果推荐 购物查价返利返佣金"><div class="card-body"><p>米果推荐小程序</p></div></div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+
+
+<footer class="footer mt-auto py-3">
+  <div class="container">
+
+
+<!-- 
+    <span>
+    <a href="https://www.zaddone.com/">首页</a>
+    <a target="_blank" href="https://zaddone.github.io/">文章</a>
+    </span>
+-->
+    <span  class="text-muted">© 2020 米果报 蜀ICP备 19018296号-1</span>
+  </div>
+</footer>
+
+<div class="modal fade bd-modal-lg" tabindex="-1" role="dialog" id="myLargeModalLabel" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"></h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body"></div>
+	<div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"></script>
+<script src="/static/js/markdown.min.js"  crossorigin="anonymous"></script>
+
+<script>
+function trim(a){
+  if(typeof a =='string'){
+    return a.replace(/\s+/,'');
+  }else {
+    return a;
+  }
+}
+function isEmpty(a){
+  var b = trim(a);
+  if((typeof a) == 'string'  && b){
+    return false;
+   }else {
+      return true;
+   }
+}
+var ListDB = [];
+function PddPageHtml(data){
+ $('.list').html("")
+ $.each(data.goods_search_response.goods_list, function(key, val) {	
+  ListDB.push(val)
+  $('.list').append('<div class="col-sm-2 top" ><div class="card"> <button data-toggle="modal" data-target=".bd-modal-lg" type="button" class="btn btn-link" data-id="'+key+'" data-site="pinduoduo" ><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text">'+val.goods_name+'</p></div></button></div></div>')
+ })
+}
+function Search(){
+  let key = $('#searchKey').val()
+  if (isEmpty(key))return;
+  $('.list').html('<div class="col-sm-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
+  $.getJSON({
+    url: '/search/pinduoduo',
+    data:{"keyword":key},	  
+    success: PddPageHtml,
+    error:function(db){
+     $('.list').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+    },
+  });
+	
+}
+$(document).ready(function(){
+
+  $("#myLargeModalLabel").on("show.bs.modal", function (event) {
+    var button = $(event.relatedTarget)
+    var goods = ListDB[parseInt(button.data('id'))]
+    
+    console.log(goods)
+    //var goodsid = button.data('id'); 
+    var site = button.data('site'); 
+    var modal = $(this).find('.modal-body')
+    $(this).find('.modal-title').html(goods.goods_name)
+    modal.html('<div class="col-sm-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
+    $.getJSON({
+      url: '/goods/'+site,
+      data:{"goodsid":goods.goods_id},	  
+      success: function(db){
+        modal.html(db)
+      },
+      error:function(db){
+       console.log(db)
+       modal.html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      },
+    });
+  })
+  $("#searchKey").keydown(function(e) {  
+   if (e.keyCode == 13) {  
+    Search()
+   }  
+  });  
+
+ $('.search').click(function(){	
+   Search()
+ });
+});
+</script>
+</body>
+</html>
+
