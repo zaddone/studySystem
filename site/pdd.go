@@ -38,6 +38,8 @@ func (self *Pdd)addSign(u *url.Values){
 	u.Add("sign",fmt.Sprintf("%X", md5.Sum([]byte(sign))))
 }
 func (self *Pdd) ClientHttp(u *url.Values)( out interface{}){
+	u.Add("client_id",self.Info.Client_id)
+	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	self.addSign(u)
 	ht := http.Header{}
 	ht.Add("Content-Type","application/json")
@@ -93,10 +95,7 @@ func (self *Pdd) getPid()error {
 }
 //pdd.ddk.goods.pid.generate
 func (self *Pdd) pidGenerate(n int) interface{}{
-
 	u := &url.Values{}
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	u.Add("type","pdd.ddk.goods.pid.generate")
 	u.Add("number",fmt.Sprintf("%d",n))
 	return self.ClientHttp(u)
@@ -104,8 +103,6 @@ func (self *Pdd) pidGenerate(n int) interface{}{
 //pdd.ddk.goods.pid.query
 func (self *Pdd) pidQuery() interface{}{
 	u := &url.Values{}
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	u.Add("type","pdd.ddk.goods.pid.query")
 	return self.ClientHttp(u)
 }
@@ -119,28 +116,29 @@ func (self *Pdd) GoodsUrl(goodsid string,multi bool) interface{}{
 	}
 
 	u := &url.Values{}
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	u.Add("type","pdd.ddk.goods.promotion.url.generate")
 	u.Add("goods_id_list","["+goodsid+"]")
 	u.Add("p_id",self.PddPid[0])
 	u.Add("generate_short_url","true")
-	u.Add("generate_we_app","true")
+	//u.Add("generate_we_app","true")
 	if multi{
 		u.Add("multi_group","true")
 	}
 	return self.ClientHttp(u)
-
 }
 
 func (self *Pdd) SearchGoods(words ...string)interface{}{
 	u := &url.Values{}
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	u.Add("type","pdd.ddk.goods.search")
 	for _,k := range words{
 		u.Add("keyword",k)
 	}
 	return self.ClientHttp(u)
 }
-
+//pdd.ddk.goods.detail
+func (self *Pdd) GoodsDetail(goodsid string)interface{}{
+	u := &url.Values{}
+	u.Add("type","pdd.ddk.goods.detail")
+	u.Add("goods_id_list","["+goodsid+"]")
+	return self.ClientHttp(u)
+}

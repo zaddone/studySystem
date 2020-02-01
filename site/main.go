@@ -19,6 +19,7 @@ var(
 type ShoppingInterface interface{
 	SearchGoods(...string)interface{}
 	GoodsUrl(string,bool)interface{}
+	GoodsDetail(string)interface{}
 }
 func initShoppingMap(){
 	err := ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
@@ -123,6 +124,21 @@ func init(){
 				return
 			}
 			c.HTML(http.StatusOK,"index.tmpl",li)
+		})
+
+		Router.GET("goodsid/:py",func(c *gin.Context){
+			sh := ShoppingMap[c.Param("py")]
+			if sh == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				return
+			}
+			keyword := c.DefaultQuery("goodsid","")
+			if keyword == "" {
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				return
+			}
+			c.JSON(http.StatusOK,sh.GoodsDetail(keyword))
+			return
 		})
 		Router.GET("goods/:py",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]
