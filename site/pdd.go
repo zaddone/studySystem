@@ -11,11 +11,11 @@ import(
 	//"bytes"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
-	"net/http"
+	//"net/http"
 )
 var (
 	PddUrl = "https://gw-api.pinduoduo.com/api/router"
-	PddErrNum int = 0
+	//PddErrNum int = 0
 	//pdd.ddk.theme.goods.search
 	//pdd.ddk.goods.search
 )
@@ -24,6 +24,8 @@ type Pdd struct{
 	PddPid []string
 }
 func (self *Pdd)addSign(u *url.Values){
+	u.Add("client_id",self.Info.Client_id)
+	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	var li []string
 	for k,_ := range *u {
 		li = append(li,k)
@@ -38,11 +40,10 @@ func (self *Pdd)addSign(u *url.Values){
 	u.Add("sign",fmt.Sprintf("%X", md5.Sum([]byte(sign))))
 }
 func (self *Pdd) ClientHttp(u *url.Values)( out interface{}){
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
+
 	self.addSign(u)
-	ht := http.Header{}
-	ht.Add("Content-Type","application/json")
+	//ht := http.Header{}
+	//ht.Add("Content-Type","application/json")
 	var err error
 	err = request.ClientHttp_(
 		PddUrl+"?"+u.Encode(),
@@ -107,36 +108,36 @@ func (self *Pdd) pidQuery() interface{}{
 	return self.ClientHttp(u)
 }
 //pdd.ddk.goods.promotion.url.generate
-func (self *Pdd) GoodsUrl(goodsid string,multi bool) interface{}{
+func (self *Pdd) GoodsUrl(words ...string) interface{}{
+	goodsid := words[0]
 	if len(self.PddPid) == 0 {
 		err := self.getPid()
 		if err != nil {
 			return err
 		}
 	}
-
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.goods.promotion.url.generate")
 	u.Add("goods_id_list","["+goodsid+"]")
 	u.Add("p_id",self.PddPid[0])
 	u.Add("generate_short_url","true")
 	//u.Add("generate_we_app","true")
-	if multi{
-		u.Add("multi_group","true")
-	}
+	//if multi{
+	u.Add("multi_group","true")
+	//}
 	return self.ClientHttp(u)
 }
 
 func (self *Pdd) SearchGoods(words ...string)interface{}{
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.goods.search")
-	for _,k := range words{
-		u.Add("keyword",k)
-	}
+	u.Add("keyword",words[0])
+	u.Add("custom_parameters",words[1])
 	return self.ClientHttp(u)
 }
 //pdd.ddk.goods.detail
-func (self *Pdd) GoodsDetail(goodsid string)interface{}{
+func (self *Pdd) GoodsDetail(words ...string)interface{}{
+	goodsid := words[0]
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.goods.detail")
 	u.Add("goods_id_list","["+goodsid+"]")

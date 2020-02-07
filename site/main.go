@@ -8,6 +8,7 @@ import(
 	"net/http"
 	"fmt"
 	"flag"
+	"time"
 )
 var(
 	Release  = flag.Bool("Release",false,"Release")
@@ -16,17 +17,22 @@ var(
 	ShoppingMap = map[string]ShoppingInterface{}
 	//Tls  = flag.Bool("TLS",false,"TLS")
 )
+
 type ShoppingInterface interface{
 	SearchGoods(...string)interface{}
-	GoodsUrl(string,bool)interface{}
-	GoodsDetail(string)interface{}
+	GoodsUrl(...string)interface{}
+	GoodsDetail(...string)interface{}
 }
+
 func initShoppingMap(){
 	err := ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
 		switch sh.Py {
 		case "pinduoduo":
-			//fmt.Println(sh)
 			ShoppingMap[sh.Py] = &Pdd{Info:sh}
+		case "vip":
+			ShoppingMap[sh.Py] = &Vip{Info:sh}
+		case "jd":
+			ShoppingMap[sh.Py] = &Jd{Info:sh}
 		default:
 		}
 		return nil
@@ -104,13 +110,34 @@ func init(){
 			}
 			c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 		})
+		Router.GET("/shopping",func(c *gin.Context){
+			var li []interface{}
+			err := ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
+				li = append(li,sh)
+				return nil
+			})
+			if err != nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK,li)
+		})
 	}
 
 	Router.Use(secureFunc)
 	{
 		Router.GET("/",func(c *gin.Context){
 			var li []map[string]string
-			err := ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
+			//session
+			_,err := c.Cookie("session_id")
+			//fmt.Println(co,err)
+			if err != nil {
+				c.SetCookie("session_id",fmt.Sprintf("%d",time.Now().UnixNano()),3600*24*365,"/","www.zaddone.com",true,true)
+			}
+			err = ReadShoppingList(SiteDB,func(sh *ShoppingInfo)error{
+				if sh.Client_id == ""{
+					return nil
+				}
 				li = append(li,
 				map[string]string{
 					"Name":sh.Name,
@@ -125,6 +152,7 @@ func init(){
 			}
 			c.HTML(http.StatusOK,"index.tmpl",li)
 		})
+
 
 		Router.GET("goodsid/:py",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]
@@ -151,21 +179,28 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
-			c.JSON(http.StatusOK,sh.GoodsUrl(keyword,true))
+			c.JSON(http.StatusOK,sh.GoodsUrl(keyword))
 			return
 		})
 		Router.GET("search/:py",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]
 			if sh == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not1"})
 				return
 			}
 			keyword := c.DefaultQuery("keyword","")
 			if keyword == "" {
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 				return
 			}
-			c.JSON(http.StatusOK,sh.SearchGoods(keyword))
+
+			session,err := c.Cookie("session_id")
+			if err != nil{
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
+				return
+			}
+			//fmt.Println(session,err)
+			c.JSON(http.StatusOK,sh.SearchGoods(keyword,session))
 			return
 		})
 	}

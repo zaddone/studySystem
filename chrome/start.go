@@ -247,7 +247,7 @@ func init(){
 
 		findPageVod(config.Conf.MaxPage)
 		updateFileToWX()
-		<-time.After(2 * time.Hour)
+		<-time.After(5 * time.Hour)
 	}
 	}()
 	log.Println("run")

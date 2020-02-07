@@ -285,6 +285,7 @@ func UpDBToWX(coll,uri string)error{
 		}
 
 		if strings.EqualFold(res["status"].(string),"fail"){
+			continue
 			panic(res)
 		}
 		if strings.EqualFold(res["status"].(string),"success"){

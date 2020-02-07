@@ -8,7 +8,7 @@
     <meta name="author" content="Mark Otto, Jacob Thornton, and Bootstrap contributors">
     <meta name="generator" content="Jekyll v3.8.6">
 
-    <title>米果推荐 网购查价 优惠卷 省钱返利返佣金</title>
+    <title>米果推荐 网购查价 优惠卷 省钱</title>
 
     <link rel="canonical" href="https://v4.bootcss.com/docs/examples/sticky-footer-navbar/">
 
@@ -26,16 +26,15 @@
 <link rel="icon" href="/static/img/favicon.ico">
 <meta name="theme-color" content="#563d7c">
 <link href="/static/css/main.css" rel="stylesheet">
-
-    <!-- Custom styles for this template -->
-  </head>
-  <body class="d-flex flex-column h-100">
-    <header>
-  <!-- <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark"> -->
-  <nav class="navbar navbar-expand-lg navbar-dark fixed-top bg-dark justify-content-center">
+<!-- Custom styles for this template -->
+</head>
+<body class="d-flex flex-column h-100">
+<header>
+<!-- <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark"> -->
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top bg-dark justify-content-center">
 <form method="get" class="form-inline" >
 <div class="input-group input-group-lg" >
-  <input type="text" name="keyword" id="searchKey" class="form-control " placeholder="产品链接 关键词" aria-label="网购查价优惠卷省钱返利返佣" aria-describedby="inputGroup-sizing-lg" >
+  <input type="text" name="keyword" id="searchKey" class="form-control " placeholder="产品链接 关键词" aria-label="网购查价优惠卷省钱" aria-describedby="inputGroup-sizing-lg" >
   <div class="input-group-append">
     <button class="btn btn-outline-secondary search" type="submit" id="button-addon2" >搜索</button>
   </div>
@@ -55,7 +54,10 @@
   <button type="button" class="btn btn-secondary">Right</button>
 </div>
 -->
+
 <div class="row list">
+</div>
+<div class="row wait">
 </div>
 
 <div class="row">
@@ -64,14 +66,16 @@
 {{end}}
 </div>
 
+<!--
 <div class="row top">
     <div class="col-lg-2"  >
-    <div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价返利返佣金"><div class="card-body"><p>米果推荐公众号</p></div></div>
+    <div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐公众号</p></div></div>
     </div>
     <div class="col-lg-2" >
-    <div class="card"><img src="/static/img/xcx.jpeg" class="card-img-top" alt="i米果推荐 购物查价返利返佣金"><div class="card-body"><p>米果推荐小程序</p></div></div>
+    <div class="card"><img src="/static/img/xcx.jpeg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐小程序</p></div></div>
     </div>
   </div>
+-->
 
 </div>
 </main>
@@ -80,9 +84,11 @@
 
 <footer class="footer mt-auto py-3">
   <div class="container">
+   <!--
     <span>
     <a target="_blank" href="https://zaddone.github.io/">文章</a>
     </span>
+   -->
     <span  class="text-muted">© 2020 米果报 蜀ICP备 19018296号-1</span>
   </div>
 </footer>
@@ -112,154 +118,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"></script>
 <script src="/static/js/markdown.min.js"  crossorigin="anonymous"></script>
-
-<script>
-function trim(a){
-  if(typeof a =='string'){
-    return a.replace(/\s+/,'');
-  }else {
-    return a;
-  }
-}
-function isEmpty(a){
-  var b = trim(a);
-  if((typeof a) == 'string'  && b){
-    return false;
-   }else {
-      return true;
-   }
-}
-var ListDB = [];
-function PddPageHtml(data){
- $('.list').html("")
- ListDB = [];
- $.each(data, function(key, val) {	
-  val.min_group_price /= 100.0
-  val.min_normal_price /= 100.0
-  ListDB.push(val)
-  //promotion_rate
-  var fprice = (val.min_group_price*(val.promotion_rate/1000.0)).toFixed(2);
-  //<span class="badge badge-dark">Dark</span>
-  $('.list').append('<div class="col-lg-2 top" ><div class="card"> <button data-toggle="modal" data-target=".bd-modal-lg" type="button" class="btn btn-link" data-id="'+key+'" data-site="pinduoduo" ><span class="position-absolute"><span class="badge badge-secondary">拼多多</span><span class="badge badge-dark">'+val.mall_name+'</span></span><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.min_group_price+'-'+fprice+'</span></br>'+val.goods_name+'</p></div></button></div></div>')
- })
-}
-function parseQueryString(url) {
- var reg_url = /^[^\?]+\?([\w\W]+)$/,
-  reg_para = /([^&=]+)=([\w\W]*?)(&|$|#)/g,
-  arr_url = reg_url.exec(url),
-  ret = {};
- if (arr_url && arr_url[1]) {
-  var str_para = arr_url[1], result;
-  while ((result = reg_para.exec(str_para)) != null) {
-   ret[result[1]] = result[2];
-  }
- }
- return ret;
-}
-function getQueryString(name) {
- var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
- var r = window.location.search.substr(1).match(reg);
- //console.log(r)
- if (r != null) return decodeURIComponent(r[2]);
- return null;
-}
-function checkInputIsUrl(word){
-  let pos = word.indexOf("http");
-  if (pos<0)return false;
-  word.slice(pos, word.length)
-  let ret = parseQueryString(word)
-  ret.goods_id
-  let res = word.slice(pos, word.length);
-  pos = res.indexOf("yangkeduo.com")
-  if (pos>0){
-    let req = parseQueryString(res)
-    pddGoods(req["goods_id"])
-    return true
-  }
-  return false
-}
-function pddGoods(goodsid){
-
-  $('.list').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
-  $.getJSON({
-    url: '/goodsid/pinduoduo',
-    data:{"goodsid":goodsid},	  
-    success: function(db){
-     console.log(db)
-     PddPageHtml(db.goods_detail_response.goods_details)
-    },
-    error:function(db){
-      $('.list').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
-    },
-  });
-}
-
-function Search(){
-  let key = getQueryString("keyword")
-  if (isEmpty(key))return;
-  if (checkInputIsUrl(key)) {
-    return
-  }
-  $('#searchKey').val(key)
-  $('.list').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
-  $.getJSON({
-    url: '/search/pinduoduo',
-    data:{"keyword":key},	  
-    success: function(db){
-      PddPageHtml(db.goods_search_response.goods_list)
-    },
-    error:function(db){
-      $('.list').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
-    },
-  });
-}
-$(document).ready(function(){
-  Search()
-  $("#myLargeModalLabel").on("show.bs.modal", function (event) {
-    var button = $(event.relatedTarget)
-    var goods = ListDB[parseInt(button.data('id'))]
-    
-    //console.log(goods)
-    //var goodsid = button.data('id'); 
-    var site = button.data('site'); 
-    $(this).find('.modal-header h6').html('<span class="badge badge-secondary">'+goods.mall_name+'</span><span class="badge badge-danger">￥'+goods.min_group_price+'-'+goods.min_normal_price+'</span></br>'+goods.goods_name)
-    let innet = $(this).find('.carousel-inner')
-    innet.html("")
-    innet.append('<div class="carousel-item active"><img src="'+goods.goods_image_url+'" class="d-block w-100" alt=""></div>')
-    if (goods.goods_gallery_urls){
-      goods.goods_gallery_urls.forEach(function(value,i){
-        innet.append('<div class="carousel-item"><img src="'+value+'" class="d-block w-100" alt=""></div>')
-      })
-    }
-    var modal = $(this)
-    modal.find(".down").html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
-    $.getJSON({
-      url: '/goods/'+site,
-      data:{"goodsid":goods.goods_id},	  
-      success: function(db){
-       console.log(db)
-       let g = db.goods_promotion_url_generate_response.goods_promotion_url_list[0]
-       var down  = '<a target="_blank" class="btn btn-success" href="'+g.short_url+'">拼多多下单 返'+goods.promotion_rate/10.0+'%</a>'
-        modal.find(".down").html(down)
-        modal.find(".footerdown").html(down)
-      },
-      error:function(db){
-       //console.log(db)
-       modal.find(".modal-footer").html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
-      },
-    });
-  })
- // $("#searchKey").keydown(function(e) {  
- //  if (e.keyCode == 13) {  
- //   Search()
- //  }  
- // });  
-
- //$('.search').click(function(){	
- //  Search()
- //});
-});
-</script>
+<script src="/static/js/main.js"  crossorigin="anonymous"></script>
 </body>
 </html>
 
