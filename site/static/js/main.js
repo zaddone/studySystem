@@ -3,6 +3,7 @@ ListDB.set("pinduoduo",{func:pddMode,li:[]})
 ListDB.set("vip",{func:vipMode,li:[]})
 ListDB.set("jd",{func:jdMode,li:[]})
 var jdReg = new RegExp(/\/(\d+)\.html/);
+var pddReg = new RegExp(/goods_id=(\d+)(\&|$)/);
 function Search(){
   let key = getQueryString("keyword")
   if (isEmpty(key))return;
@@ -30,8 +31,9 @@ function checkInputIsUrl(word){
   let res = word.slice(pos, word.length);
   pos = res.indexOf("yangkeduo.com")
   if (pos>0){
-    let req = parseQueryString(res)
-    pddGoods(req["goods_id"])
+    let _li = pddReg.exec(res)
+    //let req = parseQueryString(res)
+    pddGoods(_li[1])
     return true
   }
   pos = res.indexOf("jd.com")
@@ -112,9 +114,9 @@ function PddPageHtml(db){
   val.min_group_price /= 100.0
   val.min_normal_price /= 100.0
   obj.li.push(val)
-  var fprice = (val.min_group_price*(val.promotion_rate/1000.0)).toFixed(2);
+  val.fprice = (val.min_group_price*(val.promotion_rate/1000.0)).toFixed(2);
   //<span class="badge badge-dark">Dark</span>
-  $('.list').append('<div class="col-lg-2 top" ><div class="card"> <button data-toggle="modal" data-target=".bd-modal-lg" type="button" class="btn btn-link" data-id="'+key+'" data-site="pinduoduo" ><span class="position-absolute"><span class="badge badge-secondary">拼多多</span><span class="badge badge-dark">'+val.mall_name+'</span></span><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.min_group_price+'</span></br>'+val.goods_name+'</p></div></button></div></div>')
+  $('.list').append('<div class="col-lg-2 top" ><div class="card"> <button data-toggle="modal" data-target=".bd-modal-lg" type="button" class="btn btn-link" data-id="'+key+'" data-site="pinduoduo" ><span class="position-absolute"><span class="badge badge-secondary">拼多多</span><span class="badge badge-dark">'+val.mall_name+'</span></span><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.min_group_price+'-'+val.fprice+'</span></br>'+val.goods_name+'</p></div></button></div></div>')
   //$('.list').append('<div class="col-lg-2 top" ><div class="card"> <button data-toggle="modal" data-target=".bd-modal-lg" type="button" class="btn btn-link" data-id="'+key+'" data-site="pinduoduo" ><span class="position-absolute"><span class="badge badge-secondary">拼多多</span><span class="badge badge-dark">'+val.mall_name+'</span></span><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.min_group_price+'-'+fprice+'</span></br>'+val.goods_name+'</p></div></button></div></div>')
  })
 }
@@ -161,7 +163,7 @@ function jdMode(that,site,goods){
 }
 
 function pddMode(that,site,goods){
-    $(that).find('.modal-header h6').html('<span class="badge badge-secondary">'+goods.mall_name+'</span><span class="badge badge-danger">￥'+goods.min_group_price+'-'+goods.min_normal_price+'</span></br>'+goods.goods_name)
+    $(that).find('.modal-header h6').html('<span class="badge badge-secondary">'+goods.mall_name+'</span><span class="badge badge-danger">￥'+goods.min_group_price+'-'+goods.fprice+'</span></br>'+goods.goods_name)
     let innet = $(that).find('.carousel-inner')
     innet.html("")
     innet.append('<div class="carousel-item active"><img src="'+goods.goods_image_url+'" class="d-block w-100" alt=""></div>')
