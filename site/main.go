@@ -15,6 +15,7 @@ var(
 	Site  = flag.String("Site","www.zaddone.com:443","site")
 	SiteDB *bolt.DB
 	ShoppingMap = map[string]ShoppingInterface{}
+
 	//Tls  = flag.Bool("TLS",false,"TLS")
 )
 
@@ -22,6 +23,7 @@ type ShoppingInterface interface{
 	SearchGoods(...string)interface{}
 	GoodsUrl(...string)interface{}
 	GoodsDetail(...string)interface{}
+	OrderSearch(...string)interface{}
 }
 
 func initShoppingMap(){
@@ -75,6 +77,21 @@ func init(){
 	if *Release{
 		gin.SetMode(gin.ReleaseMode)
 	}else{
+		Router.GET("test/:py",func(c *gin.Context){
+			obj := ShoppingMap[c.Param("py")]
+			if obj == nil {
+				c.JSON(http.StatusOK,gin.H{"msg":""})
+				return
+			}
+
+			order := c.Query("order")
+			if order == "" {
+				c.JSON(http.StatusOK,gin.H{"msg":""})
+				return
+			}
+			c.JSON(http.StatusOK,obj.OrderSearch(order))
+			return
+		})
 
 		Router.GET("delsite/:py",func(c *gin.Context){
 			err := SiteDB.Update(func(t *bolt.Tx)error{
@@ -153,6 +170,8 @@ func init(){
 			c.HTML(http.StatusOK,"index.tmpl",li)
 		})
 
+		Router.POST("wx",handWxQuery)
+		Router.GET("wx",handWxQuery)
 
 		Router.GET("goodsid/:py",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]

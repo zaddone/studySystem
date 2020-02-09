@@ -143,3 +143,13 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 	u.Add("goods_id_list","["+goodsid+"]")
 	return self.ClientHttp(u)
 }
+func (self *Pdd)OrderSearch(keys ...string)interface{}{
+	//pdd.ddk.order.detail.get
+	goodsid := keys[0]
+	u := &url.Values{}
+	u.Add("type","pdd.ddk.order.detail.get")
+	u.Add("order_sn",goodsid)
+	return self.ClientHttp(u)
+	return nil
+}
+

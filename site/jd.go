@@ -15,10 +15,12 @@ import(
 )
 var (
 	JdUrl = "https://router.jd.com/api"
+	JdUrl_ = "https://api.jd.com/routerjson"
 	//PddErrNum int = 0
 	//pdd.ddk.theme.goods.search
 	//pdd.ddk.goods.search
-	JdToken = "0619e9dd75e448dea0ab1b0449de3d89wu5z"
+	//JdToken = "0619e9dd75e448dea0ab1b0449de3d89wu5z"
+	JdToken = "8fb30ead08284c52a879444d6a47c8bdywqw"
 )
 type Jd struct{
 	Info *ShoppingInfo
@@ -49,14 +51,14 @@ func (self *Jd)addSign(u *url.Values){
 	//fmt.Println(u.Get("sign"))
 }
 
-func (self *Jd) ClientHttp(u *url.Values)( out interface{}){
+func (self *Jd) ClientHttp(uri string,u *url.Values)( out interface{}){
 
 	self.addSign(u)
 	//ht := http.Header{}
 	//ht.Add("Content-Type","application/json")
 	var err error
 	err = request.ClientHttp_(
-		JdUrl+"?"+u.Encode(),
+		uri+"?"+u.Encode(),
 		"GET",nil,
 		nil,
 		func(body io.Reader,start int)error{
@@ -98,7 +100,7 @@ func (self *Jd) SearchGoods(words ...string)interface{}{
 	u.Add("param_json",string(body))
 
 	//u.Add("custom_parameters",words[1])
-	return self.ClientHttp(u)
+	return self.ClientHttp(JdUrl,u)
 }
 func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u := &url.Values{}
@@ -117,12 +119,40 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u.Add("param_json",string(body))
 	//jd.kpl.open.item.getmobilewarestyleandjsbywareid
 	u.Add("access_token",JdToken)
-	return self.ClientHttp(u)
+	return self.ClientHttp(JdUrl,u)
 	//return nil
 }
 func (self *Jd) GoodsUrl(words ...string) interface{}{
 
 	u := &url.Values{}
+	//jd.kpl.open.promotion.pidurlconvert
+	//jd.kpl.open.batch.convert.cpslink
+	//jd.kpl.open.cps.convert.keplerurl
+	//jd.kepler.xuanpin.cpsurl.convert
+	//jd.kepler.xuanpin.genclickurl.batch
+	//u.Add("method","jd.union.open.promotion.common.get")
+	//u.Add("v","1.0")
+	////u.Add("access_token",JdToken)
+	//query := map[string]interface{}{
+	//	"promotionCodeReq":map[string]interface{}{
+	//		//"sourceEmt":"14",
+	//		//"unionId":"1001616744",
+	//		"siteId":"2009626993",
+	//		//"skuList":words[0],
+	//		//"appKey":self.Info.Client_id,
+	//		//"type":"1",
+	//	//	"subUnionId":"abc",
+	//		"materalId":fmt.Sprintf("https://item.jd.com/%s.html",words[0]),
+	//	},
+	//	//"skuIds":
+	//	//"pin":"zaddone",
+	//	//"webId":"2009626993",
+	//	//"positionId":0,
+	//	//"materalId":fmt.Sprintf("https://item.jd.com/%s.html",words[0]),
+	//	//"type":"1",
+	//	//"kplClick":1,
+	//	//"shortUrl":1,
+	//}
 	//jd.kpl.open.promotion.pidurlconvert
 	u.Add("method","jd.kpl.open.promotion.pidurlconvert")
 	u.Add("v","2.0")
@@ -132,12 +162,37 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 		"positionId":0,
 		"materalId":fmt.Sprintf("https://item.jd.com/%s.html",words[0]),
 		"kplClick":1,
+		"shortUrl":1,
 	}
 	body,err := json.Marshal(query)
 	if err != nil {
 		panic(err)
 	}
 	u.Add("param_json",string(body))
+	//body,err := json.Marshal(query)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//u.Add("360buy_param_json",string(body))
+	//u.Add("param_json",string(body))
 
-	return self.ClientHttp(u)
+	return self.ClientHttp(JdUrl,u)
+}
+func (self *Jd)OrderSearch(keys ...string)interface{}{
+
+	u := &url.Values{}
+	//jd.kepler.order.getorderdetail
+	u.Add("method","jd.kepler.order.getorderdetail")
+	u.Add("v","1.0")
+	u.Add("access_token",JdToken)
+	query := map[string]interface{}{
+		"orderId":keys[0],
+	}
+	body,err := json.Marshal(query)
+	if err != nil {
+		panic(err)
+	}
+	u.Add("param_json",string(body))
+	return self.ClientHttp(JdUrl,u)
+
 }
