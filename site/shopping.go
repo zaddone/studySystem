@@ -56,21 +56,29 @@ func (self *ShoppingInfo) SaveToDB(db *bolt.DB) error {
 		return b.Put([]byte(self.Py),self.toByte())
 	})
 }
-func ReadShoppingList(db *bolt.DB,h func(*ShoppingInfo)error)error{
-	return db.View(func(t *bolt.Tx) error{
-		b := t.Bucket(SiteList)
-		if b == nil {
-			return fmt.Errorf("b == nil")
-		}
-		return b.ForEach(func(k,v []byte)error{
-			sh := &ShoppingInfo{}
-			er := sh.loadByte(v)
-			if er != nil {
-				return er
+func openSiteDB(dbname string,h func(*bolt.DB)error)error{
+	db ,err := bolt.Open(dbname,0600,nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return h(db)
+}
+func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
+	return openSiteDB(dbname,func(db *bolt.DB)error{
+		return db.View(func(t *bolt.Tx) error{
+			b := t.Bucket(SiteList)
+			if b == nil {
+				return fmt.Errorf("b == nil")
 			}
-			return h(sh)
-			//li = append(li,sh)
-			return nil
+			return b.ForEach(func(k,v []byte)error{
+				sh := &ShoppingInfo{}
+				er := sh.loadByte(v)
+				if er != nil {
+					return er
+				}
+				return h(sh)
+			})
 		})
 	})
 

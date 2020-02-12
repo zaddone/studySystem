@@ -11,18 +11,34 @@ import(
 	//"bytes"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
+	"github.com/boltdb/bolt"
 	//"net/http"
+	"regexp"
 )
 var (
 	PddUrl = "https://gw-api.pinduoduo.com/api/router"
+	PddOrderDB *bolt.DB
 	//PddErrNum int = 0
 	//pdd.ddk.theme.goods.search
 	//pdd.ddk.goods.search
+	pddReg = regexp.MustCompile(`goods_id=(\d+)`);
+	pddOrderReg = regexp.MustCompile(`\d{6}-\d{15}`)
 )
 type Pdd struct{
 	Info *ShoppingInfo
 	PddPid []string
+	OrderDB *bolt.DB
 }
+func NewPdd(sh *ShoppingInfo) (p *Pdd) {
+	p = &Pdd{Info:sh}
+	var err error
+	p.OrderDB,err = bolt.Open("pddOrder",0600,nil)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (self *Pdd)addSign(u *url.Values){
 	u.Add("client_id",self.Info.Client_id)
 	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
@@ -127,6 +143,28 @@ func (self *Pdd) GoodsUrl(words ...string) interface{}{
 	//}
 	return self.ClientHttp(u)
 }
+func (self *Pdd)OrderMsg(_db interface{}) (str string){
+	db := _db.(map[string]interface{})
+	res := db["order_detail_response"].(map[string]interface{})
+
+	fee := res["promotion_amount"].(float64)/100
+	str = fmt.Sprintf("%s\n￥%.2f\n佣金￥%.2f \n技术服务费￥%.2f\n",
+		res["goods_name"].(string),
+		res["order_amount"].(float64)/100,
+		fee,fee*0.1,
+	)
+	if res["order_status"].(float64) == 2{
+		finishTime :=time.Unix(int64(db["order_receive_time"].(float64)/1000),0).Add(time.Hour*24*15)
+		str += fmt.Sprintf("%s\n返￥%.2f\n预计%s到帐\n",
+			iMsg,
+			fee*0.9,
+			finishTime.Format("1月2日"),
+		)
+	}else{
+		str +=iMsg+"订单完成15日后返利\n"
+	}
+	return str
+}
 
 func (self *Pdd) SearchGoods(words ...string)interface{}{
 	u := &url.Values{}
@@ -145,11 +183,94 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 }
 func (self *Pdd)OrderSearch(keys ...string)interface{}{
 	//pdd.ddk.order.detail.get
-	goodsid := keys[0]
+	orderid := keys[0]
+	userid := keys[1]
+	err := self.orderGet(orderid,userid)
+	if err != nil {
+		return nil
+	}
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.order.detail.get")
-	u.Add("order_sn",goodsid)
-	return self.ClientHttp(u)
-	return nil
+	u.Add("order_sn",orderid)
+	db:= self.ClientHttp(u)
+	if db == nil {
+		return nil
+	}
+	err = self.orderSave(orderid,userid,db)
+	if err != nil {
+		fmt.Println(err)
+	}
+	//fmt.Println(db)
+	return db
+	//return nil
+}
+func (self *Pdd) orderGet (orderid,userid string) error {
+
+	//oid := []byte(orderid)
+	return self.OrderDB.View(func(t *bolt.Tx)error{
+		b := t.Bucket(dbId)
+		if b == nil{
+			//panic(err)
+			return nil
+		}
+		v := b.Get([]byte(orderid))
+		if v == nil {
+			return nil
+		}
+		var db map[string]interface{}
+		err := json.Unmarshal(v,&db)
+		if err != nil {
+			return err
+		}
+		uid := db["userid"]
+		if uid!=nil && uid.(string)!=userid {
+			return io.EOF
+		}
+		return nil
+	})
+}
+func (self *Pdd) orderSave (orderid,userid string,db interface{}) error {
+	response := db.(map[string]interface{})["order_detail_response"]
+	if response == nil {
+		return nil
+	}
+	data := response.(map[string]interface{})
+	//fmt.Println(db)
+	data["userid"] = userid
+	return self.OrderDB.Update(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(dbId)
+		if err != nil {
+			return err
+		}
+		d_,err := json.Marshal(data)
+		if err != nil{
+			return err
+		}
+		return b.Put([]byte(orderid),d_)
+	})
+	//order_status_desc
+	//return nil
+}
+func (self *Pdd)OutUrl(db interface{}) string {
+	res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
+	if res == nil {
+		return ""
+	}
+	res_ := res.(map[string]interface{})["goods_promotion_url_list"]
+	if res == nil {
+		return ""
+	}
+	res__ := res_.([]interface{})
+	if len(res__)== 0 {
+		return ""
+	}
+	res___ := res__[0].(map[string]interface{})
+	if res___ == nil {
+		return ""
+	}
+	return res___["short_url"].(string)
+}
+func(self *Pdd)GetInfo()*ShoppingInfo {
+	return self.Info
 }
 

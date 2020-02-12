@@ -108,3 +108,9 @@ func (self *Vip) GoodsDetail(words ...string)interface{}{
 func (self *Vip)OrderSearch(keys ...string)interface{}{
 	return nil
 }
+func (self *Vip)OutUrl(db interface{}) string {
+	return ""
+}
+func(self *Vip)GetInfo()*ShoppingInfo {
+	return self.Info
+}
