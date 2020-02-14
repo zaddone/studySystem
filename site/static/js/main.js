@@ -1,9 +1,28 @@
 var ShoppingMap =  new Map()
 //var publicObj;
 var jdReg = new RegExp(/\/(\d+)\.html/);
-var jdReg_ = new RegExp(/sku=(\d+)/);
-var pddReg = new RegExp(/goods_id=(\d+)(\&|$)/);
+var jdReg_ = new RegExp(/[\?|\&]sku=(\d+)/);
+var pddReg = new RegExp(/[\?|\&]goods_id=(\d+)[\&|$]/);
+var tbReg = new RegExp(/[\?|\&]id=(\d+)[\&|$]/);
+var tburlReg = new RegExp(/(taobao|tmall)/);
+var urlReg = new RegExp(/(http[\S]+)\+/);
 
+function isWeixin () {
+  let wx = navigator.userAgent.toLowerCase()
+  if (wx.match(/MicroMessenger/i) === 'micromessenger') {
+    return true
+  } else {
+    return false
+  }
+}
+function isWl(){
+  return (/Android|webOS|iPhone|iPod|BlackBerry/i.test(navigator.userAgent)) 
+}
+function ShowWX(id){
+
+    $(id).append('<div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐公众号</p></div></div>')
+	return 
+}
 function Search(){
   let key = getQueryString("keyword")
   let py = getQueryString("py")
@@ -21,6 +40,7 @@ function Search(){
   //jsonGetSearch('jd',key)
   //jsonGet('/search/vip',key,VipPageHtml)
 }
+
 function checkInputIsUrl(word){
   let pos = word.indexOf("http");
   if (pos<0)return false;
@@ -50,6 +70,13 @@ function checkInputIsUrl(word){
     ShowGoods("jd",_li[1])
     return true
   }
+  if (tburlReg.test(res)>=0){
+    //console.log(urlReg.exec(res))
+    let rui_ =  urlReg.exec(res)
+    ShowGoods("taobao",rui_[1])
+    return true
+  }
+  
   return false
 }
 
@@ -57,7 +84,10 @@ function ShowGoods(py,goodsid){
   let obj  = ShoppingMap.get(py) 
   if (!obj)return
   $('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
-  $.getJSON({
+  $.ajax({
+    type: "get",
+    dataType: "json",
+    cache:false,
     url: '/goodsid/'+py,
     data:{"goodsid":goodsid},	  
     success: function(db){
@@ -69,38 +99,6 @@ function ShowGoods(py,goodsid){
       $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
     },
   });
-}
-function jdPageHtml(data){
-
- let that = this
- $.each(data.jd_kpl_open_xuanpin_searchgoods_response.result.queryVo, function(key, val) {	
-  val.fprice = (parseFloat(val.commisionRatioWl)/100 * parseFloat(val.price)).toFixed(2);
-  //console.log(val)
-  that.db.push(val)
-  that.html(val)
- })
-}
-function htmljd(val){
-  $('.list').append('<div class="col-lg-2 top" ><div class="card"> <a class="btn btn-link" target="_blank" href="https://www.zaddone.com/p/jd/'+val.skuId+'" ><span class="position-absolute"><span class="badge badge-secondary">京东</span></span><img src="http://img14.360buyimg.com/ads/'+val.imageUrl+'" class="card-img-top" alt="'+val.wareName+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.price+'-'+val.fprice+'</span></br>'+val.wareName+'</p></div></a></div></div>')
-}
-function pinduoduoPageHtml(db_){
-  let data
-  try{
-  data = db_.goods_search_response.goods_list
-  }catch(err) {
-  data = db_.goods_detail_response.goods_details
-  }
-  let that = this
- $.each(data, function(key, val) {	
-  val.min_group_price /= 100.0
-  val.min_normal_price /= 100.0
-  val.fprice = (val.min_group_price*(val.promotion_rate/1000.0)).toFixed(2);
-  that.db.push(val)
-  that.html(val)
- })
-}
-function htmlpinduoduo(val){
-  $('.list').append('<div class="col-lg-2 top" ><div class="card"><a class="btn btn-link" target="_blank" href="https://www.zaddone.com/p/pinduoduo/'+val.goods_id+'" ><span class="position-absolute"><span class="badge badge-secondary">拼多多</span><span class="badge badge-dark">'+val.mall_name+'</span></span><img src="'+val.goods_thumbnail_url+'" class="card-img-top" alt="'+val.goods_desc+'"><div class="overflow-hidden" style="height:100px"><p class="card-text"><span class="badge badge-danger">￥'+val.min_group_price+'-'+val.fprice+'</span></br>'+val.goods_name+'</p></div></button></div></div>')
 }
 function jsonGetSearch(py,key){
     $('.list').html("")
@@ -130,7 +128,7 @@ function jsonGetSearch(py,key){
   	key = getQueryString("keyword")
 	if (!key)return
     }
-    jsonGet('/search/'+py,key,obj)
+    jsonGet('/search/'+py+"?keyword="+encodeURI(key),obj)
 }
 function ShowSearch(){
     $('#form').toggle()
@@ -138,10 +136,13 @@ function ShowSearch(){
     $('#searchKey').focus()
     $('.list').html("")
 }
-function jsonGet(uri_,key_,obj){
-  $.getJSON({
+function jsonGet(uri_,obj){
+  $.ajax({
+    type: "get",
+    dataType: "json",
+    //cache:false,
     url: uri_,
-    data:{"keyword":key_},	  
+    //data:{"keyword":key_},	  
     success:function(db){
  	$('.wait').html("")
 	obj.func(db,true)

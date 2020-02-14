@@ -48,9 +48,9 @@
 
 </nav>
 <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark justify-content-center"  id="form">
-<form method="get" class="form-inline" >
+<form method="get" class="form-inline" style="width:100%" >
 <input type='hidden' name="py" id="pyinput" value="">
-<div class="input-group input-group-lg" >
+<div class="input-group input-group-lg" style="width:100%" >
 
   <input type="text" name="keyword" id="searchKey" class="form-control " placeholder="链接 关键词" aria-label="链接 关键词" aria-describedby="inputGroup-sizing-lg" >
 <!--
@@ -126,20 +126,6 @@
 {{end}}
 </div>
 </section>
-
-<!--
-  <div class="row top">
-    <div class="col-lg-2"  >
-    <div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐公众号</p></div>
-    </div>
-    </div>
-    <div class="col-lg-2" >
-    <div class="card"><img src="/static/img/xcx.jpeg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐小程序</p></div>
-    </div>
-    </div>
-  </div>
--->
-
 </div>
 </main>
 
@@ -167,11 +153,38 @@
       </div>
       <div class="modal-body">
 	<p class="down" ></p>
+<div class="container">
+  <div class="row">
+    <div class="col-sm">
+     <div class="text">
+     </div>
+    <div >
+    <p class="pmsg">  copy txt to taobao</p>
+    </div>
+
+    </div>
+    <div class="col-sm">
+
 	<div id="carouselExampleSlidesOnly" class="carousel slide" data-ride="carousel">
 	  <div class="carousel-inner">
 	  </div>
+  <a class="carousel-control-prev" href="#carouselExampleSlidesOnly" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="sr-only">Previous</span>
+  </a>
+  <a class="carousel-control-next" href="#carouselExampleSlidesOnly" role="button" data-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="sr-only">Next</span>
+  </a>
 	</div>
+
+    </div>
+
+
+  </div>
+</div>
      </div>
+
      <div class="modal-footer">
      <span><button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button></span>
      <span class="footerdown" ></span></div>
@@ -182,13 +195,20 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"></script>
 <script src="/static/js/markdown.min.js"  crossorigin="anonymous"></script>
 <script src="/static/js/main.js"  crossorigin="anonymous"></script>
+
+{{range .}}
+  <script src="/static/js/{{.py}}.js"  crossorigin="anonymous"></script>
+{{end}}
+
 <script src="/script"  crossorigin="anonymous"></script>
 <script>
 $(document).ready(function(){
   Search()
-  //ShowMode()
 });
+
+
 </script>
+
 </body>
 </html>
 

@@ -1,9 +1,9 @@
 package main
 import(
-	//"regexp"
+	"regexp"
 	//"flag"
 	"fmt"
-	"time"
+	//"time"
 )
 var(
 	//WXtoken = "zhaoweijie2020"
@@ -16,13 +16,15 @@ var(
 
 
 	//cmd  = flag.String("c","www.zaddone.com:443","cmd")
-	orderTimeFormat = "2006010215"
+	//orderTimeFormat = "2006010215"
+	taobaoid = regexp.MustCompile(`[\?|\&]id=(\d+)`)
 )
 
 func main(){
-	t_,err := time.Parse(orderTimeFormat,"2020010101")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(t_)
+	//t_,err := time.Parse(orderTimeFormat,"2020010101")
+	//if err != nil {
+	//	panic(err)
+	//}
+	str := taobaoid.FindStringSubmatch("https://item.taobao.com/item.htm?spm=a219r.lm869.14.1.1d667ee4vRNM0F&id=611800287553&ns=1&abbucket=12#detail")
+	fmt.Println(str)
 }

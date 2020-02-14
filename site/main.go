@@ -41,6 +41,8 @@ func initShoppingMap(){
 		//	ShoppingMap[sh.Py] = &Vip{Info:sh}
 		case "jd":
 			ShoppingMap[sh.Py] = NewJd(sh)
+		case "taobao":
+			ShoppingMap[sh.Py] = NewTaobao(sh)
 		default:
 		}
 		return nil
@@ -214,7 +216,8 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
-			c.JSON(http.StatusOK,sh.GoodsUrl(keyword))
+			ext := c.DefaultQuery("ext","")
+			c.JSON(http.StatusOK,sh.GoodsUrl(keyword,ext))
 			return
 		})
 		Router.GET("search/:py",func(c *gin.Context){
