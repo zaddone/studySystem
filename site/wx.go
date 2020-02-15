@@ -38,6 +38,7 @@ var(
 	msgPhone = []byte("phone")
 	msgType = []byte("type")
 	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
+	welcome = "zaddone_com米果推荐\n1、支持输入（淘宝、京东、拼多多）网购商品链接，查询产品价格和返利下单链接\n 2、输入订单号、手机号和（微信|支付宝）设置系统自动转账信息，定时到帐。3、发送其他信息，可获取账户金额等相关信息"
 
 )
 func init(){
@@ -112,6 +113,7 @@ type wxRevMsg struct{
 	CreateTime int64
 	MsgType string
 	Content string
+	Event string
 	MsgId int
 }
 func Sha1(data []byte) string {
@@ -266,19 +268,7 @@ func handHttp(str,userid string,h func(string)) {
 	}
 	h(str)
 }
-
-func handWxPost(c *gin.Context){
-	var db wxRevMsg
-	err := xml.NewDecoder(c.Request.Body).Decode(&db)
-	if err != nil {
-		fmt.Println(err)
-		c.String(http.StatusOK,"")
-		return
-	}
-	content := "success"
-	handMsg(db.Content,db.FromUserName,func(s string){
-		content = s
-	})
+func sendMsg(c *gin.Context,db *wxRevMsg,content string) {
 	sendstr,err := xml.Marshal(&wxMsg{
 		ToUserName:db.FromUserName,
 		FromUserName:db.ToUserName,
@@ -290,8 +280,29 @@ func handWxPost(c *gin.Context){
 		c.String(http.StatusOK,"")
 		return
 	}
-	//fmt.Println(string(sendstr))
 	c.String(http.StatusOK,string(sendstr))
+}
+
+func handWxPost(c *gin.Context){
+	var db wxRevMsg
+	err := xml.NewDecoder(c.Request.Body).Decode(&db)
+	if err != nil {
+		fmt.Println(err)
+		c.String(http.StatusOK,"")
+		return
+	}
+	content := "success"
+	if db.Event != ""{
+		if db.Event == "subscribe" {
+			sendMsg(c,&db,welcome)
+		}
+		return
+	}
+	handMsg(db.Content,db.FromUserName,func(s string){
+		content = s
+	})
+
+	sendMsg(c,&db,content)
 	return
 }
 func handWxQuery(c *gin.Context){
