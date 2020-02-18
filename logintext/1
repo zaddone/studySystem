@@ -1,0 +1,92 @@
+package main
+import(
+	//"gocv.io/x/gocv"
+	"image"
+	//"strings"
+	"fmt"
+	"os"
+	"image/png"
+	"github.com/zaddone/studySystem/control"
+	//"image/color"
+	"flag"
+)
+var(
+	MainImg = flag.String("img","screen.png","img")
+	MainTag = flag.String("tag","../img/t1.png","tag")
+)
+func init(){
+	flag.Parse()
+	return
+}
+func openImg(src string) image.Image {
+	fi,err := os.Stat(src)
+	if err != nil {
+		return nil
+		panic(err)
+	}
+	if fi.Size() == 0 {
+		fmt.Println("size=0")
+		return nil
+	}
+	f,err := os.Open(src)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+		//panic(err)
+	}
+	defer f.Close()
+	//png.Decode(
+	img,err := png.Decode(f)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+		//panic(err)
+	}
+	return img
+}
+func ContainsImg(img,subimg image.Image,point *image.Point,rale float64) bool {
+	var k,v float64
+	w := subimg.Bounds().Dx()
+	h := subimg.Bounds().Dy()
+	w_ := img.Bounds().Dx()
+	h_ := img.Bounds().Dy()
+	fmt.Println(w,h)
+	for i,I,j,J:=0,point.X,0,point.Y ; i<w && j<h && I<w_ && J<h_ ; i,I,j,J = i+1,I+1,j+1,J+1{
+		k++
+		if img.At(I,J) == subimg.At(i,j){
+		v++
+		}
+	}
+	return  (v/k) >= rale
+}
+func checkScreen(tag,app,appact string){
+
+}
+func main(){
+	err := control.Screencap(control.MainPhone)
+	if err != nil {
+		panic(err)
+	}
+	img := openImg(*MainImg)
+	if img == nil{
+		return
+	}
+	fmt.Println(img.At(0,0).RGBA())
+
+	return
+	tag := openImg(*MainTag)
+	//bounds := img.Bounds()
+	//bounds_ := tag.Bounds()
+	//r := NewRect(32,112,92,92)
+	Pt := image.Pt(32,112)
+	ContainsImg(img,tag,&Pt,0.9)
+
+	for i,I,j,J:=0,32,0,112;i<92&&j<92;i,I,j,J = i+1,I+1,j+1,J+1{
+		//fmt.Println(i,j)
+		if img.At(I,J) != tag.At(i,j){
+		fmt.Println(img.At(I,J))
+		fmt.Println(tag.At(i,j))
+		}
+	}
+}
+

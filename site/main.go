@@ -4,11 +4,12 @@ import(
 	//"encoding/json"
 	"github.com/boltdb/bolt"
 	"github.com/gin-gonic/gin"
-	"github.com/unrolled/secure"
+	//"github.com/unrolled/secure"
 	"net/http"
 	"fmt"
 	"flag"
 	"time"
+	"sync"
 )
 var(
 	Release  = flag.Bool("Release",false,"Release")
@@ -16,8 +17,28 @@ var(
 	siteDB  = flag.String("db","SiteDB","db")
 	//SiteDB *bolt.DB
 	ShoppingMap = map[string]ShoppingInterface{}
+	MapSession = sync.Map{}
+	UpdateMap = time.Now()
 
-	//Tls  = flag.Bool("TLS",false,"TLS")
+	Html = []byte(`
+<!doctype html>
+<html lang="zh" class="h-100">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="keywords" content="zaddone,米果报,米果,推荐,网购,查价,优惠卷,省钱,链接,交换">
+    <meta name="description" content="zaddone.com,米果报,米果推荐,网购查价,优惠卷省钱,链接交换">
+    <meta name="author" content="zaddone, 米果报">
+    <meta name="generator" content="Jekyll v3.8.6">
+    <title>zaddone米果报</title>
+    </head>
+<body><script>
+window.location.replace("https://www.zaddone.com")
+</script>
+
+</body>
+</html>
+    `)
 )
 
 
@@ -51,6 +72,14 @@ func initShoppingMap(){
 		panic(err)
 	}
 }
+func ClearSessionMap(t time.Time){
+	MapSession.Range(func(k,v interface{})bool{
+		if (t.Unix() - v.(int64))>86400 {
+			MapSession.Delete(k)
+		}
+		return true
+	})
+}
 
 func init(){
 	flag.Parse()
@@ -64,14 +93,27 @@ func init(){
 	//fmt.Println(*Site)
 	secureFunc := func() gin.HandlerFunc {
 		return func(c *gin.Context) {
-			secureMiddleware := secure.New(secure.Options{
-			    SSLRedirect: true,
-			    SSLHost:     *Site,
-			})
-			err := secureMiddleware.Process(c.Writer, c.Request)
+			session,err := c.Cookie("session_id")
 			if err != nil {
 			    return
 			}
+			now := time.Now()
+			v,ok := MapSession.Load(session)
+			if !ok{
+				MapSession.Store(session,now.Unix())
+			}else{
+				fmt.Println(v)
+				if (now.Unix() - v.(int64))>5{
+					return
+				}
+				MapSession.Store(session,now.Unix())
+				if now.Day() != UpdateMap.Day(){
+					UpdateMap = now
+					go ClearSessionMap(now)
+				}
+			}
+
+			//fmt.Println(session)
 			c.Next()
 		}
 	}()
@@ -80,6 +122,11 @@ func init(){
 	Router.Static("/static","./static")
 	//Router.Static("/","./static")
 	Router.LoadHTMLGlob("./templates/*")
+	Router_ := gin.Default()
+	Router_.GET("/",func(c *gin.Context){
+		//c.Data(http.StatusOK,"text/html",Html)
+		c.Data(301,"text/html",Html)
+	})
 
 
 	if *Release{
@@ -145,37 +192,41 @@ func init(){
 			c.JSON(http.StatusOK,li)
 		})
 	}
+	//Router.Use(secureFunc)
+	Router.GET("/",func(c *gin.Context){
+		var li []map[string]string
+		for k,v := range ShoppingMap {
+			sh := v.GetInfo()
+			li = append(li,
+			map[string]string{
+				"Name":sh.Name,
+				"Img":sh.Img,
+				"Uri":sh.Uri,
+				"py":k,
+				//"script":fmt.Sprintf("{func:%sPageHtml,db:[],page:0,html: html%s,py:\"%s\",name:\"%s\"}",sh.Py,sh.Py,sh.Py,sh.Py,sh.Name),
+			})
+		}
+		c.HTML(http.StatusOK,"index.tmpl",li)
+	})
+	Router.GET("/script",func(c *gin.Context){
+		_,err := c.Cookie("session_id")
+		if err != nil {
+			//sk := fmt.Sprintf("%d",time.Now().UnixNano())
+			c.SetCookie("session_id",fmt.Sprintf("%d",time.Now().UnixNano()),3600*24*365,"/","www.zaddone.com",true,true)
+			//MapSession.Store(sk,time.Now().Unix())
+		}
+		js:=""
+		for k,v := range ShoppingMap {
+			sh := v.GetInfo()
+			js+=fmt.Sprintf("ShoppingMap.set('%s',{func:%sPageHtml,db:[],page:0,html: html%s,py:'%s',name:'%s'});",k,k,k,k,sh.Name)
+		}
+		c.Data(http.StatusOK,"application/javascript",[]byte(js))
+	})
+	Router.POST("/wx",handWxQuery)
+	Router.GET("/wx",handWxQuery)
+
 	Router.Use(secureFunc)
 	{
-		Router.GET("/",func(c *gin.Context){
-			var li []map[string]string
-			for k,v := range ShoppingMap {
-				sh := v.GetInfo()
-				li = append(li,
-				map[string]string{
-					"Name":sh.Name,
-					"Img":sh.Img,
-					"Uri":sh.Uri,
-					"py":k,
-					//"script":fmt.Sprintf("{func:%sPageHtml,db:[],page:0,html: html%s,py:\"%s\",name:\"%s\"}",sh.Py,sh.Py,sh.Py,sh.Py,sh.Name),
-				})
-			}
-			c.HTML(http.StatusOK,"index.tmpl",li)
-		})
-		Router.GET("/script",func(c *gin.Context){
-			_,err := c.Cookie("session_id")
-			if err != nil {
-				c.SetCookie("session_id",fmt.Sprintf("%d",time.Now().UnixNano()),3600*24*365,"/","www.zaddone.com",true,true)
-			}
-			js:=""
-			for k,v := range ShoppingMap {
-				sh := v.GetInfo()
-				js+=fmt.Sprintf("ShoppingMap.set('%s',{func:%sPageHtml,db:[],page:0,html: html%s,py:'%s',name:'%s'});",k,k,k,k,sh.Name)
-			}
-			c.Data(http.StatusOK,"application/javascript",[]byte(js))
-		})
-		Router.POST("/wx",handWxQuery)
-		Router.GET("/wx",handWxQuery)
 		Router.GET("/p/:py/:id",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]
 			if sh == nil {
@@ -190,7 +241,6 @@ func init(){
 			c.Redirect(http.StatusMovedPermanently,u)
 
 		})
-
 		Router.GET("goodsid/:py",func(c *gin.Context){
 			sh := ShoppingMap[c.Param("py")]
 			if sh == nil {
@@ -244,7 +294,7 @@ func init(){
 	}
 	//Router.LoadHTMLGlob(config.Conf.Templates+"/*")
 	go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
-	go Router.Run(":80")
+	go Router_.Run(":80")
 
 }
 func main(){

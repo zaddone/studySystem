@@ -5,6 +5,8 @@ import(
 	"log"
 	"fmt"
 	"github.com/zaddone/studySystem/request"
+	"github.com/gin-gonic/gin"
+	//"github.com/zaddone/studySystem/control"
 	"io"
 	"io/ioutil"
 	"os/exec"
@@ -21,7 +23,8 @@ import(
 type Hfunc func(interface{})
 var (
 	port = "9222"
-	rooturl string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
+	//rooturl string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
+	rooturl string = "https://www.alimama.com/index.htm"
 	orderUrl string = "https://pub.alimama.com/openapi/param2/1/gateway.unionpub/report.getTbkOrderDetails.json?t=1581752650893&_tb_token_=f087e0e378633&jumpType=0&positionIndex=&pageNo=1&startTime=2020-01-01&endTime=2020-02-15&queryType=2&tkStatus=&memberType=&pageSize=40"
 	tb_token = "_tb_token_"
 	indexUrl = "https://www.alimama.com/index.htm"
@@ -29,7 +32,7 @@ var (
 	chromekey = []byte{10,68,101,118,84,111,111,108,115,32}
 	op =[]string{
 		"--remote-debugging-port="+port,
-		"--headless",
+		//"--headless",
 		"--disable-gpu",
 		"--no-sandbox",
 		"--no-default-browser-check",
@@ -40,9 +43,16 @@ var (
 	handleFinish = map[string]func(string,map[string]interface{}){}
 	handleResponse Hfunc = nil
 	Num float64 = 0
-	png = "xcode.png"
+	Png = "xcode.png"
 	writeChan = make(chan interface{},5)
 )
+
+func init(){
+	Router := gin.Default()
+	Router.Static("/","./")
+
+	go Router.Run(":8001")
+}
 func InputText(str string,endHand func()){
 	Num++
 	handMap[Num] = func(id__ float64,req_ map[string]interface{}){
@@ -124,6 +134,7 @@ func LoginSession(_db interface{}){
 			qu := fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
 			PageNavigate(qu,func(res map[string]interface{}){
 				fmt.Println(res)
+				//getBody(res,qu)
 			})
 			return
 
@@ -131,18 +142,21 @@ func LoginSession(_db interface{}){
 		//})
 	})
 }
-func CheckLogin(_db interface{}){
-	if !getBody(_db,png,func(__id float64,result map[string]interface{}){
+
+func CheckLogin_(_db interface{}){
+	if !getBody(_db,Png,func(__id float64,result map[string]interface{}){
 		//fmt.Println("--------------")
 		//fmt.Println(result)
 		body,err := base64.StdEncoding.DecodeString(result["body"].(string))
 		if err != nil {
 			panic(err)
 		}
-		f, _ := os.OpenFile(png, os.O_RDWR|os.O_CREATE, os.ModePerm)
+		f, _ := os.OpenFile(Png, os.O_RDWR|os.O_CREATE, os.ModePerm)
 		f.Write(body)
 		f.Close()
-		fmt.Println("http://127.0.0.1"+":8001/"+png)
+
+		fmt.Println("http://127.0.0.1"+":8001/"+Png)
+		//TaobaoLoginCheck()
 		//fmt.Println(result["body"].(string))
 		handleResponse = LoginSession
 		return
