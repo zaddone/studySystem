@@ -2,10 +2,10 @@ var ShoppingMap =  new Map()
 //var publicObj;
 var jdReg = new RegExp(/\/(\d+)\.html/);
 var jdReg_ = new RegExp(/[\?|\&]sku=(\d+)/);
-var pddReg = new RegExp(/[\?|\&]goods_id=(\d+)[\&|$]/);
-var tbReg = new RegExp(/[\?|\&]id=(\d+)[\&|$]/);
-var tburlReg = new RegExp(/(taobao|tmall)/);
-var urlReg = new RegExp(/(http[\S]+)\+/);
+var pddReg = new RegExp(/[\?|\&]goods_id=(\d+)/);
+var tbReg = new RegExp(/[\?|\&]id=(\d+)/);
+var tburlReg = new RegExp(/(taobao|tmall|tb)/);
+var urlReg = new RegExp(/(http[\S]+)[\+| ]?/);
 
 function isWeixin () {
   let wx = navigator.userAgent.toLowerCase()
@@ -18,10 +18,15 @@ function isWeixin () {
 function isWl(){
   return (/Android|webOS|iPhone|iPod|BlackBerry/i.test(navigator.userAgent)) 
 }
+function ShowErr(func){
+
+     $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">error<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+	
+}
 function ShowWX(id){
 
     $(id).append('<div class="card"><img src="/static/img/gzh.jpg" class="card-img-top" alt="米果推荐 购物查价"><div class="card-body"><p>米果推荐公众号</p></div></div>')
-	return 
+    return 
 }
 function Search(){
   let key = getQueryString("keyword")
@@ -35,7 +40,7 @@ function Search(){
   //$('#searchKey').val(key)
   $('#clear').toggle()
   $('#form').toggle()
-  $('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
+  //$('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
   jsonGetSearch(py,key)
   //jsonGetSearch('jd',key)
   //jsonGet('/search/vip',key,VipPageHtml)
@@ -52,6 +57,7 @@ function checkInputIsUrl(word){
   if (pos>0){
     let _li = pddReg.exec(res)
     //let req = parseQueryString(res)
+    console.log(_li)
     ShowGoods("pinduoduo",_li[1])
     return true
   }
@@ -71,7 +77,7 @@ function checkInputIsUrl(word){
     return true
   }
   if (tburlReg.test(res)>=0){
-    //console.log(urlReg.exec(res))
+    console.log(urlReg.exec(res))
     let rui_ =  urlReg.exec(res)
     ShowGoods("taobao",rui_[1])
     return true
@@ -83,6 +89,8 @@ function checkInputIsUrl(word){
 function ShowGoods(py,goodsid){
   let obj  = ShoppingMap.get(py) 
   if (!obj)return
+  obj.key = goodsid
+  //obj.funcHand = "ShowGoods"
   $('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
   $.ajax({
     type: "get",
@@ -93,10 +101,11 @@ function ShowGoods(py,goodsid){
     success: function(db){
      //console.log(db)
      $('.wait').html('')
-     obj.func(db,false)
+     obj.func(db)
     },
     error:function(db){
-      $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+     //console.log(db)
+     $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">没有找到 <a href="javascript:ShowGoods(\''+py+'\',\''+goodsid+'\')"> 重试</a><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
     },
   });
 }
@@ -118,8 +127,8 @@ function jsonGetSearch(py,key){
     $('#nav'+obj.py).addClass('active');
     $("#dropdownMenuButton").html(obj.name);
     if (obj.db.length>0){
-	obj.db.forEach(function(val){
-		obj.html(val)
+	obj.db.forEach(function(val,key){
+		obj.html(key,val)
 	})
     	return
     }
@@ -128,6 +137,7 @@ function jsonGetSearch(py,key){
   	key = getQueryString("keyword")
 	if (!key)return
     }
+    obj.key = key
     jsonGet('/search/'+py+"?keyword="+encodeURI(key),obj)
 }
 function ShowSearch(){
@@ -137,6 +147,8 @@ function ShowSearch(){
     $('.list').html("")
 }
 function jsonGet(uri_,obj){
+
+  $('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
   $.ajax({
     type: "get",
     dataType: "json",
@@ -144,12 +156,13 @@ function jsonGet(uri_,obj){
     url: uri_,
     //data:{"keyword":key_},	  
     success:function(db){
+	obj.funcHand="jsonGetSearch"
  	$('.wait').html("")
 	obj.func(db,true)
 	//success_(db)
     },
     error:function(db){
-      $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">'+db+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      $('.wait').html('<div class="alert alert-warning alert-dismissible fade show" role="alert">没有找到 <a href="javascript:jsonGetSearch(\''+obj.py+'\',\''+obj.key+'\')"> 重试</a><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
     },
   });
 }
