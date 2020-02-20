@@ -47,6 +47,8 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
+	Router.POST("/wx",handWxQuery)
+	Router.GET("/wx",handWxQuery)
 }
 func GetUserMsg(userid string,h func(string))error{
 	return UserDB.View(func(t *bolt.Tx)error{
@@ -143,6 +145,10 @@ func handMsg(str,userid string,hand func(string)){
 			panic(err)
 		}
 		hand(msg)
+		return
+	}
+	if len(oid) == 18 {
+		hand("taobao order:"+oid)
 		return
 	}
 	oid = pddOrderReg.FindString(str)
@@ -308,6 +314,19 @@ func handWxPost(c *gin.Context){
 func handWxQuery(c *gin.Context){
 	timestamp:=c.Query("timestamp")
 	if timestamp == ""{
+		c.String(http.StatusOK,"")
+		return
+	}
+	stamp,err := strconv.ParseInt(timestamp,10,64)
+	if err != nil {
+		c.String(http.StatusOK,"")
+		return
+	}
+	d := time.Now().Unix() - stamp
+	if d<0 {
+		d=-d
+	}
+	if d>6 {
 		c.String(http.StatusOK,"")
 		return
 	}

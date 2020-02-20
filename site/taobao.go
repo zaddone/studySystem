@@ -8,16 +8,29 @@ import(
 	"io/ioutil"
 	"encoding/json"
 	"github.com/zaddone/studySystem/request"
+	"github.com/PuerkitoBio/goquery"
 	"net/url"
 	"github.com/boltdb/bolt"
 	//"strconv"
 	"regexp"
+	"bytes"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 var (
 	taobaoid = regexp.MustCompile(`[\?|\&]id=(\d+)`)
 	getTaobaoUrl=regexp.MustCompile(`var url = '(\S+)';`)
 	//Pid = "109998500026"
 )
+func DecodeGBK(s []byte) ([]byte, error) {
+	I := bytes.NewReader(s)
+	O := transform.NewReader(I, simplifiedchinese.GBK.NewDecoder())
+	d, e := ioutil.ReadAll(O)
+	if e != nil {
+		return nil, e
+	}
+	return d, nil
+}
 type Taobao struct{
 	Info *ShoppingInfo
 	Pid string
@@ -84,16 +97,69 @@ func (self *Taobao) ClientHttp(u *url.Values)( out interface{}){
 	return
 }
 func (self *Taobao) SearchGoods(words ...string)interface{}{
+	u := &url.Values{}
+	u.Add("q",words[0])
+	u.Add("adzone_id",self.Pid)
+	u.Add("platform","2")
+	u.Add("is_tmall","false")
+	u.Add("method","taobao.tbk.dg.material.optional")
+	db := self.ClientHttp(u)
+	if db == nil {
+		return nil
+	}
+	res_ := db.(map[string]interface{})["tbk_dg_material_optional_response"]
+	if res_ == nil {
+		return nil
+	}
+	return res_.(map[string]interface{})["result_list"].(map[string]interface{})["map_data"]
+
+}
+func (self *Taobao) ProductSearch(words ...string)(result []interface{}){
 	//taobao.tbk.dg.material.optional
 	u := &url.Values{}
-	u.Add("adzone_id",self.Pid)
 	u.Add("q",words[0])
-	u.Add("platform","2")
-	u.Add("method","taobao.tbk.dg.material.optional")
-	return self.ClientHttp(u)
-	//fmt.Println(db)
-	//return db
-	//return nil
+	u.Add("type","p")
+	//var result []interface{}
+	err:= request.ClientHttp_("https://list.tmall.com/search_product.htm?"+u.Encode(),"GET",nil,nil,func(body io.Reader,st int)error{
+		doc,err := goquery.NewDocumentFromReader(body)
+		//db,err := ioutil.ReadAll(body)
+		if err != nil {
+			return err
+		}
+		//fmt.Println(string(db))
+		I := 0
+		doc.Find(".product").EachWithBreak(func(i int,s *goquery.Selection)bool{
+			title,err := DecodeGBK([]byte(s.Find(".productTitle").Text()))
+			if err != nil {
+				panic(err)
+			}
+			uri,_ := s.Find(".productTitle a").First().Attr("href")
+			ids := taobaoid.FindStringSubmatch(uri)
+			//fmt.Println(title,ids[1])
+			db := self.SearchGoods(string(title))
+			if db == nil{
+				return true
+			}
+			id_ := ids[1]
+			for _,v := range self.getResList(db){
+				if id_ == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
+					I++
+					result = append(result,v)
+					break
+				}
+			}
+
+			return I<4
+
+		})
+		return nil
+	})
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	return result
+
 }
 func (self *Taobao) GoodsUrl(words ...string) interface{}{
 	//taobao.tbk.spread.get
@@ -172,20 +238,23 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	if db == nil {
 		return nil
 	}
-	res_ := db.(map[string]interface{})["tbk_dg_material_optional_response"]
-	if res_ == nil {
-		return nil
-	}
+
 	var li_  []interface{}
-	reslist := res_.(map[string]interface{})["result_list"].(map[string]interface{})
-	for _,v := range reslist["map_data"].([]interface{}){
+	for _,v := range db.([]interface{}) {
 		if id == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
 			li_ = []interface{}{v}
 			break
 		}
 	}
-	reslist["map_data"] = li_
-	return db
+	//reslist["map_data"] = li_
+	return li_
+}
+func (self *Taobao) getResList(db interface{}) []interface{} {
+	res_ := db.(map[string]interface{})["tbk_dg_material_optional_response"]
+	if res_ == nil {
+		return nil
+	}
+	return res_.(map[string]interface{})["result_list"].(map[string]interface{})["map_data"].([]interface{})
 }
 func (self *Taobao) OrderSearch(keys ...string)interface{}{
 	return nil

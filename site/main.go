@@ -2,23 +2,26 @@ package main
 import(
 	//"github.com/zaddone/studySystem/config"
 	//"encoding/json"
-	"github.com/boltdb/bolt"
 	"github.com/gin-gonic/gin"
 	//"github.com/unrolled/secure"
 	"net/http"
+	"strings"
+	"strconv"
 	"fmt"
 	"flag"
 	"time"
 	"sync"
 )
 var(
-	Release  = flag.Bool("Release",false,"Release")
+	//Release  = flag.Bool("Release",false,"Release")
 	Site  = flag.String("Site","www.zaddone.com:443","site")
 	siteDB  = flag.String("db","SiteDB","db")
 	//SiteDB *bolt.DB
 	ShoppingMap = map[string]ShoppingInterface{}
 	MapSession = sync.Map{}
-	UpdateMap = time.Now()
+	Router = gin.Default()
+	Router_ = gin.Default()
+	//UpdateMap = time.Now()
 
 	Html = []byte(`
 <!doctype html>
@@ -35,12 +38,17 @@ var(
 <body><script>
 window.location.replace("https://www.zaddone.com")
 </script>
-
 </body>
 </html>
     `)
 )
 
+func runServerClearMap(){
+	for{
+		time.Sleep(time.Hour*1)
+		MapSession = sync.Map{}
+	}
+}
 
 type ShoppingInterface interface{
 	GetInfo()*ShoppingInfo
@@ -50,7 +58,29 @@ type ShoppingInterface interface{
 	OrderSearch(...string)interface{}
 	OutUrl(interface{}) string
 	OrderMsg(interface{}) string
+	ProductSearch(...string)[]interface{}
+}
 
+func checkSession(c *gin.Context){
+	ip := IpStrToByte(c.Request.RemoteAddr)
+	if ip == nil {
+		c.Abort()
+		return
+	}
+	s := string(ip)
+	v,ok := MapSession.Load(s)
+	now := time.Now().Unix()
+	MapSession.Store(s,now)
+	if !ok {
+		c.Next()
+		return
+	}
+	if (now - v.(int64)) < 3{
+		c.Abort()
+		return
+	}
+	c.Next()
+	return
 }
 
 func initShoppingMap(){
@@ -80,119 +110,38 @@ func ClearSessionMap(t time.Time){
 		return true
 	})
 }
+func IpStrToByte(s string) []byte {
+	ips := strings.Split(s,":")
+	if len(ips) !=2 {
+		return nil
+	}
+	var ipaddr [4]byte
+	for i,p := range strings.Split(ips[0],"."){
+		n,err := strconv.Atoi(p)
+		if err != nil {
+			return nil
+		}
+		ipaddr[i] = byte(n)
+	}
+	return ipaddr[:]
+}
 
 func init(){
+	gin.SetMode(gin.ReleaseMode)
+	go runServerClearMap()
 	flag.Parse()
-	//var err error
-	//SiteDB,err = bolt.Open("SiteDB",0600,nil)
-	//if err != nil {
-	//	panic(err)
-	//}
 	initShoppingMap()
-
-	//fmt.Println(*Site)
 	secureFunc := func() gin.HandlerFunc {
-		return func(c *gin.Context) {
-			session,err := c.Cookie("session_id")
-			if err != nil {
-			    return
-			}
-			now := time.Now()
-			v,ok := MapSession.Load(session)
-			if !ok{
-				MapSession.Store(session,now.Unix())
-			}else{
-				fmt.Println(v)
-				if (now.Unix() - v.(int64))>5{
-					return
-				}
-				MapSession.Store(session,now.Unix())
-				if now.Day() != UpdateMap.Day(){
-					UpdateMap = now
-					go ClearSessionMap(now)
-				}
-			}
-
-			//fmt.Println(session)
-			c.Next()
-		}
+		return checkSession
 	}()
-	//fmt.Println("init")
-	Router := gin.Default()
+
 	Router.Static("/static","./static")
-	//Router.Static("/","./static")
 	Router.LoadHTMLGlob("./templates/*")
-	Router_ := gin.Default()
 	Router_.GET("/",func(c *gin.Context){
 		//c.Data(http.StatusOK,"text/html",Html)
-		c.Data(301,"text/html",Html)
+		c.Data(200,"text/html",Html)
 	})
 
-
-	if *Release{
-		gin.SetMode(gin.ReleaseMode)
-	}else{
-		Router.GET("test/:py",func(c *gin.Context){
-			obj := ShoppingMap[c.Param("py")]
-			if obj == nil {
-				c.JSON(http.StatusOK,gin.H{"msg":""})
-				return
-			}
-
-			order := c.Query("order")
-			if order == "" {
-				c.JSON(http.StatusOK,gin.H{"msg":""})
-				return
-			}
-			c.JSON(http.StatusOK,obj.OrderSearch(order))
-			return
-		})
-
-		Router.GET("delsite/:py",func(c *gin.Context){
-			err := openSiteDB(*siteDB,func(db *bolt.DB)error{
-				return db.Update(func(t *bolt.Tx)error{
-					b := t.Bucket(SiteList)
-					if b == nil {
-						return fmt.Errorf("b == nil")
-					}
-					return b.Delete([]byte(c.Param("py")))
-				})
-			})
-			c.JSON(http.StatusOK,gin.H{"msg":err.Error()})
-		})
-		Router.GET("updatesite/:py",func(c *gin.Context){
-			sh := ShoppingInfo{
-				Py:c.Param("py"),
-			}
-			err := openSiteDB(*siteDB,func(db *bolt.DB)error{
-				sh.Load(db)
-				sh.Name = c.DefaultQuery("name",sh.Name)
-				sh.Img = c.DefaultQuery("img",sh.Img)
-				sh.Uri = c.DefaultQuery("uri",sh.Uri)
-				sh.Client_id = c.DefaultQuery("clientid",sh.Client_id)
-				sh.Client_secret = c.DefaultQuery("clientsecret",sh.Client_secret)
-				return sh.SaveToDB(db)
-
-			})
-			if err == nil {
-				err = fmt.Errorf("success")
-			}
-			c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
-		})
-		Router.GET("/shopping",func(c *gin.Context){
-			var li []interface{}
-			err := ReadShoppingList(*siteDB,func(sh *ShoppingInfo)error{
-				li = append(li,sh)
-				return nil
-			})
-			if err != nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
-				return
-			}
-			c.JSON(http.StatusOK,li)
-		})
-	}
-	//Router.Use(secureFunc)
 	Router.GET("/",func(c *gin.Context){
 		var li []map[string]string
 		for k,v := range ShoppingMap {
@@ -209,12 +158,6 @@ func init(){
 		c.HTML(http.StatusOK,"index.tmpl",li)
 	})
 	Router.GET("/script",func(c *gin.Context){
-		_,err := c.Cookie("session_id")
-		if err != nil {
-			//sk := fmt.Sprintf("%d",time.Now().UnixNano())
-			c.SetCookie("session_id",fmt.Sprintf("%d",time.Now().UnixNano()),3600*24*365,"/","www.zaddone.com",true,true)
-			//MapSession.Store(sk,time.Now().Unix())
-		}
 		js:=""
 		for k,v := range ShoppingMap {
 			sh := v.GetInfo()
@@ -222,8 +165,7 @@ func init(){
 		}
 		c.Data(http.StatusOK,"application/javascript",[]byte(js))
 	})
-	Router.POST("/wx",handWxQuery)
-	Router.GET("/wx",handWxQuery)
+
 
 	Router.Use(secureFunc)
 	{
@@ -252,7 +194,12 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
-			c.JSON(http.StatusOK,sh.GoodsDetail(keyword))
+			db := sh.GoodsDetail(keyword)
+			if db == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				return
+			}
+			c.JSON(http.StatusOK,db)
 			return
 		})
 		Router.GET("goods/:py",func(c *gin.Context){
@@ -266,8 +213,13 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
-			ext := c.DefaultQuery("ext","")
-			c.JSON(http.StatusOK,sh.GoodsUrl(keyword,ext))
+			//ext := c.DefaultQuery("ext","")
+			db := sh.GoodsUrl(keyword,c.DefaultQuery("ext",""))
+			if db == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				return
+			}
+			c.JSON(http.StatusOK,db)
 			return
 		})
 		Router.GET("search/:py",func(c *gin.Context){
@@ -281,22 +233,21 @@ func init(){
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 				return
 			}
-
-			session,err := c.Cookie("session_id")
-			if err != nil{
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
+			db := sh.SearchGoods(keyword)
+			if db == nil{
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not3"})
 				return
 			}
-			//fmt.Println(session,err)
-			c.JSON(http.StatusOK,sh.SearchGoods(keyword,session))
+			c.JSON(http.StatusOK,db)
 			return
 		})
 	}
 	//Router.LoadHTMLGlob(config.Conf.Templates+"/*")
-	go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
-	go Router_.Run(":80")
+
 
 }
 func main(){
+	go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
+	go Router_.Run(":80")
 	select{}
 }

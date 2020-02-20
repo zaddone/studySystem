@@ -167,19 +167,43 @@ func (self *Pdd)OrderMsg(_db interface{}) (str string){
 }
 
 func (self *Pdd) SearchGoods(words ...string)interface{}{
+	db :=  self.searchGoods(words...)
+	if db == nil {
+		return nil
+	}
+	res := db.(map[string]interface{})["goods_search_response"]
+	if res == nil {
+		return nil
+	}
+	return res.(map[string]interface{})["goods_list"].([]interface{})
+}
+func (self *Pdd) searchGoods(words ...string)interface{}{
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.goods.search")
 	u.Add("keyword",words[0])
-	u.Add("custom_parameters",words[1])
+	u.Add("page_size","30")
+	//u.Add("custom_parameters",words[1])
 	return self.ClientHttp(u)
 }
 //pdd.ddk.goods.detail
-func (self *Pdd) GoodsDetail(words ...string)interface{}{
+func (self *Pdd) goodsDetail(words ...string)interface{}{
 	goodsid := words[0]
 	u := &url.Values{}
 	u.Add("type","pdd.ddk.goods.detail")
 	u.Add("goods_id_list","["+goodsid+"]")
 	return self.ClientHttp(u)
+}
+func (self *Pdd) GoodsDetail(words ...string)interface{}{
+	db := self.goodsDetail(words...)
+	if db == nil {
+		return nil
+	}
+	res := db.(map[string]interface{})["goods_detail_response"]
+	if res == nil {
+		return nil
+	}
+	return res.(map[string]interface{})["goods_details"]
+	//db_.goods_detail_response.goods_details
 }
 func (self *Pdd)OrderSearch(keys ...string)interface{}{
 	//pdd.ddk.order.detail.get
@@ -274,3 +298,6 @@ func(self *Pdd)GetInfo()*ShoppingInfo {
 	return self.Info
 }
 
+func (self *Pdd) ProductSearch(words ...string)(result []interface{}){
+	return self.searchGoods(words...).([]interface{})
+}

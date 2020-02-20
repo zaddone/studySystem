@@ -16,6 +16,7 @@ type ShoppingInfo struct {
 	Uri string
 	Client_id string
 	Client_secret string
+	Token string
 }
 func (self *ShoppingInfo)Load(db *bolt.DB) error {
 	if self.Py == "" {

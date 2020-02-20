@@ -16,6 +16,7 @@ import(
 	"net/url"
 	"github.com/boltdb/bolt"
 	"encoding/binary"
+	"github.com/PuerkitoBio/goquery"
 )
 var (
 	JdUrl = "https://router.jd.com/api"
@@ -313,6 +314,7 @@ func (self *Jd) ClientHttp(uri string,u *url.Values)( out interface{}){
 	return
 }
 func (self *Jd) SearchGoods(words ...string)interface{}{
+	//self.ProductSearch(words...)
 	u := &url.Values{}
 	//jd.kpl.open.xuanpin.search.sku
 	//jd.kpl.open.xuanpin.searchgoods
@@ -330,9 +332,17 @@ func (self *Jd) SearchGoods(words ...string)interface{}{
 	}
 	//u.Add("360buy_param_json",fmt.Sprintf("{\"goodsReqDTO\":{\"keyword\":\"%s\"}}",words[0]))
 	u.Add("param_json",string(body))
-
 	//u.Add("custom_parameters",words[1])
-	return self.ClientHttp(JdUrl,u)
+	//data.jd_kpl_open_xuanpin_searchgoods_response.result.queryVo
+	db := self.ClientHttp(JdUrl,u)
+	if db == nil {
+		return nil
+	}
+	res := db.(map[string]interface{})["jd_kpl_open_xuanpin_searchgoods_response"]
+	if res == nil {
+		return nil
+	}
+	return res.(map[string]interface{})["result"].(map[string]interface{})["queryVo"]
 }
 func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u := &url.Values{}
@@ -351,7 +361,17 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u.Add("param_json",string(body))
 	//jd.kpl.open.item.getmobilewarestyleandjsbywareid
 	u.Add("access_token",JdToken)
-	return self.ClientHttp(JdUrl,u)
+	//return self.ClientHttp(JdUrl,u)
+	db := self.ClientHttp(JdUrl,u)
+	if db == nil {
+		return nil
+	}
+	res := db.(map[string]interface{})["jd_kpl_open_xuanpin_searchgoods_response"]
+	if res == nil {
+		return nil
+	}
+	//return res["result"].(map[string]interface{})["queryVo"]
+	return res.(map[string]interface{})["result"].(map[string]interface{})["queryVo"]
 	//return nil
 }
 func (self *Jd) GoodsUrl(words ...string) interface{}{
@@ -455,4 +475,23 @@ func (self *Jd)OutUrl(db interface{}) string {
 }
 func(self *Jd)GetInfo()*ShoppingInfo {
 	return self.Info
+}
+func (self *Jd) ProductSearch(words ...string)(result []interface{}){
+	//https://search.jd.com/Search?keyword=
+	u := &url.Values{}
+	u.Add("keyword",words[0])
+	err:= request.ClientHttp_("https://search.jd.com/Search?"+u.Encode(),"GET",nil,nil,func(body io.Reader,st int)error{
+		_,err := goquery.NewDocumentFromReader(body)
+		//db,err := ioutil.ReadAll(body)
+		if err != nil {
+			return err
+		}
+		//fmt.Println(string(db))
+		return nil
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+	return nil
+
 }
