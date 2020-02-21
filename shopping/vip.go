@@ -1,4 +1,4 @@
-package main
+package shopping
 import(
 	"fmt"
 	"time"

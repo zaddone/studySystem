@@ -1,4 +1,4 @@
-package main
+package shopping
 import(
 	"fmt"
 	"sort"
@@ -9,13 +9,13 @@ import(
 	"io/ioutil"
 	"encoding/json"
 	//"strings"
-	"bytes"
+	//"bytes"
 	//"strconv"
-	"regexp"
+	//"regexp"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
 	"github.com/boltdb/bolt"
-	"encoding/binary"
+	//"encoding/binary"
 	"github.com/PuerkitoBio/goquery"
 )
 var (
@@ -28,27 +28,27 @@ var (
 	JdToken = "8fb30ead08284c52a879444d6a47c8bdywqw"
 	//JdOrderDB *bolt.DB
 	//dbTime = []byte("time")
-	dbId = []byte("order")
 	//dbUser = []byte("user")
 	dbLast = []byte("last")
 	dbPhone = []byte("Phone")
 	timeFormat = "2006-01-02 15:04:05"
 	orderTimeFormat = "2006010215"
 	//week = []string{""}
-	jdReg = regexp.MustCompile(`\/(\d+)\.html`)
-	jdReg_ = regexp.MustCompile(`sku=(\d+)`)
-	jdOrderReg = regexp.MustCompile(`\d{12,}`)
+
 
 )
 
-func NewJd(sh *ShoppingInfo) (p *Jd){
-	p = &Jd{Info:sh}
+func NewJd(sh *ShoppingInfo,Open bool) (ShoppingInterface){
+	p := &Jd{Info:sh}
+	if !Open{
+		return p
+	}
 	var err error
 	p.OrderDB,err = bolt.Open("jdorderDB",0600,nil)
 	if err != nil {
 		panic(err)
 	}
-	return
+	return p
 }
 type Jd struct{
 	Info *ShoppingInfo
@@ -86,178 +86,31 @@ func (self *Jd)OrderMsg(_db interface{})(str string){
 	}
 	return
 }
-func (self *Jd)HandOrderDB(db interface{},hand func(map[string]interface{}))error{
-
-	if db == nil {
-		return fmt.Errorf("db == nil")
-	}
-	var db_ map[string]interface{}
-	err := json.Unmarshal([]byte(db.(map[string]interface{})["jd_union_open_order_query_response"].(map[string]interface{})["result"].(string)),&db_)
-	if err != nil {
-		return err
-	}
-	if db_["code"].(float64) != 200 {
-		return fmt.Errorf("%v",db)
-	}
-	datalist := db_["data"]
-	if datalist == nil {
-		return nil
-		//return fmt.Errorf("data = nil")
-	}
-	for _,l := range datalist.([]interface{}){
-		hand(l.(map[string]interface{}))
-	}
-	return nil
-
-}
-func (self *Jd)orderDownAll() (err error){
-	t_:=self.orderLast()
-	//fmt.Println(t_)
-	t,err := self.OrderDB.Begin(true)
-	if err != nil {
-		return
-	}
-	defer t.Commit()
-	//tb ,err := t.CreateBucketIfNotExists(dbTime)
-	//if err != nil {
-	//	return
-	//}
-	ob ,err := t.CreateBucketIfNotExists(dbId)
-	if err != nil {
-		return
-	}
-	ol ,err := t.CreateBucketIfNotExists(dbLast)
-	if err != nil {
-		return
-	}
-	for{
-		//db := self.orderDown(t_)
-		fmt.Println(t_)
-		err = self.HandOrderDB(self.orderDown(t_),func(v map[string]interface{}){
-			//fmt.Println(v)
-			orderId :=[]byte(fmt.Sprintf("%.0f",v["orderId"].(float64)))
-			v_, err:= json.Marshal(v)
-			if err != nil {
-				panic(err)
-			}
-			ob.Put(orderId,v_)
-		})
-		if err != nil {
-			return err
-		}
-
-		t_ = t_.Add(time.Hour)
-		if time.Now().Unix() < t_.Unix(){
-			break
-		}
-		last_ := make([]byte,8)
-		binary.BigEndian.PutUint64(last_,uint64(t_.Unix()))
-		ol.Put(dbLast,last_)
-	}
-	return
-
-}
-func (self *Jd)orderDown(t time.Time) interface{} {
-	u := &url.Values{}
-	u.Add("method","jd.union.open.order.query")
-	u.Add("v","1.0")
-	u.Add("access_token",JdToken)
-	query := map[string]interface{}{
-		//"orderId":keys[0],
-		"orderReq":map[string]interface{}{
-			"pageIndex":1,
-			"pageSize":500,
-			"type":1,
-			"time":t.Format(orderTimeFormat),
-		},
-		//"bin":"zaddone",
-
-	}
-	body,err := json.Marshal(query)
-	if err != nil {
-		panic(err)
-	}
-	u.Add("param_json",string(body))
-	return self.ClientHttp(JdUrl,u)
-}
-func (self *Jd)orderLast() (t_ time.Time) {
-	//t_ = nil
-	isO:= false
-	err := self.OrderDB.View(func(t *bolt.Tx)(err error){
-		b := t.Bucket(dbLast)
-		if b == nil {
-			return
-		}
-		v := b.Get(dbLast)
-		if v == nil {
-			return
-		}
-		t_ = time.Unix(int64(binary.BigEndian.Uint64(v)),0)
-		isO = true
-		//fmt.Println(t_)
-		return
-	})
-	if err != nil {
-		panic(err)
-	}
-	if !isO {
-		t_,err = time.Parse(orderTimeFormat,"2020010101")
-		if err != nil {
-			panic(err)
-		}
-	}
-	return
-
-}
 func (self *Jd)orderGet(orderid,userid string,hand func(interface{}))error{
-
-	key := []byte(orderid)
-	//fmt.Println(orderid)
-	//u:= []byte(userid)
 	var db map[string]interface{}
-	err :=  self.OrderDB.View(func(t *bolt.Tx)error{
+	return  self.OrderDB.View(func(t *bolt.Tx)error{
 		b := t.Bucket(dbId)
 		if b == nil {
 			return io.EOF
 		}
-		v := b.Get(key)
+		v := b.Get([]byte(orderid))
 		if v == nil {
 			return io.EOF
 		}
 		err := json.Unmarshal(v,&db)
 		if err != nil {
-			//return err
-			panic(err)
+			return err
 		}
 		fmt.Println(db)
 		uid := db["userid"]
 		if uid != nil &&  uid.(string) != userid {
 			return io.EOF
 		}
+		hand(db)
 		//db["userid"] = uid
 		return nil
 	})
-	if err != nil {
-		return nil
-	}
-	return self.HandOrderDB(self.orderDown(time.Unix(int64(db["orderTime"].(float64)/1000),0)),func(v map[string]interface{}){
-		if !bytes.Equal(key,[]byte(fmt.Sprintf("%.0f",v["orderId"].(float64)))){
-			return
-		}
-		db = v
-		db["userid"] = userid
-		t,err := self.OrderDB.Begin(true)
-		if err != nil {
-			return
-		}
-		v_, err:= json.Marshal(v)
-		if err != nil {
-			panic(err)
-		}
-		t.Bucket(dbId).Put(key,v_)
-		t.Commit()
-		hand(db)
-	})
+
 }
 
 func (self *Jd)addSign(u *url.Values){
@@ -396,7 +249,6 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 
 }
 func (self *Jd)OrderSearch(keys ...string)(d interface{}){
-
 	if len(keys)<2 {
 		return
 	}
@@ -405,60 +257,10 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 		//d = string(db.([]byte))
 	})
 	if err != nil {
-		panic(err)
-	}
-	if d != nil {
-		return d
-	}
-	//fmt.Println("run down")
-	ok := make(chan int,1)
-	go func(){
-		err := self.orderDownAll()
-		if err != nil {
-			fmt.Println(err)
-		}
-		ok<-1
-	}()
-	select{
-	case <- time.After(time.Second*4):
-		//fmt.Println("time out")
-		return
-	case <- ok:
-		//fmt.Println("ok")
-		err = self.orderGet(keys[0],keys[1],func(db interface{}){
-			d = db
-			//d = string(db.([]byte))
-		})
-		if err != nil {
-			panic(err)
-		}
+		fmt.Println(err)
+		return nil
 	}
 	return
-	//u := &url.Values{}
-	////jd.kepler.order.getorderdetail
-	////jd.kepler.order.getlist
-	////jd.union.open.order.row.query
-	////jd.union.open.order.query
-	//u.Add("method","jd.union.open.order.query")
-	//u.Add("v","1.0")
-	//u.Add("access_token",JdToken)
-	//query := map[string]interface{}{
-	//	//"orderId":keys[0],
-	//	"orderReq":map[string]interface{}{
-	//		"pageIndex":1,
-	//		"pageSize":500,
-	//		"type":1,
-	//		"time":"",
-	//	}
-	//	//"bin":"zaddone",
-	//}
-	//body,err := json.Marshal(query)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//u.Add("param_json",string(body))
-	//return self.ClientHttp(JdUrl,u)
-
 }
 func (self *Jd)OutUrl(db interface{}) string {
 	//db.jd_kpl_open_promotion_pidurlconvert_response.clickUrl.clickURL
@@ -494,4 +296,32 @@ func (self *Jd) ProductSearch(words ...string)(result []interface{}){
 	}
 	return nil
 
+}
+
+func (self *Jd) OrderDown(hand func(interface{}))error{
+	return nil
+}
+
+func (self *Jd)OrderUpdate(orderid string,db interface{})error{
+	return self.OrderDB.Batch(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(dbId)
+		if err != nil {
+			return err
+		}
+		db_ := db.(map[string]interface{})
+		val := b.Get([]byte(orderid))
+		var valdb map[string]interface{}
+		if val != nil {
+			err := json.Unmarshal(val,valdb)
+			if err != nil {
+				return err
+			}
+			db_["userid"] = valdb["userid"]
+		}
+		str,err := json.Marshal(db_)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(orderid),str)
+	})
 }

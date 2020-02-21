@@ -1,4 +1,4 @@
-package main
+package shopping
 import(
 	"fmt"
 	"sort"
@@ -13,35 +13,36 @@ import(
 	"net/url"
 	"github.com/boltdb/bolt"
 	//"net/http"
-	"regexp"
+	//"regexp"
 )
 var (
 	PddUrl = "https://gw-api.pinduoduo.com/api/router"
-	PddOrderDB *bolt.DB
+	//PddOrderDB *bolt.DB
 	//PddErrNum int = 0
 	//pdd.ddk.theme.goods.search
 	//pdd.ddk.goods.search
-	pddReg = regexp.MustCompile(`goods_id=(\d+)`);
-	pddOrderReg = regexp.MustCompile(`\d{6}-\d{15}`)
 )
 type Pdd struct{
 	Info *ShoppingInfo
 	PddPid []string
 	OrderDB *bolt.DB
 }
-func NewPdd(sh *ShoppingInfo) (p *Pdd) {
-	p = &Pdd{Info:sh}
+func NewPdd(sh *ShoppingInfo,o bool) (ShoppingInterface) {
+	p := &Pdd{Info:sh}
+	if !o {
+		return p
+	}
 	var err error
 	p.OrderDB,err = bolt.Open("pddOrder",0600,nil)
 	if err != nil {
 		panic(err)
 	}
-	return
+	return p
 }
 
 func (self *Pdd)addSign(u *url.Values){
-	u.Add("client_id",self.Info.Client_id)
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
+	u.Set("client_id",self.Info.Client_id)
+	u.Set("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	var li []string
 	for k,_ := range *u {
 		li = append(li,k)
@@ -52,8 +53,8 @@ func (self *Pdd)addSign(u *url.Values){
 		sign+=k+u.Get(k)
 	}
 	sign+=self.Info.Client_secret
-	fmt.Println(sign)
-	u.Add("sign",fmt.Sprintf("%X", md5.Sum([]byte(sign))))
+	//fmt.Println(sign)
+	u.Set("sign",fmt.Sprintf("%X", md5.Sum([]byte(sign))))
 }
 func (self *Pdd) ClientHttp(u *url.Values)( out interface{}){
 
@@ -205,30 +206,23 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 	return res.(map[string]interface{})["goods_details"]
 	//db_.goods_detail_response.goods_details
 }
-func (self *Pdd)OrderSearch(keys ...string)interface{}{
+func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 	//pdd.ddk.order.detail.get
-	orderid := keys[0]
-	userid := keys[1]
-	err := self.orderGet(orderid,userid)
-	if err != nil {
+	if len(keys)<2 {
 		return nil
 	}
-	u := &url.Values{}
-	u.Add("type","pdd.ddk.order.detail.get")
-	u.Add("order_sn",orderid)
-	db:= self.ClientHttp(u)
-	if db == nil {
-		return nil
-	}
-	err = self.orderSave(orderid,userid,db)
+	err := self.orderGet(keys[0],keys[1],func(db interface{}){
+		d = db
+		//d = string(db.([]byte))
+	})
 	if err != nil {
 		fmt.Println(err)
+		return nil
 	}
-	//fmt.Println(db)
-	return db
+	return
 	//return nil
 }
-func (self *Pdd) orderGet (orderid,userid string) error {
+func (self *Pdd) orderGet (orderid,userid string,hand func(db interface{})) error {
 
 	//oid := []byte(orderid)
 	return self.OrderDB.View(func(t *bolt.Tx)error{
@@ -250,7 +244,35 @@ func (self *Pdd) orderGet (orderid,userid string) error {
 		if uid!=nil && uid.(string)!=userid {
 			return io.EOF
 		}
+		hand(db)
 		return nil
+	})
+}
+
+func (self *Pdd)OrderUpdate(orderid string,db interface{})error{
+	return self.OrderDB.Batch(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(dbId)
+		if err != nil {
+			return err
+		}
+
+		db_ := db.(map[string]interface{})
+		val := b.Get([]byte(orderid))
+		var valdb map[string]interface{}
+		if val != nil {
+			err := json.Unmarshal(val,valdb)
+			if err != nil {
+				return err
+			}
+			db_["userid"] = valdb["userid"]
+		}
+
+		str,err := json.Marshal(db_)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(orderid),str)
+
 	})
 }
 func (self *Pdd) orderSave (orderid,userid string,db interface{}) error {
@@ -300,4 +322,66 @@ func(self *Pdd)GetInfo()*ShoppingInfo {
 
 func (self *Pdd) ProductSearch(words ...string)(result []interface{}){
 	return self.searchGoods(words...).([]interface{})
+}
+func (self *Pdd) OrderDown(hand func(interface{}))error{
+	var begin,end time.Time
+	if self.Info.Update == 0 {
+		var err error
+		begin,err = time.Parse(timeFormat,"2020-01-01 00:00:00")
+		if err != nil {
+			panic(err)
+		}
+	}else{
+		begin = time.Unix(self.Info.Update,0)
+	}
+	//self.Info.Update = end.Unix()
+	for{
+		isOut := false
+		end = begin.Add(24*time.Hour)
+		Now := time.Now()
+		if !Now.After(end){
+			//fmt.Println()
+			end = Now
+			isOut = true
+		}
+		//fmt.Println(begin,end)
+		page := 1
+		for {
+			db := self.getOrder(begin,end,page)
+			if db == nil {
+				continue
+			}
+			res := db.(map[string]interface{})["order_list_get_response"]
+			if res == nil {
+				fmt.Println(db)
+				return io.EOF
+			}
+			li := res.(map[string]interface{})["order_list"].([]interface{})
+			for _,l := range li{
+				hand(l)
+			}
+			if len(li) <40 {
+				break
+			}
+			page++
+		}
+		begin = end
+		if  isOut {
+			break
+		}
+	}
+	self.Info.Update = begin.Unix()
+	return nil
+	//return openSiteDB(siteDB,self.Info.SaveToDB)
+
+}
+func (self *Pdd) getOrder(begin,end time.Time,page int)interface{}{
+	u := &url.Values{}
+	u.Add("type","pdd.ddk.order.list.increment.get")
+	u.Add("page_size","40")
+	u.Add("return_count","false")
+	u.Add("start_update_time",fmt.Sprintf("%d",begin.Unix()))
+	u.Add("end_update_time",fmt.Sprintf("%d",end.Unix()))
+	u.Add("page",fmt.Sprintf("%d",page))
+	return self.ClientHttp(u)
 }

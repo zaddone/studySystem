@@ -1,12 +1,13 @@
 package main
 import(
 	"sort"
+	"github.com/zaddone/studySystem/shopping"
 	"strings"
 	"github.com/boltdb/bolt"
 	"github.com/gin-gonic/gin"
 	//"crypto/hmac"
-	"encoding/hex"
-	"crypto/sha1"
+	//"encoding/hex"
+	//"crypto/sha1"
 	"net/http"
 	"strconv"
 	//"io/ioutil"
@@ -37,8 +38,13 @@ var(
 	UserDB *bolt.DB
 	msgPhone = []byte("phone")
 	msgType = []byte("type")
-	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
 	welcome = "zaddone_com米果推荐\n1、支持输入（淘宝、京东、拼多多）网购商品链接，查询产品价格和返利下单链接\n 2、输入订单号、手机号和（微信|支付宝）设置系统自动转账信息，定时到帐。3、发送其他信息，可获取账户金额等相关信息"
+
+	jdReg = regexp.MustCompile(`\/(\d+)\.html`)
+	jdReg_ = regexp.MustCompile(`sku=(\d+)`)
+	jdOrderReg = regexp.MustCompile(`\d{12,}`)
+	pddReg = regexp.MustCompile(`goods_id=(\d+)`);
+	pddOrderReg = regexp.MustCompile(`\d{6}-\d{15}`)
 
 )
 func init(){
@@ -118,11 +124,7 @@ type wxRevMsg struct{
 	Event string
 	MsgId int
 }
-func Sha1(data []byte) string {
-	sha1 := sha1.New()
-	sha1.Write(data)
-	return hex.EncodeToString(sha1.Sum([]byte(nil)))
-}
+
 func handMsg(str,userid string,hand func(string)){
 	n := httpReg.FindStringIndex(str)
 	if len(n)>0{
@@ -131,7 +133,8 @@ func handMsg(str,userid string,hand func(string)){
 	}
 	oid := jdOrderReg.FindString(str)
 	if len(oid)==12 {
-		obj := ShoppingMap["jd"]
+		obj_ ,_ := shopping.ShoppingMap.Load("jd")
+		obj := obj_.(shopping.ShoppingInterface)
 		db := obj.OrderSearch(oid,userid)
 		if db == nil {
 			hand(OrderErrMsg)
@@ -154,7 +157,8 @@ func handMsg(str,userid string,hand func(string)){
 	oid = pddOrderReg.FindString(str)
 	if len(oid)>0 {
 	//if pddOrderReg.MatchString(str){
-		obj := ShoppingMap["pinduoduo"]
+		obj_,_ := shopping.ShoppingMap.Load("pinduoduo")
+		obj := obj_.(shopping.ShoppingInterface)
 		db := obj.OrderSearch(oid,userid)
 		if db == nil {
 			hand(OrderErrMsg)
@@ -189,7 +193,8 @@ func handMsg(str,userid string,hand func(string)){
 
 
 func jdRev(id,uesrid string)string{
-	obj := ShoppingMap["jd"]
+	obj_,_ := shopping.ShoppingMap.Load("jd")
+	obj := obj_.(shopping.ShoppingInterface)
 	info:=obj.GoodsDetail(id)
 	if info == nil {
 		return msg
@@ -225,7 +230,8 @@ func jdRev(id,uesrid string)string{
 	return msg
 }
 func pddRev(id,uesrid string)string{
-	obj := ShoppingMap["pinduoduo"]
+	obj_,_ := shopping.ShoppingMap.Load("pinduoduo")
+	obj := obj_.(shopping.ShoppingInterface)
 	info:=obj.GoodsDetail(id)
 	if info == nil {
 		return "msg error"
@@ -335,7 +341,7 @@ func handWxQuery(c *gin.Context){
 	//echostr:= c.Query("echostr")
 	li := []string{WXtoken,timestamp,nonce}
 	sort.Strings(li)
-	li_ := Sha1([]byte(strings.Join(li,"")))
+	li_ := shopping.Sha1([]byte(strings.Join(li,"")))
 	if signature != li_ {
 		c.String(http.StatusOK,"")
 		return

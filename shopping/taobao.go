@@ -1,4 +1,4 @@
-package main
+package shopping
 import(
 	"fmt"
 	"sort"
@@ -37,16 +37,19 @@ type Taobao struct{
 	OrderDB *bolt.DB
 	Url string
 }
-func NewTaobao(sh *ShoppingInfo)(t *Taobao) {
-	t = &Taobao{Info:sh}
+func NewTaobao(sh *ShoppingInfo,o bool)(ShoppingInterface) {
+	t := &Taobao{Info:sh}
 	t.Pid = "109998500026"
 	t.Url = "https://eco.taobao.com/router/rest"
+	if !o{
+		return t
+	}
 	var err error
 	t.OrderDB,err = bolt.Open("taobaoOrder",0600,nil)
 	if err != nil {
 		panic(err)
 	}
-	return
+	return t
 }
 func (self *Taobao)addSign(u *url.Values){
 	u.Add("format","json")
@@ -269,3 +272,31 @@ func (self *Taobao)OrderMsg(_db interface{}) (str string){
 	return ""
 }
 
+func (self *Taobao)OrderDown(hand func(interface{}))error{
+	return nil
+}
+func (self *Taobao)OrderUpdate(orderid string,db interface{})error{
+	return self.OrderDB.Batch(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(dbId)
+		if err != nil {
+			return err
+		}
+		db_ := db.(map[string]interface{})
+		val := b.Get([]byte(orderid))
+		var valdb map[string]interface{}
+		if val != nil {
+			err := json.Unmarshal(val,valdb)
+			if err != nil {
+				return err
+			}
+			db_["userid"] = valdb["userid"]
+		}
+		str,err := json.Marshal(db_)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(orderid),str)
+
+	})
+
+}

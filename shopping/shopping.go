@@ -1,13 +1,48 @@
-package main
+package shopping
 import(
 	"fmt"
 	"github.com/boltdb/bolt"
 	"encoding/gob"
 	"bytes"
+	//"flag"
+	"encoding/hex"
+	"crypto/sha1"
+	"sync"
 )
+type NewShopping func(*ShoppingInfo,bool) ShoppingInterface
 var (
 	SiteList  = []byte("siteList")
+	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
+	//ShoppingMap = map[string]ShoppingInterface{}
+	ShoppingMap = sync.Map{}// map[string]ShoppingInterface{}
+	siteDB string
+	dbId = []byte("order")
+	//siteDB  = flag.String("db","SiteDB","db")
+	FuncMap = map[string]NewShopping{
+		"jd":NewJd,
+		"pinduoduo":NewPdd,
+		"taobao":NewTaobao,
+	}
+
 )
+func Sha1(data []byte) string {
+	sha1 := sha1.New()
+	sha1.Write(data)
+	return hex.EncodeToString(sha1.Sum([]byte(nil)))
+}
+type ShoppingInterface interface{
+	GetInfo()*ShoppingInfo
+	SearchGoods(...string)interface{}
+	GoodsUrl(...string)interface{}
+	GoodsDetail(...string)interface{}
+	OrderSearch(...string)interface{}
+	OutUrl(interface{}) string
+	OrderMsg(interface{}) string
+	ProductSearch(...string)[]interface{}
+	OrderDown(hand func(interface{}))error
+	OrderUpdate(orderid string,db interface{})error
+
+}
 
 type ShoppingInfo struct {
 	Py string
@@ -17,6 +52,7 @@ type ShoppingInfo struct {
 	Client_id string
 	Client_secret string
 	Token string
+	Update int64
 }
 func (self *ShoppingInfo)Load(db *bolt.DB) error {
 	if self.Py == "" {
@@ -57,12 +93,23 @@ func (self *ShoppingInfo) SaveToDB(db *bolt.DB) error {
 		return b.Put([]byte(self.Py),self.toByte())
 	})
 }
+func OpenSiteDB(dbname string,h func(*bolt.DB)error)error{
+	return openSiteDB(dbname,h)
+}
 func openSiteDB(dbname string,h func(*bolt.DB)error)error{
 	db ,err := bolt.Open(dbname,0600,nil)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	siteDB = dbname
+	//fmt.Println("open",dbname)
+	defer func(){
+		err := db.Close()
+		if err != nil {
+			panic(err)
+		}
+		//fmt.Println("close",dbname)
+	}()
 	return h(db)
 }
 func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
@@ -84,5 +131,15 @@ func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
 	})
 
 }
-
-
+func InitShoppingMap(dbname string){
+	err := ReadShoppingList(dbname,func(sh *ShoppingInfo)error{
+		hand := FuncMap[sh.Py]
+		if hand != nil {
+			ShoppingMap.Store(sh.Py,hand(sh,true))
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+}
