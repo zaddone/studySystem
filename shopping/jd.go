@@ -25,13 +25,13 @@ var (
 	//pdd.ddk.theme.goods.search
 	//pdd.ddk.goods.search
 	//JdToken = "0619e9dd75e448dea0ab1b0449de3d89wu5z"
-	JdToken = "8fb30ead08284c52a879444d6a47c8bdywqw"
+
+	//JdToken = "8fb30ead08284c52a879444d6a47c8bdywqw"
 	//JdOrderDB *bolt.DB
 	//dbTime = []byte("time")
 	//dbUser = []byte("user")
 	dbLast = []byte("last")
 	dbPhone = []byte("Phone")
-	timeFormat = "2006-01-02 15:04:05"
 	orderTimeFormat = "2006010215"
 	//week = []string{""}
 
@@ -39,6 +39,7 @@ var (
 )
 
 func NewJd(sh *ShoppingInfo,Open bool) (ShoppingInterface){
+	fmt.Println("jd")
 	p := &Jd{Info:sh}
 	if !Open{
 		return p
@@ -132,7 +133,7 @@ func (self *Jd)addSign(u *url.Values){
 		sign+=k+u.Get(k)
 	}
 	sign+=self.Info.Client_secret
-	fmt.Println(sign)
+	//fmt.Println(sign)
 	u.Add("sign",fmt.Sprintf("%X", md5.Sum([]byte(sign))))
 	//fmt.Println(u.Get("sign"))
 }
@@ -178,7 +179,7 @@ func (self *Jd) SearchGoods(words ...string)interface{}{
 		"pageParam":map[string]interface{}{"pageSize":20,"pageNum":1},
 		"orderField":0,
 	}
-	u.Add("access_token",JdToken)
+	u.Add("access_token",self.Info.Token)
 	body,err := json.Marshal(query)
 	if err != nil {
 		panic(err)
@@ -213,7 +214,7 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	}
 	u.Add("param_json",string(body))
 	//jd.kpl.open.item.getmobilewarestyleandjsbywareid
-	u.Add("access_token",JdToken)
+	u.Add("access_token",self.Info.Token)
 	//return self.ClientHttp(JdUrl,u)
 	db := self.ClientHttp(JdUrl,u)
 	if db == nil {
@@ -232,7 +233,7 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 	u := &url.Values{}
 	u.Add("method","jd.kpl.open.promotion.pidurlconvert")
 	u.Add("v","2.0")
-	u.Add("access_token",JdToken)
+	u.Add("access_token",self.Info.Token)
 	query := map[string]interface{}{
 		"webId":"0",
 		"positionId":0,
@@ -298,8 +299,89 @@ func (self *Jd) ProductSearch(words ...string)(result []interface{}){
 
 }
 
+func (self *Jd) getOrder(t time.Time,page int)interface{}{
+	u := &url.Values{}
+	u.Add("method","jd.union.open.order.query")
+	u.Add("v","1.0")
+	query := map[string]interface{}{
+		"orderReq":map[string]interface{}{
+			"pageNo":page,
+			"type":3,
+			"time":t.Format(orderTimeFormat),
+		},
+	}
+	body,err := json.Marshal(query)
+	if err != nil {
+		panic(err)
+	}
+	u.Add("param_json",string(body))
+	return self.ClientHttp(JdUrl,u)
+
+}
 func (self *Jd) OrderDown(hand func(interface{}))error{
+	//fmt.Println("jd down")
+	var begin time.Time
+	if self.Info.Update == 0 {
+		var err error
+		begin,err = time.Parse(timeFormat,"2020-02-03 16:00:00")
+		if err != nil {
+			panic(err)
+		}
+	}else{
+		begin = time.Unix(self.Info.Update,0)
+	}
+
+	fmt.Println(begin)
+	for{
+		page := 1
+		//fmt.Println(begin)
+		for {
+			db := self.getOrder(begin,page)
+			if db == nil {
+				continue
+			}
+			page++
+			res := db.(map[string]interface{})["jd_union_open_order_query_response"]
+			if res == nil {
+				fmt.Println("response",db)
+				return io.EOF
+			}
+			res_ := res.(map[string]interface{})["result"]
+			if res_ == nil {
+				fmt.Println("result",db)
+				return io.EOF
+			}
+			var data map[string]interface{}
+			err := json.Unmarshal([]byte(res_.(string)),&data)
+			if err != nil {
+				panic(err)
+			}
+			//fmt.Println(data)
+			li := data["data"]
+			if li == nil {
+				break
+			}
+			li_ := li.([]interface{})
+			for _,l := range li_ {
+				l_ := l.(map[string]interface{})
+				l_["order_id"] =fmt.Sprintf("%.0f", l_["orderId"].(float64))
+				fmt.Println(l_)
+				hand(l_)
+			}
+			if len(li_) <20 {
+				break
+			}
+		}
+		begin = begin.Add(1*time.Hour)
+		now := time.Now()
+		if now.Unix()< begin.Unix() && now.Hour() < begin.Hour(){
+			break
+		}
+	}
+	self.Info.Update = begin.Unix()
 	return nil
+	//jd.union.open.order.query
+	//return io.EOF
 }
 
 func (self *Jd)OrderUpdate(orderid string,db interface{})error{

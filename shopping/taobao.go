@@ -8,6 +8,7 @@ import(
 	"io/ioutil"
 	"encoding/json"
 	"github.com/zaddone/studySystem/request"
+	"github.com/zaddone/studySystem/alimama"
 	"github.com/PuerkitoBio/goquery"
 	"net/url"
 	"github.com/boltdb/bolt"
@@ -273,7 +274,14 @@ func (self *Taobao)OrderMsg(_db interface{}) (str string){
 }
 
 func (self *Taobao)OrderDown(hand func(interface{}))error{
-	return nil
+	//fmt.Println("taobao")
+	if self.Info.Update !=0 {
+		alimama.Begin = time.Unix(self.Info.Update,0)
+	}
+	alimama.HandOrder = hand
+	alimama.Run()
+	return  nil
+	//return nil
 }
 func (self *Taobao)OrderUpdate(orderid string,db interface{})error{
 	return self.OrderDB.Batch(func(t *bolt.Tx)error{

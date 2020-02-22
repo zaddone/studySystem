@@ -3,6 +3,7 @@ import(
 	"fmt"
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/shopping"
+	//"github.com/zaddone/studySystem/alimama"
 	"github.com/gin-gonic/gin"
 	"net/url"
 	"time"
@@ -10,6 +11,7 @@ import(
 	"strings"
 	"bytes"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"encoding/json"
 	//"flag"
@@ -68,7 +70,7 @@ func InitShoppingMap(){
 				shopping.ShoppingMap.Store(sh.Py,hand(sh,false))
 			}
 		}
-		fmt.Println(shopping.ShoppingMap)
+		//fmt.Println(shopping.ShoppingMap)
 		return nil
 	})
 }
@@ -87,7 +89,7 @@ func DownOrder(){
 		v_ := v.(shopping.ShoppingInterface)
 		//v_.GetInfo().Update = 0
 		//var orderlist []interface{}
-		v_.OrderDown(func(db interface{}){
+		err := v_.OrderDown(func(db interface{}){
 			db_,err := json.Marshal(db)
 			if err != nil {
 				panic(err)
@@ -95,20 +97,42 @@ func DownOrder(){
 				return
 			}
 			u := url.Values{}
-			u.Add("orderid",db.(map[string]interface{})["order_sn"].(string))
-			var req interface{}
+			u.Add("orderid",db.(map[string]interface{})["order_id"].(string))
+			//var req interface{}
 			err = requestHttp("/updateorder/"+k.(string),"POST",u,bytes.NewReader(db_),func(body io.Reader,res *http.Response)error{
-				return json.NewDecoder(body).Decode(&req)
-
+				db,err := ioutil.ReadAll(body)
+				fmt.Println("order",string(db))
+				return err
+				//return json.NewDecoder(body).Decode(&req)
 			})
 			if err != nil {
 				panic(err)
 				fmt.Println(err)
 			}
-			fmt.Println(req)
+			//fmt.Println(req)
 			//orderlist = append(orderlist,db)
 			//fmt.Println(db)
 		})
+		if err != nil {
+			fmt.Println(k,err)
+			return true
+		}
+		u_:= url.Values{}
+		u_.Set("update",fmt.Sprintf("%d",v_.GetInfo().Update))
+		//var req_ interface{}
+		err = requestHttp("/updatesite/"+k.(string),"GET",u_,nil,func(body io.Reader,res *http.Response)error{
+			//return json.NewDecoder(body).Decode(&req_)
+			db,err := ioutil.ReadAll(body)
+			//fmt.Println(db)
+			fmt.Println("site",string(db))
+			//fmt.Println(string(db))
+			return err
+		})
+		if err != nil {
+			panic(err)
+			fmt.Println(err)
+		}
+		//fmt.Println(req_)
 		return true
 	})
 }

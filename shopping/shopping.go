@@ -17,6 +17,7 @@ var (
 	ShoppingMap = sync.Map{}// map[string]ShoppingInterface{}
 	siteDB string
 	dbId = []byte("order")
+	timeFormat = "2006-01-02 15:04:05"
 	//siteDB  = flag.String("db","SiteDB","db")
 	FuncMap = map[string]NewShopping{
 		"jd":NewJd,

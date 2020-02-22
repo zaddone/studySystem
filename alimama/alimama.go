@@ -1,10 +1,11 @@
-package main
+package alimama
 import(
 	"fmt"
 	"encoding/base64"
 	"os"
 	"time"
 	"strings"
+	"strconv"
 	"github.com/zaddone/studySystem/chromeServer"
 	"net/url"
 )
@@ -16,17 +17,87 @@ var(
 	indexUrl = "https://www.alimama.com/index.htm"
 	Png = "xcode.png"
 	RunConTrol chan bool
+	HandOrder func(interface{}) = nil
+	Begin time.Time
+	orderTimeFormat = "2006-01-02"
 
 )
-func main(){
+func init(){
+	var err error
+	Begin,err = time.Parse(orderTimeFormat,"2020-01-01")
+	if err != nil {
+		panic(err)
+	}
+}
+func Run(){
 	//"https://www.alimama.com/index.htm"
 	chromeServer.HandleResponse = CheckLogin
 	chromeServer.Run(uri)
 }
+
+func NextPage(){
+
+	ourl,err := url.Parse(orderUrl)
+	if err != nil {
+		panic(err)
+	}
+	uVal,err := url.ParseQuery(ourl.RawQuery)
+	if err != nil {
+		panic(err)
+	}
+	uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
+	page,err :=strconv.Atoi(uVal.Get("pageNo"))
+	if err != nil {
+		panic(err)
+	}
+	uVal.Set("pageNo",fmt.Sprintf("%d",page+1))
+	orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+	chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
+		fmt.Println(res)
+		//getBody(res,qu)
+	})
+
+}
+
 func GetOrder(_db interface{}){
 	chromeServer.GetBody(_db,"gateway.unionpub",func(__id float64,result map[string]interface{}){
-		
-		fmt.Println(result)
+		if HandOrder != nil {
+			li := result["data"].(map[string]interface{})["result"]
+			if li == nil {
+				return
+			}
+			li_ := li.([]interface{})
+			for _,l := range li_ {
+				HandOrder(l)
+			}
+			if len(li_) == 40 {
+				NextPage()
+			}
+		}else{
+			fmt.Println(result)
+		}
+		ourl,err := url.Parse(orderUrl)
+		if err != nil {
+			panic(err)
+		}
+		uVal,err := url.ParseQuery(ourl.RawQuery)
+		if err != nil {
+			panic(err)
+		}
+		if uVal.Get("queryType") == "3"{
+			return
+		}
+
+		uVal.Set("queryType","3")
+		uVal.Set("pageNo","0")
+		orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+		chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
+			fmt.Println(res)
+			//getBody(res,qu)
+		})
+
+		//NextPage()
+		//chromeServer.HandleResponse = GetOrder
 	})
 }
 func LoginSession(_db interface{}){
@@ -46,6 +117,10 @@ func LoginSession(_db interface{}){
 			if err != nil {
 				panic(err)
 			}
+			uVal.Set("startTime",Begin.Format(orderTimeFormat))
+			uVal.Set("endTime",time.Now().Format(orderTimeFormat))
+			uVal.Set("queryType","1")
+			uVal.Set("pageNo","1")
 			for _,_c_ := range db_["cookies"].([]interface{}) {
 				c_ := _c_.(map[string]interface{})
 				name := c_["name"].(string)
@@ -56,8 +131,8 @@ func LoginSession(_db interface{}){
 					break
 				}
 			}
-			qu := fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
-			chromeServer.PageNavigate(qu,func(res map[string]interface{}){
+			orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+			chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
 				fmt.Println(res)
 				//getBody(res,qu)
 			})
@@ -69,8 +144,6 @@ func LoginSession(_db interface{}){
 func CheckLogin(_db interface{}){
 
 	if !chromeServer.GetBody(_db,Png,func(__id float64,result map[string]interface{}){
-		//fmt.Println("--------------")
-		//fmt.Println(result)
 		body,err := base64.StdEncoding.DecodeString(result["body"].(string))
 		if err != nil {
 			panic(err)
@@ -89,15 +162,11 @@ func CheckLogin(_db interface{}){
 		go func(){
 			if err := InitPhone(*ShowPhone,RunConTrol,func(p string){
 				ShowBrowser(p)
-				//TaobaoLoginCheck(p)
 			}); err != nil {
 				panic(err)
 			}
 		}()
-		//InitPhone(*LoginPhone,)
 		fmt.Println("http://127.0.0.1"+":8001/"+Png)
-		//TaobaoLoginCheck()
-		//fmt.Println(result["body"].(string))
 		chromeServer.HandleResponse = LoginSession
 		return
 	}){

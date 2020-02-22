@@ -1,4 +1,4 @@
-package main
+package alimama
 import(
 	//"gocv.io/x/gocv"
 	"image"
@@ -14,7 +14,7 @@ import(
 )
 var(
 	MainImg = flag.String("img","screen.png","img")
-	ShowImg = flag.String("img","screen_1.png","img")
+	ShowImg = flag.String("img_","screen_1.png","img")
 	CodeToPath = flag.String("Codepath","/sdcard/Pictures/Screenshots/xcode.png","codePath")
 	Code = flag.String("Code","xcode.png","code")
 	MainTag = flag.String("tag","./img/t1.png","tag")
@@ -26,9 +26,9 @@ var(
 	LoginPhone = flag.String("Login","192.168.1.51","ip")
 	ShowPhone = flag.String("Show","192.168.1.52","ip")
 )
-func init(){
-	flag.Parse()
-}
+//func init(){
+//	flag.Parse()
+//}
 func InitPhone(phone string,stop chan bool,hand func(string)) (err error){
 	for{
 		select{
@@ -238,7 +238,7 @@ func TaobaoLoginCheck(loginPhone string){
 	if err != nil {
 		panic(err)
 	}
-	err := control.CloseApp(loginPhone,strings.Split(Taobao,"/")[0])
+	err = control.CloseApp(loginPhone,strings.Split(Taobao,"/")[0])
 	if err != nil {
 		panic(err)
 	}

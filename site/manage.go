@@ -66,6 +66,15 @@ func init(){
 			sh.Client_id = c.DefaultQuery("clientid",sh.Client_id)
 			sh.Client_secret = c.DefaultQuery("clientsecret",sh.Client_secret)
 			sh.Token = c.DefaultQuery("token",sh.Token)
+			up := c.Query("update")
+			if up != "" {
+				in,err := strconv.Atoi(up)
+				if err != nil {
+					return err
+				}
+				sh.Update = int64(in)
+			}
+			//sh.Update = c.DefaultQuery("update",sh.Update)
 			return sh.SaveToDB(db)
 
 		})
@@ -78,6 +87,7 @@ func init(){
 		sh_,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh_ == nil {
 			c.JSON(http.StatusNotFound,nil)
+			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+c.Param("py")})
 			return
 		}
 		sh := sh_.(shopping.ShoppingInterface)

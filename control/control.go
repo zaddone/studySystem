@@ -42,7 +42,6 @@ func InitDevices(ip string) error{
 			return connect(l,ip)
 		}
 	}
-
 	return io.EOF
 }
 func Connect(name,ip string)error{
@@ -92,11 +91,12 @@ func cmdToAdb(h func(string)error,opt ...string)(err error){
 	defer outerr.Close()
 	go runout(out)
 	go runout(outerr)
-	er :=  cmd.Run()
-	if er != nil {
-		panic(er)
-	}
-	return
+	return cmd.Run()
+	//if er != nil {
+	//	//return er
+	//	panic(er)
+	//}
+	//return
 
 }
 func GetRate(name string)(X,Y,W,H float64){

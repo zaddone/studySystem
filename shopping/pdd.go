@@ -358,6 +358,8 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 			}
 			li := res.(map[string]interface{})["order_list"].([]interface{})
 			for _,l := range li{
+				l_ := l.(map[string]interface{})
+				l_["order_id"] = l_["order_sn"]
 				hand(l)
 			}
 			if len(li) <40 {
