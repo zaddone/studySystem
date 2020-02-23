@@ -67,7 +67,7 @@ func InitShoppingMap(){
 		for _,sh := range db {
 			hand := shopping.FuncMap[sh.Py]
 			if hand != nil {
-				shopping.ShoppingMap.Store(sh.Py,hand(sh,false))
+				shopping.ShoppingMap.Store(sh.Py,hand(sh))
 			}
 		}
 		//fmt.Println(shopping.ShoppingMap)
@@ -81,6 +81,7 @@ func init(){
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)
 	Router.GET("shopping",HandForward)
+	Router.GET("order/:py",HandForward)
 	//Router.POST("updateorder/:py",HandForward)
 	go Router.Run(":8088")
 }
@@ -141,5 +142,5 @@ func main(){
 	DownOrder()
 	//sh,_ := shopping.ShoppingMap.Load("pinduoduo")
 
-	select{}
+	//select{}
 }

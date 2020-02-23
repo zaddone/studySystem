@@ -11,7 +11,7 @@ import(
 	"github.com/zaddone/studySystem/alimama"
 	"github.com/PuerkitoBio/goquery"
 	"net/url"
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
 	//"strconv"
 	"regexp"
 	"bytes"
@@ -35,21 +35,21 @@ func DecodeGBK(s []byte) ([]byte, error) {
 type Taobao struct{
 	Info *ShoppingInfo
 	Pid string
-	OrderDB *bolt.DB
+	//OrderDB *bolt.DB
 	Url string
 }
-func NewTaobao(sh *ShoppingInfo,o bool)(ShoppingInterface) {
+func NewTaobao(sh *ShoppingInfo)(ShoppingInterface) {
 	t := &Taobao{Info:sh}
 	t.Pid = "109998500026"
 	t.Url = "https://eco.taobao.com/router/rest"
-	if !o{
-		return t
-	}
-	var err error
-	t.OrderDB,err = bolt.Open("taobaoOrder",0600,nil)
-	if err != nil {
-		panic(err)
-	}
+	//if !o{
+	//	return t
+	//}
+	//var err error
+	//t.OrderDB,err = bolt.Open("taobaoOrder",0600,nil)
+	//if err != nil {
+	//	panic(err)
+	//}
 	return t
 }
 func (self *Taobao)addSign(u *url.Values){
@@ -279,32 +279,8 @@ func (self *Taobao)OrderDown(hand func(interface{}))error{
 		alimama.Begin = time.Unix(self.Info.Update,0)
 	}
 	alimama.HandOrder = hand
-	alimama.Run()
-	return  nil
+	return alimama.Run()
+	//return  nil
 	//return nil
 }
-func (self *Taobao)OrderUpdate(orderid string,db interface{})error{
-	return self.OrderDB.Batch(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(dbId)
-		if err != nil {
-			return err
-		}
-		db_ := db.(map[string]interface{})
-		val := b.Get([]byte(orderid))
-		var valdb map[string]interface{}
-		if val != nil {
-			err := json.Unmarshal(val,valdb)
-			if err != nil {
-				return err
-			}
-			db_["userid"] = valdb["userid"]
-		}
-		str,err := json.Marshal(db_)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(orderid),str)
 
-	})
-
-}

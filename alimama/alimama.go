@@ -2,6 +2,7 @@ package alimama
 import(
 	"fmt"
 	"encoding/base64"
+	"encoding/json"
 	"os"
 	"time"
 	"strings"
@@ -20,6 +21,9 @@ var(
 	HandOrder func(interface{}) = nil
 	Begin time.Time
 	orderTimeFormat = "2006-01-02"
+	orderTime = "2006-01-02 15:04:05"
+	LoginPhone = "192.168.1.51"
+	ShowPhone = "192.168.1.52"
 
 )
 func init(){
@@ -29,10 +33,10 @@ func init(){
 		panic(err)
 	}
 }
-func Run(){
+func Run() error {
 	//"https://www.alimama.com/index.htm"
 	chromeServer.HandleResponse = CheckLogin
-	chromeServer.Run(uri)
+	return chromeServer.Run(uri)
 }
 
 func NextPage(){
@@ -52,6 +56,7 @@ func NextPage(){
 	}
 	uVal.Set("pageNo",fmt.Sprintf("%d",page+1))
 	orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+	fmt.Println(orderUrl)
 	chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
 		fmt.Println(res)
 		//getBody(res,qu)
@@ -61,20 +66,46 @@ func NextPage(){
 
 func GetOrder(_db interface{}){
 	chromeServer.GetBody(_db,"gateway.unionpub",func(__id float64,result map[string]interface{}){
-		if HandOrder != nil {
-			li := result["data"].(map[string]interface{})["result"]
-			if li == nil {
-				return
+		if HandOrder == nil {
+			return
+		}
+		fmt.Println(result)
+		body := result["body"]
+		if body == nil {
+			return
+		}
+		var data map[string]interface{}
+		err := json.Unmarshal([]byte(body.(string)),&data)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		res := data["data"].(map[string]interface{})["result"]
+		if res == nil {
+			fmt.Println(data)
+			return
+		}
+		li_ := res.([]interface{})
+		for _,l := range li_ {
+			l_ := l.(map[string]interface{})
+			l_["order_id"] = l_["tradeId"]
+			l_["status"] = false
+			l_["fee"] = l_["pubSharePreFee"]
+			l_["goodsid"] =fmt.Sprintf("%.0f",l_["itemId"].(float64))
+			if l_["tkStatusText"].(string) =="已结算" {
+				l_["status"] = true
+				endt,err := time.Parse(orderTime, l_["tkEarningTime"].(string))
+				if err != nil {
+					panic(err)
+				}
+				l_["endTime"] =endt.Unix()
+
 			}
-			li_ := li.([]interface{})
-			for _,l := range li_ {
-				HandOrder(l)
-			}
-			if len(li_) == 40 {
-				NextPage()
-			}
-		}else{
-			fmt.Println(result)
+			HandOrder(l)
+		}
+		if len(li_) == 40 {
+			NextPage()
+			return
 		}
 		ourl,err := url.Parse(orderUrl)
 		if err != nil {
@@ -85,12 +116,14 @@ func GetOrder(_db interface{}){
 			panic(err)
 		}
 		if uVal.Get("queryType") == "3"{
+			chromeServer.ClosePage()
 			return
 		}
 
 		uVal.Set("queryType","3")
 		uVal.Set("pageNo","0")
 		orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+		fmt.Println(orderUrl)
 		chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
 			fmt.Println(res)
 			//getBody(res,qu)
@@ -132,6 +165,7 @@ func LoginSession(_db interface{}){
 				}
 			}
 			orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+			fmt.Println(orderUrl)
 			chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
 				fmt.Println(res)
 				//getBody(res,qu)
@@ -153,14 +187,14 @@ func CheckLogin(_db interface{}){
 		f.Close()
 		RunConTrol = make(chan bool)
 		go func(){
-			if err := InitPhone(*LoginPhone,RunConTrol,func(p string){
+			if err := InitPhone(LoginPhone,RunConTrol,func(p string){
 				TaobaoLoginCheck(p)
 			}); err != nil {
 				panic(err)
 			}
 		}()
 		go func(){
-			if err := InitPhone(*ShowPhone,RunConTrol,func(p string){
+			if err := InitPhone(ShowPhone,RunConTrol,func(p string){
 				ShowBrowser(p)
 			}); err != nil {
 				panic(err)

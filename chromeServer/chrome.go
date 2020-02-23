@@ -46,6 +46,7 @@ var (
 	//Png = "xcode.png"
 	writeChan = make(chan interface{},5)
 	Router = gin.Default()
+	StreamId string
 )
 
 func init(){
@@ -59,10 +60,6 @@ func InputText(str string,endHand func()){
 		if endHand != nil{
 			endHand()
 		}
-		//ClickBoxModel(sendbtn,func(){
-			//fmt.Println(sendbtn)
-		//})
-
 	}
 	writeChan<-map[string]interface{}{
 		"method":"Input.insertText",
@@ -119,7 +116,6 @@ func getBody(_db interface{},uri_ string, bodyMap func(float64,map[string]interf
 		return false
 	}
 	rid := u["requestId"].(string)
-	//fmt.Println(_uri,rid)
 	handleFinish[rid] =func(id_ string ,db map[string]interface{}){
 		//id := float64(time.Now().Unix())
 		delete(handleFinish,id_)
@@ -192,14 +188,15 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 	return
 }
 
-func Run(uri string){
-	start(uri,func(u string)error{
+func Run(uri string) error {
+	return start(uri,func(u string)error{
 		w := new(sync.WaitGroup)
 		//handleResponse = CheckLogin
 		//time.Sleep(100*time.Millisecond)
 		return openPage_(func(db interface{})error{
 			_vb := db.(map[string]interface{})
 			time.Sleep(100*time.Millisecond)
+			StreamId = _vb["id"].(string)
 			runStream(_vb["webSocketDebuggerUrl"].(string),w,func(db interface{},c *websocket.Conn){
 				__v := db.(map[string]interface{})
 				id__ := __v["id"]
@@ -237,14 +234,14 @@ func Run(uri string){
 
 			})
 			w.Wait()
-			closePage(_vb["id"].(string))
+			ClosePage()
 			return io.EOF
 		})
 	})
 }
-func closePage(id string){
-	log.Println("close",id)
-	err := request.ClientHttp_(Ourl+"/json/close/"+id,"GET",nil,nil,func(body io.Reader,st int)error {
+func ClosePage(){
+	log.Println("close",StreamId)
+	err := request.ClientHttp_(Ourl+"/json/close/"+StreamId,"GET",nil,nil,func(body io.Reader,st int)error {
 		if st != 200 {
 			db,err := ioutil.ReadAll(body)
 			if err != nil {
@@ -282,7 +279,7 @@ func openPage_(hand func(interface{})error) error {
 		for _,v := range k_{
 			er := hand(v)
 			if er != nil {
-				panic(er)
+				return er//panic(er)
 			}
 		}
 		//close(MsgPool)
@@ -297,7 +294,7 @@ func openPage_(hand func(interface{})error) error {
 	return io.EOF
 }
 
-func start(uri string ,hand func(string)error){
+func start(uri string ,hand func(string)error) error{
 	runout := func(r io.Reader){
 		var db [8192]byte
 		for{
@@ -319,32 +316,40 @@ func start(uri string ,hand func(string)error){
 			}
 		}
 	}
-	for{
-		//append(op,uri)
-		cmd := exec.Command("google-chrome",append(op,uri)... )
-		out,err := cmd.StdoutPipe()
-		if err != nil {
-			log.Fatal(err)
-		}
-		outerr,err := cmd.StderrPipe()
-		if err != nil {
-			log.Fatal(err)
-		}
-		go runout(out)
-		go runout(outerr)
-		err = cmd.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-		cmd.Wait()
-		out.Close()
-		outerr.Close()
-		log.Println("cmd end")
-		err = exec.Command("pkill","chrome").Run()
-		if err != nil {
-			log.Fatal(err)
-		}
+	//append(op,uri)
+	//log.Println("cmd chrome")
+	kcmd:= exec.Command("pkill","chrome")
+	err := kcmd.Start()
+	if err != nil {
+		fmt.Println("kill",err)
+		return err
 	}
+	kcmd.Wait()
+
+	cmd := exec.Command("google-chrome",append(op,uri)... )
+	out,err := cmd.StdoutPipe()
+	if err != nil {
+		//return err
+		log.Fatal(err)
+	}else{
+		go runout(out)
+	}
+	outerr,err := cmd.StderrPipe()
+	if err != nil {
+		//return err
+		log.Fatal(err)
+	}else{
+		go runout(outerr)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		fmt.Println("run",err)
+		return err
+	}
+	cmd.Wait()
+	return nil
+
 }
 func GetDoc(h func(map[string]interface{})){
 	Num++

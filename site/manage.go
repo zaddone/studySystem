@@ -4,6 +4,7 @@ import(
 	"github.com/zaddone/studySystem/shopping"
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
+	//"encoding/binary"
 	"sort"
 	"encoding/json"
 	"strconv"
@@ -24,7 +25,7 @@ func init(){
 		})
 		c.JSON(http.StatusOK,li)
 	})
-	v1.GET("shopping/:py",func(c *gin.Context){
+	v1.GET("/shopping/:py",func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh == nil {
 			c.JSON(http.StatusNotFound,nil)
@@ -33,7 +34,7 @@ func init(){
 		c.JSON(http.StatusOK,sh.(shopping.ShoppingInterface).GetInfo())
 		return
 	})
-	v1.GET("delsite/:py",func(c *gin.Context){
+	v1.GET("/delsite/:py",func(c *gin.Context){
 		py := c.Param("py")
 		shopping.ShoppingMap.Delete(py)
 		err := shopping.OpenSiteDB(*siteDB,func(db *bolt.DB)error{
@@ -47,7 +48,7 @@ func init(){
 		})
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error()})
 	})
-	v1.GET("updatesite/:py",func(c *gin.Context){
+	v1.GET("/updatesite/:py",func(c *gin.Context){
 		py := c.Param("py")
 		sh_,_ := shopping.ShoppingMap.Load(py)
 		var sh *shopping.ShoppingInfo
@@ -83,11 +84,57 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 	})
-	v1.POST("updateorder/:py",func(c *gin.Context){
-		sh_,_ := shopping.ShoppingMap.Load(c.Param("py"))
+	v1.POST("/order",func(c *gin.Context){
+		t := c.Query("t")
+		if t != "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"t error"})
+			return
+		}
+		dbMap := map[string][]interface{}{}
+		shopping.OrderWithTime([]byte(t),func(k string,db interface{}){
+			dbMap[k] = append(dbMap[k],db)
+		})
+		if len(dbMap) == 0 {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"error"})
+			return
+		}
+		c.JSON(http.StatusOK,dbMap)
+
+
+	})
+	v1.POST("/order/:py",func(c *gin.Context){
+		py := c.Param("py")
+		sh_,_ := shopping.ShoppingMap.Load(py)
 		if sh_ == nil {
-			c.JSON(http.StatusNotFound,nil)
-			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+c.Param("py")})
+			//c.JSON(http.StatusNotFound,nil)
+			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
+			return
+		}
+		orderid := c.Query("orderid")
+		if orderid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
+			return
+		}
+		userid := c.Query("userid")
+		if userid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
+			return
+		}
+		db := sh_.(shopping.ShoppingInterface).OrderSearch(orderid,userid)
+		if db == nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"order error"})
+			return
+		}
+		c.JSON(http.StatusOK,db)
+		return
+
+	})
+	v1.POST("/updateorder/:py",func(c *gin.Context){
+		py := c.Param("py")
+		sh_,_ := shopping.ShoppingMap.Load(py)
+		if sh_ == nil {
+			//c.JSON(http.StatusNotFound,nil)
+			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
 			return
 		}
 		sh := sh_.(shopping.ShoppingInterface)
@@ -96,25 +143,51 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
 			return
 		}
-		var db interface{}
+		var db map[string]interface{}
 		err := json.NewDecoder(c.Request.Body).Decode(&db)
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
-		err = sh.OrderUpdate(orderid,db)
+		err = sh.GetInfo().OrderUpdate(orderid,db)
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
+		endTime := db["endTime"]
+		//db["py"] = py
+		if endTime != nil && endTime.(float64) !=0{
+			err = sh.GetInfo().OrderUpdateTime(
+				orderid,
+				[]byte(time.Unix(int64(endTime.(float64)),0).Format("20060102")),
+			)
+			if err != nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			}
+		}
 		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 		return
-
-
 	})
-
-
 }
+//func SaveOrder(py,orderid string,endTime uint64)error{
+//	end := make([]byte,8)
+//	binary.BigEndian.PutUint64(end,endTime)
+//	return shopping.OpenSiteDB(OrderDB,func(DB *bolt.DB)error{
+//		return DB.Batch(func(t *bolt.Tx)error{
+//			b,err := t.CreateBucketIfNotExists(end)
+//			if err != nil {
+//				return err
+//			}
+//			b_,err := b.CreateBucketIfNotExists([]byte(py))
+//			if err != nil {
+//				return err
+//			}
+//			return b_.Put([]byte(orderid),[]byte{'0'})
+//		})
+//
+//	})
+//
+//}
 func checkManage(c *gin.Context){
 	timestamp:=c.Query("timestamp")
 	if timestamp == ""{

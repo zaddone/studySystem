@@ -1,7 +1,9 @@
 package main
 import(
 	"github.com/zaddone/studySystem/shopping"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	//"compress/gzip"
 	"net/http"
 	"strings"
 	"strconv"
@@ -16,6 +18,7 @@ var(
 	//siteDB  = flag.String("db","SiteDB","db")
 	//SiteDB *bolt.DB
 	//ShoppingMap = map[string]ShoppingInterface{}
+	OrderDB = "order.db"
 	MapSession = sync.Map{}
 	Router = gin.Default()
 	Router_ = gin.Default()
@@ -97,6 +100,7 @@ func IpStrToByte(s string) []byte {
 func init(){
 	flag.Parse()
 	gin.SetMode(gin.ReleaseMode)
+	Router.Use(gzip.Gzip(gzip.DefaultCompression))
 	shopping.InitShoppingMap(*siteDB)
 	go runServerClearMap()
 	secureFunc := func() gin.HandlerFunc {

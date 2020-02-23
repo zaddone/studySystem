@@ -8,13 +8,13 @@ import(
 	//"sync"
 	"io/ioutil"
 	"encoding/json"
-	//"strings"
+	"strings"
 	//"bytes"
 	//"strconv"
 	//"regexp"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
 	//"encoding/binary"
 	"github.com/PuerkitoBio/goquery"
 )
@@ -38,23 +38,23 @@ var (
 
 )
 
-func NewJd(sh *ShoppingInfo,Open bool) (ShoppingInterface){
-	fmt.Println("jd")
-	p := &Jd{Info:sh}
-	if !Open{
-		return p
-	}
-	var err error
-	p.OrderDB,err = bolt.Open("jdorderDB",0600,nil)
-	if err != nil {
-		panic(err)
-	}
-	return p
+func NewJd(sh *ShoppingInfo) (ShoppingInterface){
+	//fmt.Println("jd")
+	return &Jd{Info:sh}
+	//if !Open{
+	//	return p
+	//}
+	//var err error
+	//p.OrderDB,err = bolt.Open("jdorderDB",0600,nil)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//return p
 }
 type Jd struct{
 	Info *ShoppingInfo
 	Pid string
-	OrderDB *bolt.DB
+	//OrderDB *bolt.DB
 }
 
 func (self *Jd)OrderMsg(_db interface{})(str string){
@@ -87,33 +87,6 @@ func (self *Jd)OrderMsg(_db interface{})(str string){
 	}
 	return
 }
-func (self *Jd)orderGet(orderid,userid string,hand func(interface{}))error{
-	var db map[string]interface{}
-	return  self.OrderDB.View(func(t *bolt.Tx)error{
-		b := t.Bucket(dbId)
-		if b == nil {
-			return io.EOF
-		}
-		v := b.Get([]byte(orderid))
-		if v == nil {
-			return io.EOF
-		}
-		err := json.Unmarshal(v,&db)
-		if err != nil {
-			return err
-		}
-		fmt.Println(db)
-		uid := db["userid"]
-		if uid != nil &&  uid.(string) != userid {
-			return io.EOF
-		}
-		hand(db)
-		//db["userid"] = uid
-		return nil
-	})
-
-}
-
 func (self *Jd)addSign(u *url.Values){
 	u.Add("app_key",self.Info.Client_id)
 	//u.Add("access_token","8fb30ead08284c52a879444d6a47c8bdywqw")
@@ -253,7 +226,7 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 	if len(keys)<2 {
 		return
 	}
-	err := self.orderGet(keys[0],keys[1],func(db interface{}){
+	err := self.Info.orderGet(keys[0],keys[1],func(db interface{}){
 		d = db
 		//d = string(db.([]byte))
 	})
@@ -365,7 +338,26 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 			for _,l := range li_ {
 				l_ := l.(map[string]interface{})
 				l_["order_id"] =fmt.Sprintf("%.0f", l_["orderId"].(float64))
-				fmt.Println(l_)
+				l_["status"] = false
+				var goodid []string
+				var sumFee float64
+				for _, _db_:= range l_["skuList"].([]interface{}){
+					db_:=_db_.(map[string]interface{})
+					goodid = append(goodid,fmt.Sprintf("%.0f",db_["skuId"].(float64)))
+					fee := db_["actualFee"].(float64)
+
+					sumFee+=fee
+					//if db_["validCode"].(float64) == 17 {
+					//	l_["status"] = true
+					//}
+				}
+				l_["goodsid"] = strings.Join(goodid,",")
+				l_["fee"] = sumFee
+				if l_["finishTime"].(float64)!=0 {
+					l_["status"] = true
+					l_["endTime"] = l_["finishTime"]
+				}
+				//fmt.Println(l_)
 				hand(l_)
 			}
 			if len(li_) <20 {
@@ -382,28 +374,4 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 	return nil
 	//jd.union.open.order.query
 	//return io.EOF
-}
-
-func (self *Jd)OrderUpdate(orderid string,db interface{})error{
-	return self.OrderDB.Batch(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(dbId)
-		if err != nil {
-			return err
-		}
-		db_ := db.(map[string]interface{})
-		val := b.Get([]byte(orderid))
-		var valdb map[string]interface{}
-		if val != nil {
-			err := json.Unmarshal(val,valdb)
-			if err != nil {
-				return err
-			}
-			db_["userid"] = valdb["userid"]
-		}
-		str,err := json.Marshal(db_)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(orderid),str)
-	})
 }

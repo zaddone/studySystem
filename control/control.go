@@ -21,17 +21,17 @@ var(
 	//InitIp = flag.String("ip","192.168.1.","ip")
 	Port = flag.Int("port",5555,"port")
 	//MainPhone string
-	Screen  = "screen.png"
+	//Screen  = "screen.png"
 )
 func init(){
-	flag.Parse()
-	return
+	//flag.Parse()
+	//return
 
 }
 
 func InitDevices(ip string) error{
 	li := devices()
-	fmt.Println(li)
+	//fmt.Println(li)
 	for _,l := range li {
 		if !strings.Contains(l,"192.168.1.") {
 			err:= tcpip(l,*Port)
@@ -74,6 +74,11 @@ func cmdToAdb(h func(string)error,opt ...string)(err error){
 		}
 	}
 	//fmt.Println(opt)
+	//err = exec.Command("pkill","adb").Run()
+	//if err != nil {
+	//	return err
+	//	log.Fatal(err)
+	//}
 	cmd := exec.Command("adb",opt...)
 	out,err := cmd.StdoutPipe()
 	if err != nil {
@@ -91,12 +96,21 @@ func cmdToAdb(h func(string)error,opt ...string)(err error){
 	defer outerr.Close()
 	go runout(out)
 	go runout(outerr)
-	return cmd.Run()
+	//return cmd.Run()
+	err = cmd.Start()
+	if err != nil {
+		return err
+		//log.Fatal(err)
+	}
+	cmd.Wait()
+	out.Close()
+	outerr.Close()
 	//if er != nil {
 	//	//return er
 	//	panic(er)
 	//}
 	//return
+	return nil
 
 }
 func GetRate(name string)(X,Y,W,H float64){

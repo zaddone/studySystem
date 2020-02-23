@@ -11,7 +11,7 @@ import(
 	//"bytes"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
 	//"net/http"
 	//"regexp"
 )
@@ -25,19 +25,19 @@ var (
 type Pdd struct{
 	Info *ShoppingInfo
 	PddPid []string
-	OrderDB *bolt.DB
+	//OrderDB *bolt.DB
 }
-func NewPdd(sh *ShoppingInfo,o bool) (ShoppingInterface) {
-	p := &Pdd{Info:sh}
-	if !o {
-		return p
-	}
-	var err error
-	p.OrderDB,err = bolt.Open("pddOrder",0600,nil)
-	if err != nil {
-		panic(err)
-	}
-	return p
+func NewPdd(sh *ShoppingInfo) (ShoppingInterface) {
+	return &Pdd{Info:sh}
+	//if !o {
+	//	return p
+	//}
+	//var err error
+	//p.OrderDB,err = bolt.Open("pddOrder",0600,nil)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//return p
 }
 
 func (self *Pdd)addSign(u *url.Values){
@@ -211,7 +211,7 @@ func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 	if len(keys)<2 {
 		return nil
 	}
-	err := self.orderGet(keys[0],keys[1],func(db interface{}){
+	err := self.Info.orderGet(keys[0],keys[1],func(db interface{}){
 		d = db
 		//d = string(db.([]byte))
 	})
@@ -220,81 +220,6 @@ func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 		return nil
 	}
 	return
-	//return nil
-}
-func (self *Pdd) orderGet (orderid,userid string,hand func(db interface{})) error {
-
-	//oid := []byte(orderid)
-	return self.OrderDB.View(func(t *bolt.Tx)error{
-		b := t.Bucket(dbId)
-		if b == nil{
-			//panic(err)
-			return nil
-		}
-		v := b.Get([]byte(orderid))
-		if v == nil {
-			return nil
-		}
-		var db map[string]interface{}
-		err := json.Unmarshal(v,&db)
-		if err != nil {
-			return err
-		}
-		uid := db["userid"]
-		if uid!=nil && uid.(string)!=userid {
-			return io.EOF
-		}
-		hand(db)
-		return nil
-	})
-}
-
-func (self *Pdd)OrderUpdate(orderid string,db interface{})error{
-	return self.OrderDB.Batch(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(dbId)
-		if err != nil {
-			return err
-		}
-
-		db_ := db.(map[string]interface{})
-		val := b.Get([]byte(orderid))
-		var valdb map[string]interface{}
-		if val != nil {
-			err := json.Unmarshal(val,valdb)
-			if err != nil {
-				return err
-			}
-			db_["userid"] = valdb["userid"]
-		}
-
-		str,err := json.Marshal(db_)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(orderid),str)
-
-	})
-}
-func (self *Pdd) orderSave (orderid,userid string,db interface{}) error {
-	response := db.(map[string]interface{})["order_detail_response"]
-	if response == nil {
-		return nil
-	}
-	data := response.(map[string]interface{})
-	//fmt.Println(db)
-	data["userid"] = userid
-	return self.OrderDB.Update(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(dbId)
-		if err != nil {
-			return err
-		}
-		d_,err := json.Marshal(data)
-		if err != nil{
-			return err
-		}
-		return b.Put([]byte(orderid),d_)
-	})
-	//order_status_desc
 	//return nil
 }
 func (self *Pdd)OutUrl(db interface{}) string {
@@ -360,6 +285,14 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 			for _,l := range li{
 				l_ := l.(map[string]interface{})
 				l_["order_id"] = l_["order_sn"]
+				l_["status"] = false
+				if l_["order_status"].(float64) == 2{
+					l_["status"] = true
+					l_["endTime"] = l_["order_receive_time"]
+				}
+				l_["fee"] = l_["promotion_amount"].(float64)*100
+				l_["goodsid"] =fmt.Sprintf("%.0f",l_["goods_id"].(float64))
+
 				hand(l)
 			}
 			if len(li) <40 {

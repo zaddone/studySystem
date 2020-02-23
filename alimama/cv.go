@@ -11,31 +11,30 @@ import(
 	"github.com/zaddone/studySystem/control"
 	"image/color"
 	"flag"
+	"regexp"
 )
 var(
-	MainImg = flag.String("img","screen.png","img")
-	ShowImg = flag.String("img_","screen_1.png","img")
-	CodeToPath = flag.String("Codepath","/sdcard/Pictures/Screenshots/xcode.png","codePath")
-	Code = flag.String("Code","xcode.png","code")
+	//MainImg = flag.String("img","screen.png","img")
+	//ShowImg = flag.String("img_","screen_1.png","img")
+	//CodeToPath = flag.String("Codepath","/sdcard/Pictures/Screenshots/xcode.png","codePath")
+	//Code = flag.String("Code","xcode.png","code")
 	MainTag = flag.String("tag","./img/t1.png","tag")
-	MainTag2 = flag.String("tag2","./img/t2.png","tag")
-	MainTag3 = flag.String("tag3","./img/t3.png","tag")
-	MainTag4 = flag.String("tag4","./img/t4.png","tag")
+	//MainTag2 = flag.String("tag2","./img/t2.png","tag")
+	//MainTag3 = flag.String("tag3","./img/t3.png","tag")
+	//MainTag4 = flag.String("tag4","./img/t4.png","tag")
+	reg = regexp.MustCompile(`[\.|\:]`)
 	Taobao = "com.taobao.taobao/com.taobao.tao.TBMainActivity"
 	Browser = "com.android.browser/.BrowserActivity"
-	LoginPhone = flag.String("Login","192.168.1.51","ip")
-	ShowPhone = flag.String("Show","192.168.1.52","ip")
 )
 //func init(){
 //	flag.Parse()
 //}
 func InitPhone(phone string,stop chan bool,hand func(string)) (err error){
-	for{
+	for i:=0;i<60;i++{
 		select{
 		case <-stop:
 			return
 		default:
-
 			li := control.Devices()
 			for _,l := range li {
 				if strings.Contains(l,phone){
@@ -106,7 +105,7 @@ func ContainsImg(img,subimg image.Image,point *image.Point,rale float64) bool {
 func EqualColor(src,dis color.Color) bool{
 	g,b,a,r := src.RGBA()
 	g_,b_,a_,r_ := dis.RGBA()
-	fmt.Println(g_,b_,a_,r_ )
+	//fmt.Println(g_,b_,a_,r_ )
 	if g != g_ {
 		return false
 	}
@@ -126,17 +125,17 @@ func getZeroColor() color.Color {
 	z:=uint8(0)
 	return color.RGBA{z,z,z,r}
 }
-func TsTap(name string)error{
+func TsTap(name,simg string)error{
 	var i int
 	max := 100
 	for i=0;i<max;i++{
-		err := control.Screencap(name,*MainImg)
+		err := control.Screencap(name,simg)
 		if err != nil {
 			return err
 			//panic(err)
 		}
 		//time.Sleep(time.Second)
-		fi,err := os.Stat(*MainImg)
+		fi,err := os.Stat(simg)
 		if err != nil {
 			return err
 		}
@@ -198,11 +197,6 @@ func runApp(appact,name,img string)error{
 		return err
 	}
 	img_ := openImg(img)
-	//if img == nil{
-	//	return fmt.Errorf("img == nil")
-	//}
-	//zero := getZeroColor()
-	//t := img.At(10,10)
 	if img_ == nil || checkScreenIsEm(img_.At(10,10)){
 		//fmt.Println(img.At)
 		err := control.OpenPower(name)
@@ -222,19 +216,21 @@ func runApp(appact,name,img string)error{
 
 }
 func TaobaoLoginCheck(loginPhone string){
-	err := runApp(Taobao,loginPhone,*MainImg)
+	simg := fmt.Sprintf("%s.png",reg.ReplaceAllString(loginPhone,""))
+	//simg := strings.Split(loginPhone,"")
+	err := runApp(Taobao,loginPhone,simg)
 	if err != nil {
 		panic(err)
 	}
 	p := image.Pt(32,112)
-	err = checkTag(loginPhone,*MainTag,*MainImg,&p,func(x,y int){
+	err = checkTag(loginPhone,*MainTag,simg,&p,func(x,y int){
 		X,Y := control.GetTapXY(loginPhone,x,y)
 		control.InputTap(loginPhone,X,Y)
 	})
 	if err != nil {
 		panic(err)
 	}
-	err = TsTap(loginPhone)
+	err = TsTap(loginPhone,simg)
 	if err != nil {
 		panic(err)
 	}
@@ -254,20 +250,12 @@ func TaobaoLoginCheck(loginPhone string){
 	return
 }
 func ShowBrowser(name string){
-	err := runApp(Browser,name,*ShowImg)
+	simg := fmt.Sprintf("%s.png",reg.ReplaceAllString(name,""))
+	err := runApp(Browser,name,simg)
 	if err != nil {
 		panic(err)
 	}
 	//control.InputText(name,"http://192.168.1.30:8001:/xcode.png")
 
 }
-func main(){
-	fmt.Println("run")
-	RunConTrol := make(chan bool)
-	if err := InitPhone(*ShowPhone,RunConTrol,func(p string){
-		fmt.Println(p)
-		ShowBrowser(p)
-	});err != nil {
-		panic(err)
-	}
-}
+
