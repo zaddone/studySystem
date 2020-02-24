@@ -141,6 +141,9 @@ func (self *Pdd) GoodsUrl(words ...string) interface{}{
 	//u.Add("generate_we_app","true")
 	//if multi{
 	u.Add("multi_group","true")
+	if len(words)>1 {
+		u.Add("custom_parameters",words[1])
+	}
 	//}
 	return self.ClientHttp(u)
 }

@@ -23,6 +23,7 @@ var(
 	Router = gin.Default()
 	Router_ = gin.Default()
 	siteDB  = flag.String("db","SiteDB","db")
+	SessionId = "session_id"
 	//UpdateMap = time.Now()
 	Html = []byte(`
 <!doctype html>
@@ -52,6 +53,11 @@ func runServerClearMap(){
 }
 
 func checkSession(c *gin.Context){
+	//s,err := c.Cookie(SessionId)
+	//if err != nil {
+	//	c.Abort()
+	//	return
+	//}
 	ip := IpStrToByte(c.Request.RemoteAddr)
 	if ip == nil {
 		c.Abort()
@@ -130,6 +136,11 @@ func init(){
 		c.HTML(http.StatusOK,"index.tmpl",li)
 	})
 	Router.GET("/script",func(c *gin.Context){
+		session,err := c.Cookie(SessionId)
+		if err != nil {
+			session = shopping.Sha1([]byte( fmt.Sprintf("%.0f%s",time.Now().UnixNano(),c.Request.RemoteAddr)))
+			c.SetCookie(SessionId,session,3600*24*365,"/",".zaddone.com",false,false)
+		}
 		js:=""
 		shopping.ShoppingMap.Range(func(k,v interface{})bool{
 			sh := v.(shopping.ShoppingInterface).GetInfo()
@@ -149,7 +160,12 @@ func init(){
 		}
 		sh := sh_.(shopping.ShoppingInterface)
 		//id := c.Param("id")
-		u := sh.OutUrl(sh.GoodsUrl(c.Param("id")))
+		val := []string{c.Param("id")}
+		session,err := c.Cookie(SessionId)
+		if err == nil{
+			val = append(val,session)
+		}
+		u := sh.OutUrl(sh.GoodsUrl(val...))
 		if u == "" {
 			c.JSON(http.StatusNotFound,gin.H{"msg":""})
 		}
@@ -207,7 +223,8 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 			return
 		}
-		db := sh.(shopping.ShoppingInterface).SearchGoods(keyword)
+		session,_ := c.Cookie(SessionId)
+		db := sh.(shopping.ShoppingInterface).SearchGoods(keyword,session)
 		if db == nil{
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not3"})
 			return

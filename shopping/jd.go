@@ -214,6 +214,10 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 		"kplClick":1,
 		"shortUrl":1,
 	}
+
+	if len(words)>1 {
+		query["subUnionId"] = words[1]
+	}
 	body,err := json.Marshal(query)
 	if err != nil {
 		panic(err)
