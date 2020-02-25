@@ -295,12 +295,12 @@ func sendMsg(c *gin.Context,db *wxRevMsg,content string) {
 	c.String(http.StatusOK,string(sendstr))
 }
 
-func handWxPost(c *gin.Context){
+func handWxPost(c *gin.Context,echostr string){
 	var db wxRevMsg
 	err := xml.NewDecoder(c.Request.Body).Decode(&db)
 	if err != nil {
 		fmt.Println(err)
-		c.String(http.StatusOK,"")
+		c.String(http.StatusOK,echostr)
 		return
 	}
 	content := "success"
@@ -338,7 +338,7 @@ func handWxQuery(c *gin.Context){
 	}
 	signature := c.Query("signature")
 	nonce := c.Query("nonce")
-	//echostr:= c.Query("echostr")
+	echostr:= c.Query("echostr")
 	li := []string{WXtoken,timestamp,nonce}
 	sort.Strings(li)
 	li_ := shopping.Sha1([]byte(strings.Join(li,"")))
@@ -349,8 +349,8 @@ func handWxQuery(c *gin.Context){
 
 	//c.String(http.StatusOK,"")
 	//return
-	handWxPost(c)
 	//c.String(http.StatusOK,echostr)
+	handWxPost(c,echostr)
 
 	//c.JSON(http.StatusOK,gin.H{"msg":timestamp})
 }
