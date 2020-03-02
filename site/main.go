@@ -289,12 +289,28 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
-		//ext := c.DefaultQuery("ext","")
+
+		val := []string{keyword}
+
+		session:= c.Query("session")
+		if session != ""{
+			val = append(val,session)
+		}else{
+			session,err := c.Cookie(SessionId)
+			if err != nil{
+				return
+			}
+			val = append(val,session)
+		}
+		ext := c.Query("ext")
+		if ext != "" {
+			val = append(val,session)
+		}
 
 		uri := []byte(c.Request.URL.String())
 		db := checkCache(uri)
 		if db == nil{
-			db = sh.(shopping.ShoppingInterface).GoodsUrl(keyword)
+			db = sh.(shopping.ShoppingInterface).GoodsUrl(val...)
 			if db == nil {
 				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
@@ -310,7 +326,7 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not1"})
 			return
 		}
-		keyword := c.DefaultQuery("keyword","")
+		keyword := c.Query("keyword")
 		if keyword == "" {
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 			return
@@ -329,8 +345,6 @@ func init(){
 		c.JSON(http.StatusOK,db)
 		return
 	})
-
-
 }
 func main(){
 	go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")

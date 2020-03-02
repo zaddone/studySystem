@@ -170,8 +170,9 @@ func (self *Taobao) GoodsUrl(words ...string) interface{}{
 	//taobao.tbk.tpwd.create
 	u := &url.Values{}
 	u.Add("method","taobao.tbk.tpwd.create")
-	u.Add("text","来自米果推荐 zaddone.com "+words[1])
+	u.Add("text","来自zaddone.com "+words[2])
 	u.Add("url",words[0])
+	u.Add("ext",fmt.Sprintf("{session:\"%s\"}",words[1]))
 	return self.ClientHttp(u)
 	//req := map[string]interface{}{"url":}
 	//u.Add("requests",)

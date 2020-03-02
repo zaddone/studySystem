@@ -33,6 +33,7 @@ var (
 	dbLast = []byte("last")
 	dbPhone = []byte("Phone")
 	orderTimeFormat = "2006010215"
+	jdSiteid = "2009626993"
 	//week = []string{""}
 
 
@@ -202,6 +203,28 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	//return nil
 }
 func (self *Jd) GoodsUrl(words ...string) interface{}{
+	u := &url.Values{}
+	u.Add("method","jd.union.open.promotion.common.get")
+	u.Add("v","1.0")
+	//u.Add("access_token",self.Info.Token)
+	query := map[string]map[string]interface{}{
+		"promotionCodeReq":map[string]interface{}{
+		"siteId":jdSiteid,
+		"materialId":fmt.Sprintf("https://item.jd.com/%s.html",words[0]),
+	},
+	}
+	if len(words)>1 {
+		query["promotionCodeReq"]["ext1"] = words[1]
+	}
+	body,err := json.Marshal(query)
+	if err != nil {
+		panic(err)
+	}
+	u.Add("param_json",string(body))
+	//defer fmt.Println(u)
+	return self.ClientHttp(JdUrl,u)
+}
+func (self *Jd) GoodsUrl_(words ...string) interface{}{
 
 	u := &url.Values{}
 	u.Add("method","jd.kpl.open.promotion.pidurlconvert")
@@ -241,6 +264,28 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 	return
 }
 func (self *Jd)OutUrl(db interface{}) string {
+	//fmt.Println(db)
+	res := db.(map[string]interface{})["jd_union_open_promotion_common_get_response"]
+	if res == nil {
+		fmt.Println("root is nil")
+		return ""
+	}
+	res_ := res.(map[string]interface{})["result"]
+	if res_ == nil {
+		fmt.Println("result is nil")
+		return ""
+	}
+	var res__ map[string]interface{}
+	err := json.Unmarshal([]byte(res_.(string)),&res__)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return res__["data"].(map[string]interface{})["clickURL"].(string)
+
+
+}
+func (self *Jd)OutUrl_(db interface{}) string {
 	//db.jd_kpl_open_promotion_pidurlconvert_response.clickUrl.clickURL
 	res := db.(map[string]interface{})["jd_kpl_open_promotion_pidurlconvert_response"]
 	if res == nil {

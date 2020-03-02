@@ -2,6 +2,7 @@ package main
 import(
 	"fmt"
 	"github.com/zaddone/studySystem/shopping"
+	"github.com/zaddone/studySystem/config"
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	//"encoding/binary"
@@ -215,7 +216,7 @@ func checkManage(c *gin.Context){
 		c.Abort()
 		return
 	}
-	qu := []string{WXtoken}
+	qu := []string{config.Conf.WXtoken}
 	for k,v := range c.Request.URL.Query(){
 		if k == "sign" {
 			continue

@@ -138,7 +138,7 @@ func (self *Pdd) GoodsUrl(words ...string) interface{}{
 	u.Add("goods_id_list","["+goodsid+"]")
 	u.Add("p_id",self.PddPid[0])
 	u.Add("generate_short_url","true")
-	//u.Add("generate_we_app","true")
+	u.Add("generate_we_app","true")
 	//if multi{
 	u.Add("multi_group","true")
 	if len(words)>1 {

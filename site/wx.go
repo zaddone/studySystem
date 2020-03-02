@@ -1,7 +1,9 @@
 package main
 import(
 	"sort"
+	//"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/shopping"
+	"github.com/zaddone/studySystem/config"
 	"strings"
 	"github.com/boltdb/bolt"
 	"github.com/gin-gonic/gin"
@@ -14,21 +16,15 @@ import(
 	//"net/url"
 	"fmt"
 	"encoding/xml"
+	//"encoding/json"
 	"time"
 	"regexp"
 	"io"
 )
 var(
-	WXtoken = "zhaoweijie2020"
-	httpReg = regexp.MustCompile(`http`)
-	//jdNameReg = regexp.MustCompile(`(jd)|(京东)`)
-	//pddNameReg = regexp.MustCompile(`(pdd)|(pinduoduo)|(拼多多)`)
-	//jdReg = regexp.MustCompile(`\/(\d+)\.html`)
-	//jdReg_ = regexp.MustCompile(`sku=(\d+)`)
-	//jdOrderReg = regexp.MustCompile(`\d{12}`)
 
-	//pddReg = regexp.MustCompile(`goods_id=(\d+)`);
-	//pddOrderReg = regexp.MustCompile(`\d{6}-\d{15}`)
+	httpReg = regexp.MustCompile(`http`)
+
 	phoneReg = regexp.MustCompile(`1\d{10}`)
 	typeReg = regexp.MustCompile(`(微信)|(支付宝)`)
 	//cmdReg = regexp.MustCompile(`(\d+)([a-zA-Z|\p{Han}]+)`)
@@ -56,6 +52,7 @@ func init(){
 	Router.POST("/wx",handWxQuery)
 	Router.GET("/wx",handWxQuery)
 }
+
 func GetUserMsg(userid string,h func(string))error{
 	return UserDB.View(func(t *bolt.Tx)error{
 		b := t.Bucket([]byte(userid))
@@ -114,6 +111,21 @@ type wxMsg struct{
 	MsgType string
 	Content string
 }
+
+
+//type wxRevMiniAppMsg struct{
+//	XMLName  xml.Name `xml:"xml"`
+//	ToUserName string
+//	FromUserName string
+//	CreateTime int64
+//	MsgType string
+//	MsgId int
+//	Title string
+//	AppId string
+//	PagePath string
+//	ThumbUrl string
+//	ThumbMediaId string
+//}
 type wxRevMsg struct{
 	XMLName  xml.Name `xml:"xml"`
 	ToUserName string
@@ -123,7 +135,26 @@ type wxRevMsg struct{
 	Content string
 	Event string
 	MsgId int
+	SessionFrom string
 }
+
+//func handMiniProgrampage(c *gin.Context,msg wxRevMiniAppMsg){
+//	py := shoppingNameReg.FindStringSubmatch(msg.PagePath)
+//	goodsid:= goodsidReg.FindStringSubmatch(msg.PagePath)
+//	fmt.Println(msg,py,goodsid)
+//	obj_ ,_ := shopping.ShoppingMap.Load(py[1])
+//	if obj_ == nil {
+//		c.String(http.StatusOK,"")
+//	}
+//	sh := obj_.(shopping.ShoppingInterface).GetInfo()
+//
+//	content := fmt.Sprintf("点击链接跳转%s下单\nhttps://www.zaddone.com/p/%s/%s\n完成订单后一定复制粘贴订单号给我!查询返利详情",
+//	sh.Name,
+//	py[1],
+//	goodsid[1],
+//	)
+//	sendMiniMsg(c,&msg,content)
+//}
 
 func handMsg(str,userid string,hand func(string)){
 	n := httpReg.FindStringIndex(str)
@@ -280,6 +311,21 @@ func handHttp(str,userid string,h func(string)) {
 	}
 	h(str)
 }
+
+//func sendMiniMsg(c *gin.Context,db *wxRevMiniAppMsg,content string) {
+//	sendstr,err := xml.Marshal(&wxMsg{
+//		ToUserName:db.FromUserName,
+//		FromUserName:db.ToUserName,
+//		CreateTime:time.Now().Unix(),
+//		MsgType:"text",
+//		Content:content})
+//	if err != nil {
+//		fmt.Println(err)
+//		c.String(http.StatusOK,"")
+//		return
+//	}
+//	c.String(http.StatusOK,string(sendstr))
+//}
 func sendMsg(c *gin.Context,db *wxRevMsg,content string) {
 	sendstr,err := xml.Marshal(&wxMsg{
 		ToUserName:db.FromUserName,
@@ -295,14 +341,37 @@ func sendMsg(c *gin.Context,db *wxRevMsg,content string) {
 	c.String(http.StatusOK,string(sendstr))
 }
 
+
+
 func handWxPost(c *gin.Context,echostr string){
 	var db wxRevMsg
 	err := xml.NewDecoder(c.Request.Body).Decode(&db)
 	if err != nil {
 		fmt.Println(err)
-		c.String(http.StatusOK,echostr)
+		c.String(http.StatusOK,"")
 		return
 	}
+	//if db.Event == "user_enter_tempsession" {
+	//	fmt.Println(db)
+	//	SessionChan <-db
+	//	c.String(http.StatusOK,"")
+	//	return
+	//}
+	//if db.MsgType == "miniprogrampage" {
+	//	var minidb wxRevMiniAppMsg
+	//	err = xml.Unmarshal(data,&minidb)
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		c.String(http.StatusOK,"")
+	//		return
+	//	}
+	//	handMiniProgrampage(c,minidb)
+
+
+	//	return
+
+	//}
+	//fmt.Println(db)
 	content := "success"
 	if db.Event != ""{
 		if db.Event == "subscribe" {
@@ -320,11 +389,13 @@ func handWxPost(c *gin.Context,echostr string){
 func handWxQuery(c *gin.Context){
 	timestamp:=c.Query("timestamp")
 	if timestamp == ""{
+		fmt.Println("timestamp = nil")
 		c.String(http.StatusOK,"")
 		return
 	}
 	stamp,err := strconv.ParseInt(timestamp,10,64)
 	if err != nil {
+		fmt.Println(err)
 		c.String(http.StatusOK,"")
 		return
 	}
@@ -332,17 +403,19 @@ func handWxQuery(c *gin.Context){
 	if d<0 {
 		d=-d
 	}
-	if d>6 {
+	if d>60 {
+		fmt.Println("time out")
 		c.String(http.StatusOK,"")
 		return
 	}
 	signature := c.Query("signature")
 	nonce := c.Query("nonce")
 	echostr:= c.Query("echostr")
-	li := []string{WXtoken,timestamp,nonce}
+	li := []string{config.Conf.WXtoken,timestamp,nonce}
 	sort.Strings(li)
 	li_ := shopping.Sha1([]byte(strings.Join(li,"")))
 	if signature != li_ {
+		fmt.Println("sign is er",li_,signature)
 		c.String(http.StatusOK,"")
 		return
 	}

@@ -35,6 +35,8 @@ type Config struct {
 	OutKey string
 	MaxPage int
 	//Site []*SitePage
+	Minitoken string
+	WXtoken string
 }
 func (self *Config) Save(fileName string){
 	fi,err := os.OpenFile(fileName,os.O_CREATE|os.O_WRONLY,0777)
@@ -58,11 +60,13 @@ func NewConfig(fileName string)  *Config {
 		c.Static = "static"
 		c.Port=":8080"
 		c.Templates = "./templates/*"
-		c.WXAppid = "wx92ebd09c7b0d944f"
-		c.WXSec = "b3005d3c298e27b60ee1f90d188a9d86"
+		c.WXAppid = ""
+		c.WXSec = ""
 		c.CollPageName = "page"
 		c.CollWordName = "word"
 		c.CollPath = "/data"
+		c.Minitoken = ""
+		c.WXtoken = ""
 		_,err = os.Stat(c.CollPath)
 		if err != nil {
 			err = os.MkdirAll(c.CollPath,0777)
