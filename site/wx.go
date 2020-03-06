@@ -44,6 +44,7 @@ var(
 
 )
 func init(){
+	return
 	var err error
 	UserDB,err = bolt.Open("UserDB",0600,nil)
 	if err != nil {
@@ -366,10 +367,7 @@ func handWxPost(c *gin.Context,echostr string){
 	//		return
 	//	}
 	//	handMiniProgrampage(c,minidb)
-
-
 	//	return
-
 	//}
 	//fmt.Println(db)
 	content := "success"

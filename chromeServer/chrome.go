@@ -5,7 +5,7 @@ import(
 	"log"
 	"fmt"
 	"github.com/zaddone/studySystem/request"
-	"github.com/gin-gonic/gin"
+	//"github.com/gin-gonic/gin"
 	//"github.com/zaddone/studySystem/control"
 	"io"
 	"io/ioutil"
@@ -45,13 +45,13 @@ var (
 	Num float64 = 0
 	//Png = "xcode.png"
 	writeChan = make(chan interface{},5)
-	Router = gin.Default()
+	//Router = gin.Default()
 	StreamId string
 )
 
 func init(){
-	Router.Static("/","./")
-	go Router.Run(":8001")
+	//Router.Static("/","./")
+	//go Router.Run(":8001")
 }
 func InputText(str string,endHand func()){
 	Num++
@@ -189,6 +189,8 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 }
 
 func Run(uri string) error {
+
+	//go Router.Run(":8001")
 	return start(uri,func(u string)error{
 		w := new(sync.WaitGroup)
 		//handleResponse = CheckLogin

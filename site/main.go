@@ -304,7 +304,7 @@ func init(){
 		}
 		ext := c.Query("ext")
 		if ext != "" {
-			val = append(val,session)
+			val = append(val,ext)
 		}
 
 		uri := []byte(c.Request.URL.String())

@@ -3,7 +3,9 @@ import(
 	"fmt"
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/shopping"
-	//"github.com/zaddone/studySystem/alimama"
+	"github.com/zaddone/studySystem/config"
+	"github.com/zaddone/studySystem/alimama"
+	"github.com/gorilla/websocket"
 	"github.com/gin-gonic/gin"
 	"net/url"
 	"time"
@@ -18,10 +20,17 @@ import(
 )
 
 var(
-	WXtoken = "zhaoweijie2020"
+	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
 	Remote = "https://www.zaddone.com/v1"
-	//siteDB  = flag.String("db","/home/dimon/Documents/wxbot/bin/SiteDB","db")
+	wsupgrader = websocket.Upgrader{
+		ReadBufferSize:   1024,
+		WriteBufferSize:  1024,
+		HandshakeTimeout: 5 * time.Second,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 )
 func Sign(c *gin.Context){
 	url_ := c.Request.URL.Query()
@@ -57,8 +66,8 @@ func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Re
 	addSign(&u)
 	return request.ClientHttp__(Remote+path+"?"+u.Encode(),Method,body,nil,hand)
 }
-func InitShoppingMap(){
-	requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
+func InitShoppingMap()error{
+	return requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
 		var db []*shopping.ShoppingInfo
 		err := json.NewDecoder(body).Decode(&db)
 		if err != nil {
@@ -75,13 +84,117 @@ func InitShoppingMap(){
 	})
 }
 
+func WsHandler(w http.ResponseWriter, r *http.Request) {
+	var conn *websocket.Conn
+	var err error
+	conn, err = wsupgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Failed to set websocket upgrade: %+v", err)
+		return
+	}
+	defer conn.Close()
+    //for {
+        t, reply, err := conn.ReadMessage()
+        if err != nil {
+		fmt.Println(err)
+		return
+        }
+	fmt.Println(t,string(reply))
+	err = InitShoppingMap()
+	if err != nil {
+		err = conn.WriteMessage(t,[]byte(err.Error()))
+		if err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
+	conn.WriteMessage(t,[]byte("init"))
+	alimama.TaobaoLoginEvent = func(path string){
+		fmt.Println("event",path)
+		err := conn.WriteMessage(t,[]byte(path))
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	shopping.ShoppingMap.Range(func(k,v interface{})bool{
+		v_ := v.(shopping.ShoppingInterface)
+		err = v_.OrderDown(func(db interface{}){
+			fmt.Println(db)
+			err := conn.WriteJSON(db)
+			if err != nil {
+				fmt.Println(err)
+			}
+			db_,err := json.Marshal(db)
+			if err != nil {
+				panic(err)
+				fmt.Println(err)
+				return
+			}
+			u := url.Values{}
+			u.Add("orderid",db.(map[string]interface{})["order_id"].(string))
+			err = requestHttp("/updateorder/"+k.(string),"POST",u,bytes.NewReader(db_),func(body io.Reader,res *http.Response)error{
+				db,err := ioutil.ReadAll(body)
+				if err != nil {
+					return err
+				}
+				return conn.WriteMessage(t,db)
+			})
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		})
+		if err != nil {
+			fmt.Println(err)
+		}
+		u_:= url.Values{}
+		u_.Set("update",fmt.Sprintf("%d",v_.GetInfo().Update))
+		err = requestHttp("/updatesite/"+k.(string),"GET",u_,nil,func(body io.Reader,res *http.Response)error{
+			//return json.NewDecoder(body).Decode(&req_)
+			db,err := ioutil.ReadAll(body)
+			//fmt.Println(db)
+			fmt.Println("site",string(db))
+			//fmt.Println(string(db))
+			return err
+		})
+		if err != nil {
+			panic(err)
+			fmt.Println(err)
+		}
+		return true
+	})
+
+}
+
 func init(){
 	//flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
+	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
+	Router.LoadHTMLGlob(config.Conf.Templates)
+	Router.GET("/",func(c *gin.Context){
+		c.HTML(http.StatusOK,"index.tmpl",nil)
+	})
+	Router.GET("ws",func(c *gin.Context){
+		WsHandler(c.Writer, c.Request)
+	})
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)
 	Router.GET("shopping",HandForward)
-	Router.GET("order/:py",HandForward)
+	Router.GET("/delsite/:py",HandForward)
+	//Router.GET("order/:py",HandForward)
+	//Router.GET("order",HandForward)
+	Router.GET("order/list",HandForward)
+	Router.GET("order/time",HandForward)
+	Router.GET("order_apply",HandForward)
+
+	Router.GET("init",func(c *gin.Context){
+		InitShoppingMap()
+		c.String(http.StatusOK,"success")
+	})
+	Router.GET("run",func(c *gin.Context){
+		go DownOrder()
+		c.String(http.StatusOK,"success")
+	})
 	//Router.POST("updateorder/:py",HandForward)
 	go Router.Run(":8088")
 }
@@ -138,9 +251,9 @@ func DownOrder(){
 	})
 }
 func main(){
-	InitShoppingMap()
-	DownOrder()
+	//InitShoppingMap()
+	//DownOrder()
 	//sh,_ := shopping.ShoppingMap.Load("pinduoduo")
 
-	//select{}
+	select{}
 }

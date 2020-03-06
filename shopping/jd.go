@@ -202,7 +202,7 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	return res.(map[string]interface{})["result"].(map[string]interface{})["queryVo"]
 	//return nil
 }
-func (self *Jd) GoodsUrl(words ...string) interface{}{
+func (self *Jd) GoodsUrl_(words ...string) interface{}{
 	u := &url.Values{}
 	u.Add("method","jd.union.open.promotion.common.get")
 	u.Add("v","1.0")
@@ -224,7 +224,7 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 	//defer fmt.Println(u)
 	return self.ClientHttp(JdUrl,u)
 }
-func (self *Jd) GoodsUrl_(words ...string) interface{}{
+func (self *Jd) GoodsUrl(words ...string) interface{}{
 
 	u := &url.Values{}
 	u.Add("method","jd.kpl.open.promotion.pidurlconvert")
@@ -253,7 +253,7 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 	if len(keys)<2 {
 		return
 	}
-	err := self.Info.orderGet(keys[0],keys[1],func(db interface{}){
+	err := orderGet(keys[0],keys[1],func(db interface{}){
 		d = db
 		//d = string(db.([]byte))
 	})
@@ -263,7 +263,7 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 	}
 	return
 }
-func (self *Jd)OutUrl(db interface{}) string {
+func (self *Jd)OutUrl_(db interface{}) string {
 	//fmt.Println(db)
 	res := db.(map[string]interface{})["jd_union_open_promotion_common_get_response"]
 	if res == nil {
@@ -285,7 +285,7 @@ func (self *Jd)OutUrl(db interface{}) string {
 
 
 }
-func (self *Jd)OutUrl_(db interface{}) string {
+func (self *Jd)OutUrl(db interface{}) string {
 	//db.jd_kpl_open_promotion_pidurlconvert_response.clickUrl.clickURL
 	res := db.(map[string]interface{})["jd_kpl_open_promotion_pidurlconvert_response"]
 	if res == nil {
@@ -388,11 +388,12 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				l_ := l.(map[string]interface{})
 				l_["order_id"] =fmt.Sprintf("%.0f", l_["orderId"].(float64))
 				l_["status"] = false
-				var goodid []string
+				var goodid,goodsName []string
 				var sumFee float64
 				for _, _db_:= range l_["skuList"].([]interface{}){
 					db_:=_db_.(map[string]interface{})
 					goodid = append(goodid,fmt.Sprintf("%.0f",db_["skuId"].(float64)))
+					goodsName = append(goodsName,db_["skuName"].(string))
 					fee := db_["actualFee"].(float64)
 
 					sumFee+=fee
@@ -401,7 +402,11 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 					//}
 				}
 				l_["goodsid"] = strings.Join(goodid,",")
+				//l_["goodsImg"] = l_["goods_thumbnail_url"]
+				l_["goodsName"] = strings.Join(goodsName,",")
+				l_["userid"] = l_["ext1"]
 				l_["fee"] = sumFee
+				l_["site"] = self.Info.Py
 				if l_["finishTime"].(float64)!=0 {
 					l_["status"] = true
 					l_["endTime"] = l_["finishTime"]

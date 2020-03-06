@@ -6,6 +6,7 @@ import(
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	//"encoding/binary"
+	"io"
 	"sort"
 	"encoding/json"
 	"strconv"
@@ -24,6 +25,7 @@ func init(){
 			li = append(li,v.(shopping.ShoppingInterface).GetInfo())
 			return true
 		})
+		fmt.Println(li)
 		c.JSON(http.StatusOK,li)
 	})
 	v1.GET("/shopping/:py",func(c *gin.Context){
@@ -85,9 +87,30 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 	})
-	v1.POST("/order",func(c *gin.Context){
+	v1.GET("/order/list",func(c *gin.Context){
+		num,err := strconv.Atoi(c.DefaultQuery("count","0"))
+		if err != nil {
+			c.String(http.StatusNotFound,err.Error())
+			return
+		}
+		var li []interface{}
+		err = shopping.OrderList(c.Query("orderid"),func(v map[string]interface{})error{
+			li = append(li,v)
+			num--
+			if num<=0{
+				return io.EOF
+			}
+			return nil
+		})
+		if err!= nil && err != io.EOF {
+			c.String(http.StatusNotFound,err.Error())
+			return
+		}
+		c.JSON(http.StatusOK,li)
+	})
+	v1.GET("/order/time",func(c *gin.Context){
 		t := c.Query("t")
-		if t != "" {
+		if t == "" {
 			c.JSON(http.StatusNotFound,gin.H{"msg":"t error"})
 			return
 		}
@@ -100,17 +123,8 @@ func init(){
 			return
 		}
 		c.JSON(http.StatusOK,dbMap)
-
-
 	})
-	v1.POST("/order/:py",func(c *gin.Context){
-		py := c.Param("py")
-		sh_,_ := shopping.ShoppingMap.Load(py)
-		if sh_ == nil {
-			//c.JSON(http.StatusNotFound,nil)
-			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
-			return
-		}
+	v1.GET("order_apply",func(c *gin.Context){
 		orderid := c.Query("orderid")
 		if orderid == "" {
 			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
@@ -121,24 +135,50 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
 			return
 		}
-		db := sh_.(shopping.ShoppingInterface).OrderSearch(orderid,userid)
-		if db == nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"order error"})
+		err := shopping.OrderApply(userid,orderid)
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK,db)
 		return
 
 	})
+	//v1.GET("/order/:py",func(c *gin.Context){
+	//	py := c.Param("py")
+	//	sh_,_ := shopping.ShoppingMap.Load(py)
+	//	if sh_ == nil {
+	//		//c.JSON(http.StatusNotFound,nil)
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
+	//		return
+	//	}
+	//	orderid := c.Query("orderid")
+	//	if orderid == "" {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
+	//		return
+	//	}
+	//	userid := c.Query("userid")
+	//	if userid == "" {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
+	//		return
+	//	}
+	//	db := sh_.(shopping.ShoppingInterface).OrderSearch(orderid,userid)
+	//	if db == nil {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"order error"})
+	//		return
+	//	}
+	//	c.JSON(http.StatusOK,db)
+	//	return
+
+	//})
 	v1.POST("/updateorder/:py",func(c *gin.Context){
 		py := c.Param("py")
-		sh_,_ := shopping.ShoppingMap.Load(py)
-		if sh_ == nil {
-			//c.JSON(http.StatusNotFound,nil)
-			c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
-			return
-		}
-		sh := sh_.(shopping.ShoppingInterface)
+		//sh_,_ := shopping.ShoppingMap.Load(py)
+		//if sh_ == nil {
+		//	//c.JSON(http.StatusNotFound,nil)
+		//	c.JSON(http.StatusNotFound,gin.H{"msg":"py error"+py})
+		//	return
+		//}
+		//sh := sh_.(shopping.ShoppingInterface)
 		orderid := c.Query("orderid")
 		if orderid == ""{
 			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
@@ -150,7 +190,7 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
-		err = sh.GetInfo().OrderUpdate(orderid,db)
+		err = shopping.OrderUpdate(orderid,db)
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
@@ -158,7 +198,8 @@ func init(){
 		endTime := db["endTime"]
 		//db["py"] = py
 		if endTime != nil && endTime.(float64) !=0{
-			err = sh.GetInfo().OrderUpdateTime(
+			err = shopping.OrderUpdateTime(
+				py,
 				orderid,
 				[]byte(time.Unix(int64(endTime.(float64)),0).Format("20060102")),
 			)
@@ -206,7 +247,7 @@ func checkManage(c *gin.Context){
 	if d<0 {
 		d=-d
 	}
-	if d>6 {
+	if d>60 {
 		//fmt.Println("stamp",d)
 		c.Abort()
 		return

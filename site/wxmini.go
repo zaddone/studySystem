@@ -14,6 +14,7 @@ import(
 	"net/http"
 	"strconv"
 	"strings"
+	//"github.com/boltdb/bolt"
 )
 
 var(
@@ -21,10 +22,11 @@ var(
 	toKen string
 	sendMiniMsgUrl = "https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token="
 
-	SessionChan = make(chan interface{},100)
+	SessionChan = make(chan map[string]interface{},100)
 )
 
 func init(){
+	return
 	wxToKenUrl = fmt.Sprintf("%s?%s",wxToKenUrl,
 	(&url.Values{
 		"grant_type":	[]string{"client_credential"},
@@ -108,4 +110,15 @@ func handBody(c *gin.Context){
 	}
 	fmt.Println(db)
 	SessionChan<-db
+}
+func runHandMsg(){
+	for db := range SessionChan{
+		if db["Event"].(string)  == "user_enter_tempsession" {
+			res := strings.Split(db["SessionFrom"].(string),",")
+			fmt.Println(res)
+			if len(res) != 2 {
+				continue
+			}
+		}
+	}
 }

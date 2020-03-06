@@ -214,7 +214,7 @@ func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 	if len(keys)<2 {
 		return nil
 	}
-	err := self.Info.orderGet(keys[0],keys[1],func(db interface{}){
+	err := orderGet(keys[0],keys[1],func(db interface{}){
 		d = db
 		//d = string(db.([]byte))
 	})
@@ -295,6 +295,10 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 				}
 				l_["fee"] = l_["promotion_amount"].(float64)*100
 				l_["goodsid"] =fmt.Sprintf("%.0f",l_["goods_id"].(float64))
+				l_["goodsName"] = l_["goods_name"]
+				l_["goodsImg"] = l_["goods_thumbnail_url"]
+				l_["site"] = self.Info.Py
+				l_["userid"] = l_["custom_parameters"]
 
 				hand(l)
 			}

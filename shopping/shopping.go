@@ -17,6 +17,8 @@ var (
 	SiteList  = []byte("siteList")
 	order = []byte("order")
 	orderTime = []byte("orderTime")
+	orderUser = []byte("orderUser")
+	UserInfo = []byte("UserInfo")
 	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
 	//ShoppingMap = map[string]ShoppingInterface{}
 	ShoppingMap = sync.Map{}// map[string]ShoppingInterface{}
@@ -59,8 +61,61 @@ type ShoppingInfo struct {
 	Token string
 	Update int64
 }
+func OrderApply(userid,orderid string)error{
+	o := []byte(orderid)
+	u := []byte(userid)
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return DB.Update(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(order)
+		if err != nil {
+			return err
+		}
+		v := b.Get(o)
+		var db map[string]interface{}
+		if v != nil {
+			err = json.Unmarshal(v,&db)
+			if err != nil {
+				return err
+			}
+			if db["userid"] != nil {
+				if db["userid"].(string) == userid {
+					return nil
+				}
+				return io.EOF
+			}
+		}else{
+			db = map[string]interface{}{
+				"userid":userid,
+				//"order_id":orderid,
+			}
+		}
+		val,err := json.Marshal(db)
+		if err != nil {
+			return err
+		}
+		err = b.Put(o,val)
+		if err != nil {
+			return err
+		}
+		b_,err := t.CreateBucketIfNotExists(orderUser)
+		if err != nil {
+			return err
+		}
+		ub,err := b_.CreateBucketIfNotExists(u)
+		if err != nil {
+			return err
+		}
+		err = ub.Put(o,[]byte{0})
+		if err != nil {
+			return err
+		}
+		return nil
 
-func (self *ShoppingInfo)OrderUpdate(orderid string,db interface{})error{
+	})
+	})
+}
+
+func OrderUpdate(orderid string,db interface{})error{
 
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 	return DB.Batch(func(t *bolt.Tx)error{
@@ -70,9 +125,9 @@ func (self *ShoppingInfo)OrderUpdate(orderid string,db interface{})error{
 		}
 		db_ := db.(map[string]interface{})
 		val := b.Get([]byte(orderid))
-		var valdb map[string]interface{}
 		if val != nil {
-			err := json.Unmarshal(val,valdb)
+			var valdb map[string]interface{}
+			err := json.Unmarshal(val,&valdb)
 			if err != nil {
 				return err
 			}
@@ -86,14 +141,53 @@ func (self *ShoppingInfo)OrderUpdate(orderid string,db interface{})error{
 	})
 	})
 }
-func (self *ShoppingInfo)orderGet(orderid,userid string,hand func(interface{}))error{
+func OrderList(orderid string,hand func(map[string]interface{})error)error{
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 		return  DB.View(func(t *bolt.Tx)error{
 			b := t.Bucket(order)
 			if b == nil {
 				return io.EOF
 			}
-			b = b.Bucket([]byte(self.Py))
+			//fmt.Println("read",order)
+			c:=b.Cursor()
+			//k_,_ := c.First()
+			//fmt.Println(string(k_))
+			//var k,v []byte
+			var k,v []byte
+			if len(orderid) == 0 {
+				k,v = c.First()
+			}else{
+				k,v = c.Seek([]byte(orderid))
+			}
+			for ;k!= nil;k,v=c.Next(){
+				fmt.Println(string(k))
+				var db  map[string]interface{}
+				err := json.Unmarshal(v,&db)
+				if err != nil {
+					return err
+				}
+				err = hand(db)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	})
+
+}
+
+func OrderGet(orderid,userid string,hand func(interface{}))error{
+	return orderGet(orderid,userid,hand)
+}
+func orderGet(orderid,userid string,hand func(interface{}))error{
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+		return  DB.View(func(t *bolt.Tx)error{
+			b := t.Bucket(order)
+			if b == nil {
+				return io.EOF
+			}
+			//b = b.Bucket([]byte(self.Py))
 			v := b.Get([]byte(orderid))
 			if v == nil {
 				return io.EOF
@@ -167,20 +261,16 @@ func OrderWithTime(ti []byte,hand func(string,interface{}))error{
 				return nil
 			}
 			return b_.ForEach(func(k,v []byte)error{
-				py := string(k)
-				return b_.Bucket(k).ForEach(func(_k,_v []byte)error{
-					info := ShoppingInfo{Py:py}
-					info.orderGet(string(_k),"",func(db interface{}){
-						hand(py,db)
-					})
-					return nil
+				py := string(v)
+				//info := ShoppingInfo{Py:string(v)}
+				return orderGet(string(k),"",func(db interface{}){
+					hand(py,db)
 				})
 			})
-
 		})
 	})
 }
-func (self *ShoppingInfo)OrderUpdateTime(orderid string,ti []byte)error{
+func OrderUpdateTime(orderid,py string,ti []byte)error{
 	return OpenSiteDB(siteDB,func(DB *bolt.DB)error{
 		return DB.Batch(func(t *bolt.Tx)error{
 			b,err := t.CreateBucketIfNotExists(orderTime)
@@ -191,11 +281,11 @@ func (self *ShoppingInfo)OrderUpdateTime(orderid string,ti []byte)error{
 			if err != nil {
 				return err
 			}
-			b__,err := b_.CreateBucketIfNotExists([]byte(self.Py))
-			if err != nil {
-				return err
-			}
-			return b__.Put([]byte(orderid),[]byte{'0'})
+			//b__,err := b_.CreateBucketIfNotExists([]byte(self.Py))
+			//if err != nil {
+			//	return err
+			//}
+			return b_.Put([]byte(orderid),[]byte(py))
 		})
 
 	})

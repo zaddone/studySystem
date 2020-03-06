@@ -8,6 +8,7 @@ import(
 	"strings"
 	"strconv"
 	"github.com/zaddone/studySystem/chromeServer"
+	"github.com/zaddone/studySystem/config"
 	"net/url"
 )
 var(
@@ -16,6 +17,7 @@ var(
 	uri string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
 	tb_token = "_tb_token_"
 	indexUrl = "https://www.alimama.com/index.htm"
+	//Png = config.Conf.Static+"/xcode.png"
 	Png = "xcode.png"
 	RunConTrol chan bool
 	HandOrder func(interface{}) = nil
@@ -24,6 +26,7 @@ var(
 	orderTime = "2006-01-02 15:04:05"
 	LoginPhone = "192.168.1.51"
 	ShowPhone = "192.168.1.52"
+	TaobaoLoginEvent func(path string) = nil
 
 )
 func init(){
@@ -32,6 +35,24 @@ func init(){
 	if err != nil {
 		panic(err)
 	}
+	TaobaoLoginEvent = ControlPhoneEvent
+}
+func ControlPhoneEvent(path string){
+	RunConTrol = make(chan bool)
+	go func(){
+		if err := InitPhone(LoginPhone,RunConTrol,func(p string){
+			TaobaoLoginCheck(p)
+		}); err != nil {
+			panic(err)
+		}
+	}()
+	go func(){
+		if err := InitPhone(ShowPhone,RunConTrol,func(p string){
+			ShowBrowser(p)
+		}); err != nil {
+			panic(err)
+		}
+	}()
 }
 func Run() error {
 	//"https://www.alimama.com/index.htm"
@@ -92,6 +113,9 @@ func GetOrder(_db interface{}){
 			l_["status"] = false
 			l_["fee"] = l_["pubSharePreFee"]
 			l_["goodsid"] =fmt.Sprintf("%.0f",l_["itemId"].(float64))
+			l_["goodsName"] = l_["itemTitle"]
+			l_["goodsImg"] = l_["itemImg"]
+			l_["site"] = "taobao"
 			if l_["tkStatusText"].(string) =="已结算" {
 				l_["status"] = true
 				endt,err := time.Parse(orderTime, l_["tkEarningTime"].(string))
@@ -182,24 +206,13 @@ func CheckLogin(_db interface{}){
 		if err != nil {
 			panic(err)
 		}
-		f, _ := os.OpenFile(Png, os.O_RDWR|os.O_CREATE, os.ModePerm)
+		f, _ := os.OpenFile(config.Conf.Static+"/"+Png, os.O_RDWR|os.O_CREATE, os.ModePerm)
 		f.Write(body)
 		f.Close()
-		RunConTrol = make(chan bool)
-		go func(){
-			if err := InitPhone(LoginPhone,RunConTrol,func(p string){
-				TaobaoLoginCheck(p)
-			}); err != nil {
-				panic(err)
-			}
-		}()
-		go func(){
-			if err := InitPhone(ShowPhone,RunConTrol,func(p string){
-				ShowBrowser(p)
-			}); err != nil {
-				panic(err)
-			}
-		}()
+
+		if TaobaoLoginEvent != nil {
+			TaobaoLoginEvent(Png)
+		}
 		fmt.Println("http://127.0.0.1"+":8001/"+Png)
 		chromeServer.HandleResponse = LoginSession
 		return
