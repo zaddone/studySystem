@@ -5,18 +5,19 @@ import(
 	"time"
 	"crypto/md5"
 	"io"
-	//"sync"
 	"io/ioutil"
+	//"sync"
+	//"io/ioutil"
 	"encoding/json"
 	"strings"
 	//"bytes"
 	//"strconv"
-	//"regexp"
+	"regexp"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
 	//"github.com/boltdb/bolt"
 	//"encoding/binary"
-	"github.com/PuerkitoBio/goquery"
+	//"github.com/PuerkitoBio/goquery"
 )
 var (
 	JdUrl = "https://router.jd.com/api"
@@ -35,6 +36,7 @@ var (
 	orderTimeFormat = "2006010215"
 	jdSiteid = "2009626993"
 	//week = []string{""}
+	jdhtmlid = regexp.MustCompile(`//item.jd.com/(\d{12}).html`)
 
 
 )
@@ -141,66 +143,66 @@ func (self *Jd) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
+func (self *Jd) stuctured(data interface{}) (g Goods){
+	d_ := data.(map[string]interface{})
+	p:= d_["unitPrice"].(float64)
+	return Goods{
+		Id:fmt.Sprintf("%.0f",d_["skuId"].(float64)),
+		Img:[]string{d_["imgUrl"].(string)},
+		Name:d_["goodsName"].(string),
+		Tag:func()string{
+			if d_["isJdSale"].(float64) ==1 {
+				return "自营"
+			}
+			return ""
+		}(),
+		Price:p,
+		Fprice:d_["commisionRatioWl"].(float64)/100 * p,
+		//Coupon:
+
+	}
+
+}
 func (self *Jd) SearchGoods(words ...string)interface{}{
-	//self.ProductSearch(words...)
-	u := &url.Values{}
-	//jd.kpl.open.xuanpin.search.sku
-	//jd.kpl.open.xuanpin.searchgoods
-	u.Add("method","jd.kpl.open.xuanpin.searchgoods")
-	u.Add("v","1.0")
-	query := map[string]interface{}{
-		"queryParam":map[string]interface{}{"keywords":words[0]},
-		"pageParam":map[string]interface{}{"pageSize":20,"pageNum":1},
-		"orderField":0,
+	ids := self.ProductSearch(words...)
+	var ids_ []string
+	for _,id := range ids {
+		ids_ = append(ids_,id.(string))
 	}
-	u.Add("access_token",self.Info.Token)
-	body,err := json.Marshal(query)
-	if err != nil {
-		panic(err)
-	}
-	//u.Add("360buy_param_json",fmt.Sprintf("{\"goodsReqDTO\":{\"keyword\":\"%s\"}}",words[0]))
-	u.Add("param_json",string(body))
-	//u.Add("custom_parameters",words[1])
-	//data.jd_kpl_open_xuanpin_searchgoods_response.result.queryVo
-	db := self.ClientHttp(JdUrl,u)
-	if db == nil {
-		return nil
-	}
-	res := db.(map[string]interface{})["jd_kpl_open_xuanpin_searchgoods_response"]
-	if res == nil {
-		return nil
-	}
-	return res.(map[string]interface{})["result"].(map[string]interface{})["queryVo"]
+	fmt.Println(len(ids))
+	return self.GoodsDetail(ids_...)
+
 }
 func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u := &url.Values{}
-	u.Add("method","jd.kpl.open.xuanpin.searchgoods")
+	u.Add("method","jd.union.open.goods.promotiongoodsinfo.query")
 	u.Add("v","1.0")
 	query := map[string]interface{}{
-		//"queryParam":map[string]interface{}{"keywords":words[0]},
-		"queryParam":map[string]interface{}{"skuId":words[0]},
-		"pageParam":map[string]interface{}{"pageSize":1,"pageNum":1},
-		"orderField":0,
+		"skuIds":strings.Join(words,","),
 	}
 	body,err := json.Marshal(query)
 	if err != nil {
 		panic(err)
 	}
 	u.Add("param_json",string(body))
-	//jd.kpl.open.item.getmobilewarestyleandjsbywareid
-	u.Add("access_token",self.Info.Token)
-	//return self.ClientHttp(JdUrl,u)
 	db := self.ClientHttp(JdUrl,u)
 	if db == nil {
 		return nil
 	}
-	res := db.(map[string]interface{})["jd_kpl_open_xuanpin_searchgoods_response"]
+	res := db.(map[string]interface{})["jd_union_open_goods_promotiongoodsinfo_query_response"].(map[string]interface{})["result"]
 	if res == nil {
 		return nil
 	}
-	//return res["result"].(map[string]interface{})["queryVo"]
-	return res.(map[string]interface{})["result"].(map[string]interface{})["queryVo"]
-	//return nil
+	var res_ map[string]interface{}
+	err = json.Unmarshal([]byte(res.(string)),&res_)
+	if err != nil {
+		panic(err)
+	}
+	var li []interface{}
+	for _,d := range res_["data"].([]interface{}){
+		li = append(li,self.stuctured(d))
+	}
+	return li
 }
 func (self *Jd) GoodsUrl_(words ...string) interface{}{
 	u := &url.Values{}
@@ -263,6 +265,7 @@ func (self *Jd)OrderSearch(keys ...string)(d interface{}){
 	}
 	return
 }
+
 func (self *Jd)OutUrl_(db interface{}) string {
 	//fmt.Println(db)
 	res := db.(map[string]interface{})["jd_union_open_promotion_common_get_response"]
@@ -305,19 +308,24 @@ func (self *Jd) ProductSearch(words ...string)(result []interface{}){
 	//https://search.jd.com/Search?keyword=
 	u := &url.Values{}
 	u.Add("keyword",words[0])
+	u.Add("page","1")
+	u.Add("enc","utf-8")
 	err:= request.ClientHttp_("https://search.jd.com/Search?"+u.Encode(),"GET",nil,nil,func(body io.Reader,st int)error{
-		_,err := goquery.NewDocumentFromReader(body)
-		//db,err := ioutil.ReadAll(body)
+
+		db,err := ioutil.ReadAll(body)
 		if err != nil {
 			return err
 		}
-		//fmt.Println(string(db))
+		for _,d := range  jdhtmlid.FindAllSubmatch(db,-1){
+			result = append(result,string(d[1]))
+			//fmt.Println(string(d[1]))
+		}
 		return nil
 	})
 	if err != nil {
 		fmt.Println(err)
 	}
-	return nil
+	return
 
 }
 
@@ -429,3 +437,4 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 	//jd.union.open.order.query
 	//return io.EOF
 }
+

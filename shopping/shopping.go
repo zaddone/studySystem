@@ -32,6 +32,60 @@ var (
 	}
 
 )
+type Goods struct{
+	Id string
+	Img []string
+	Name string
+	Price float64
+	Fprice float64
+	Tag string
+	Coupon bool
+	Show string
+	Ext string
+}
+type User struct{
+	Mobile string
+	Name string
+	UserId string
+}
+func (self *User) Get() error{
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return DB.View(func(t *bolt.Tx)error{
+		b := t.Bucket(UserInfo)
+		if b == nil {
+			return io.EOF
+		}
+		db := b.Get([]byte(self.UserId))
+		if db == nil {
+			return io.EOF
+		}
+		return json.Unmarshal(db,&self)
+	})
+	})
+
+}
+func (self *User) Update() error{
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return DB.Update(func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(UserInfo)
+		if err != nil {
+			return err
+		}
+		db,err := json.Marshal(&self)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(self.UserId),db)
+	})
+	})
+}
+func GetShoppingMap(py string) ShoppingInterface {
+	v,_ := ShoppingMap.Load(py)
+	if v == nil {
+		return nil
+	}
+	return v.(ShoppingInterface)
+}
 func Sha1(data []byte) string {
 	sha1 := sha1.New()
 	sha1.Write(data)
@@ -117,6 +171,7 @@ func OrderApply(userid,orderid string)error{
 
 func OrderUpdate(orderid string,db interface{})error{
 
+	o := []byte(orderid)
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 	return DB.Batch(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(order)
@@ -124,7 +179,7 @@ func OrderUpdate(orderid string,db interface{})error{
 			return err
 		}
 		db_ := db.(map[string]interface{})
-		val := b.Get([]byte(orderid))
+		val := b.Get(o)
 		if val != nil {
 			var valdb map[string]interface{}
 			err := json.Unmarshal(val,&valdb)
@@ -137,7 +192,23 @@ func OrderUpdate(orderid string,db interface{})error{
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(orderid),str)
+		err=  b.Put(o,str)
+		if err != nil {
+			return err
+		}
+		if db_["userid"]==nil || len(db_["userid"].(string)) == 0{
+			return nil
+		}
+		b_,err := t.CreateBucketIfNotExists(orderUser)
+		if err != nil {
+			return err
+		}
+		ub,err := b_.CreateBucketIfNotExists([]byte(db_["userid"].(string)))
+		if err != nil {
+			return err
+		}
+		return ub.Put(o,[]byte{0})
+
 	})
 	})
 }

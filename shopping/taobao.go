@@ -11,6 +11,7 @@ import(
 	"github.com/zaddone/studySystem/alimama"
 	"github.com/PuerkitoBio/goquery"
 	"net/url"
+	"strconv"
 	//"github.com/boltdb/bolt"
 	//"strconv"
 	"regexp"
@@ -115,7 +116,48 @@ func (self *Taobao) SearchGoods(words ...string)interface{}{
 	if res_ == nil {
 		return nil
 	}
-	return res_.(map[string]interface{})["result_list"].(map[string]interface{})["map_data"]
+
+	var li []interface{}
+	for _,d := range res_.(map[string]interface{})["result_list"].(map[string]interface{})["map_data"].([]interface{}){
+		li = append(li,self.stuctured(d))
+	}
+	return li
+	//return res_.(map[string]interface{})["result_list"].(map[string]interface{})["map_data"]
+
+}
+
+func (self *Taobao) stuctured(data interface{}) (g Goods){
+	d_ := data.(map[string]interface{})
+	p,err := strconv.ParseFloat(d_["zk_final_price"].(string),64)
+	if err != nil {
+		panic(err)
+	}
+	r,err := strconv.ParseFloat(d_["commission_rate"].(string),64)
+	if err != nil {
+		panic(err)
+	}
+	g = Goods{
+		Id:fmt.Sprintf("%.0f",d_["item_id"].(float64)),
+		Img:[]string{d_["pict_url"].(string)},
+		Name:d_["title"].(string),
+		Tag:d_["shop_title"].(string),
+		Price:p,
+		Fprice:r/10000 * p,
+		//Ext:"https:"+d_["coupon_share_url"].(string),
+		Coupon:len(d_["coupon_id"].(string))>0,
+		Show:d_["item_description"].(string),
+		//Coupon:
+
+	}
+	if !g.Coupon {
+		g.Ext = "https:"+d_["url"].(string)
+	}else{
+		g.Ext = "https:"+d_["coupon_share_url"].(string)
+	}
+	for _,m := range d_["small_images"].(map[string]interface{})["string"].([]interface{}){
+		g.Img = append(g.Img,m.(string))
+	}
+	return
 
 }
 func (self *Taobao) ProductSearch(words ...string)(result []interface{}){
@@ -229,7 +271,7 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	if goodinfo == nil {
 		return nil
 	}
-	fmt.Println(goodinfo)
+	//fmt.Println(goodinfo)
 	res := goodinfo.(map[string]interface{})["tbk_item_info_get_response"]
 	if res == nil {
 		return nil
@@ -247,7 +289,7 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	var li_  []interface{}
 	for _,v := range db.([]interface{}) {
 		if id == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
-			li_ = []interface{}{v}
+			li_ = []interface{}{self.stuctured(v)}
 			break
 		}
 	}
@@ -280,6 +322,9 @@ func (self *Taobao)OrderDown(hand func(interface{}))error{
 		alimama.Begin = time.Unix(self.Info.Update,0)
 	}
 	alimama.HandOrder = hand
+	defer func(){
+		self.Info.Update = alimama.Begin.Unix()
+	}()
 	return alimama.Run()
 	//return  nil
 	//return nil

@@ -140,6 +140,7 @@ func GetOrder(_db interface{}){
 			panic(err)
 		}
 		if uVal.Get("queryType") == "3"{
+			Begin = time.Now()
 			chromeServer.ClosePage()
 			return
 		}
@@ -202,19 +203,29 @@ func LoginSession(_db interface{}){
 func CheckLogin(_db interface{}){
 
 	if !chromeServer.GetBody(_db,Png,func(__id float64,result map[string]interface{}){
-		body,err := base64.StdEncoding.DecodeString(result["body"].(string))
-		if err != nil {
-			panic(err)
-		}
-		f, _ := os.OpenFile(config.Conf.Static+"/"+Png, os.O_RDWR|os.O_CREATE, os.ModePerm)
-		f.Write(body)
-		f.Close()
+		switch result["body"].(type){
+		case string:
+			body,err := base64.StdEncoding.DecodeString(result["body"].(string))
+			if err != nil {
+				panic(err)
+			}
+			f, _ := os.OpenFile(config.Conf.Static+"/"+Png, os.O_RDWR|os.O_CREATE, os.ModePerm)
+			f.Write(body)
+			f.Close()
 
-		if TaobaoLoginEvent != nil {
-			TaobaoLoginEvent(Png)
+			if TaobaoLoginEvent != nil {
+				TaobaoLoginEvent(Png)
+			}
+			//fmt.Println("http://127.0.0.1"+":8001/"+Png)
+			chromeServer.HandleResponse = LoginSession
+		default:
+
+			fmt.Println(result["body"])
+			chromeServer.PageNavigate(uri,func(res map[string]interface{}){
+				fmt.Println(res)
+				//getBody(res,qu)
+			})
 		}
-		fmt.Println("http://127.0.0.1"+":8001/"+Png)
-		chromeServer.HandleResponse = LoginSession
 		return
 	}){
 		LoginSession(_db)

@@ -189,7 +189,6 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 }
 
 func Run(uri string) error {
-
 	//go Router.Run(":8001")
 	return start(uri,func(u string)error{
 		w := new(sync.WaitGroup)
@@ -260,44 +259,51 @@ func ClosePage(){
 
 func openPage_(hand func(interface{})error) error {
 	for i:=0;i<10;i++ {
-	err := request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
-		if st != 200 {
-			db,err := ioutil.ReadAll(body)
+	//fmt.Println("open",i)
+		err := request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
+			if st != 200 {
+				db,err := ioutil.ReadAll(body)
+				if err != nil {
+					return err
+				}
+				return fmt.Errorf("%d %s",st,db)
+			}
+			var k interface{}
+			err := json.NewDecoder(body).Decode(&k)
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("%d %s",st,db)
-		}
-		var k interface{}
-		err := json.NewDecoder(body).Decode(&k)
-		if err != nil {
+			//fmt.Println(k)
+			k_ := k.([]interface{})
+			if len(k_)==0 {
+				return io.EOF
+			}
+			for _,v := range k_{
+				er := hand(v)
+				if er != nil {
+					return er//panic(er)
+				}
+			}
+			//close(MsgPool)
+			//panic(0)
+			return nil
+
+		})
+		if err != io.EOF {
 			return err
 		}
-		//fmt.Println(k)
-		k_ := k.([]interface{})
-		if len(k_)==0 {
-			return io.EOF
-		}
-		for _,v := range k_{
-			er := hand(v)
-			if er != nil {
-				return er//panic(er)
-			}
-		}
-		//close(MsgPool)
-		//panic(0)
-		return nil
-
-	})
-	if err != io.EOF {
-		return err
-	}
+		time.Sleep(1*time.Second)
 	}
 	return io.EOF
 }
 
-func start(uri string ,hand func(string)error) error{
+func start(uri string ,hand func(string)error) (err error){
 	runout := func(r io.Reader){
+		defer func(){
+			err1 := exec.Command("pkill","chrome").Run()
+			fmt.Println("kill",err1)
+			err = nil
+		}()
 		var db [8192]byte
 		for{
 			n,err := r.Read(db[:])
@@ -312,7 +318,7 @@ func start(uri string ,hand func(string)error) error{
 			if bytes.HasPrefix(db[:n],chromekey){
 				err = hand(string(db[23:n-1]))
 				if err != nil {
-					log.Println(err)
+					log.Println("----------------",err)
 					return
 				}
 			}
@@ -320,22 +326,17 @@ func start(uri string ,hand func(string)error) error{
 	}
 	//append(op,uri)
 	//log.Println("cmd chrome")
-	kcmd:= exec.Command("pkill","chrome")
-	err := kcmd.Start()
-	if err != nil {
-		fmt.Println("kill",err)
-		return err
-	}
-	kcmd.Wait()
+
 
 	cmd := exec.Command("google-chrome",append(op,uri)... )
-	out,err := cmd.StdoutPipe()
-	if err != nil {
-		//return err
-		log.Fatal(err)
-	}else{
-		go runout(out)
-	}
+	//out,err := cmd.StdoutPipe()
+	//if err != nil {
+	//	//return err
+	//	log.Fatal(err)
+	//}else{
+	//	go runout(out)
+	//}
+
 	outerr,err := cmd.StderrPipe()
 	if err != nil {
 		//return err
@@ -344,13 +345,13 @@ func start(uri string ,hand func(string)error) error{
 		go runout(outerr)
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		fmt.Println("run",err)
-		return err
-	}
-	cmd.Wait()
-	return nil
+	//defer func(){
+	//	fmt.Println("start end")
+	//}()
+
+	err = cmd.Run()
+	return
+
 
 }
 func GetDoc(h func(map[string]interface{})){

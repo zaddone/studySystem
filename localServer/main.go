@@ -92,6 +92,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Failed to set websocket upgrade: %+v", err)
 		return
 	}
+
 	defer conn.Close()
     //for {
         t, reply, err := conn.ReadMessage()
@@ -108,22 +109,42 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	conn.WriteMessage(t,[]byte("init"))
-	alimama.TaobaoLoginEvent = func(path string){
-		fmt.Println("event",path)
-		err := conn.WriteMessage(t,[]byte(path))
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-	shopping.ShoppingMap.Range(func(k,v interface{})bool{
-		v_ := v.(shopping.ShoppingInterface)
-		err = v_.OrderDown(func(db interface{}){
-			fmt.Println(db)
-			err := conn.WriteJSON(db)
+	chanmsg := make(chan interface{},100)
+	defer close(chanmsg)
+	go func(){
+	for m := range chanmsg {
+		//fmt.Println("chan",m)
+		switch m_ := m.(type){
+		case string:
+			err = conn.WriteMessage(t,[]byte(m_))
 			if err != nil {
 				fmt.Println(err)
 			}
+
+		case []byte:
+			err = conn.WriteMessage(t,m_)
+			if err != nil {
+				fmt.Println(err)
+			}
+		default:
+			err = conn.WriteJSON(m_)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+
+	}
+	}()
+	alimama.TaobaoLoginEvent = func(path string){
+		fmt.Println("event",path)
+		chanmsg<-"/"+config.Conf.Static+"/"+path
+	}
+	shopping.ShoppingMap.Range(func(k,v interface{})bool{
+		fmt.Println(k.(string))
+		chanmsg<-k.(string)
+		v_ := v.(shopping.ShoppingInterface)
+		err = v_.OrderDown(func(db interface{}){
+			//fmt.Println(db)
 			db_,err := json.Marshal(db)
 			if err != nil {
 				panic(err)
@@ -133,11 +154,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			u := url.Values{}
 			u.Add("orderid",db.(map[string]interface{})["order_id"].(string))
 			err = requestHttp("/updateorder/"+k.(string),"POST",u,bytes.NewReader(db_),func(body io.Reader,res *http.Response)error{
-				db,err := ioutil.ReadAll(body)
+				data,err := ioutil.ReadAll(body)
 				if err != nil {
 					return err
 				}
-				return conn.WriteMessage(t,db)
+				chanmsg<-data
+				return nil
+				//return conn.WriteMessage(t,db)
 			})
 			if err != nil {
 				fmt.Println(err)
@@ -146,23 +169,24 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			fmt.Println(err)
+			return true
 		}
 		u_:= url.Values{}
 		u_.Set("update",fmt.Sprintf("%d",v_.GetInfo().Update))
 		err = requestHttp("/updatesite/"+k.(string),"GET",u_,nil,func(body io.Reader,res *http.Response)error{
-			//return json.NewDecoder(body).Decode(&req_)
 			db,err := ioutil.ReadAll(body)
-			//fmt.Println(db)
 			fmt.Println("site",string(db))
-			//fmt.Println(string(db))
 			return err
 		})
 		if err != nil {
-			panic(err)
+			//panic(err)
 			fmt.Println(err)
 		}
 		return true
 	})
+
+	conn.CloseHandler()(2,"end")
+
 
 }
 

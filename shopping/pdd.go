@@ -170,6 +170,21 @@ func (self *Pdd)OrderMsg(_db interface{}) (str string){
 	return str
 }
 
+func (self *Pdd) stuctured(data interface{}) (g Goods){
+	d_ := data.(map[string]interface{})
+	p:= d_["min_group_price"].(float64)
+	return Goods{
+		Id:fmt.Sprintf("%.0f",d_["goods_id"].(float64)),
+		Img:[]string{d_["goods_thumbnail_url"].(string)},
+		Name:d_["goods_name"].(string),
+		Tag:d_["mall_name"].(string),
+		Price:p,
+		Fprice:p*(d_["promotion_rate"].(float64)/1000.0),
+		Coupon:d_["coupon_discount"].(float64)>0,
+		Show:d_["goods_desc"].(string),
+	}
+}
+
 func (self *Pdd) SearchGoods(words ...string)interface{}{
 	db :=  self.searchGoods(words...)
 	if db == nil {
@@ -179,7 +194,12 @@ func (self *Pdd) SearchGoods(words ...string)interface{}{
 	if res == nil {
 		return nil
 	}
-	return res.(map[string]interface{})["goods_list"].([]interface{})
+	var li []interface{}
+	for _,d := range res.(map[string]interface{})["goods_list"].([]interface{}){
+		li = append(li,self.stuctured(d))
+	}
+	return li
+	//return res.(map[string]interface{})["goods_list"].([]interface{})
 }
 func (self *Pdd) searchGoods(words ...string)interface{}{
 	u := &url.Values{}
@@ -206,7 +226,13 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 	if res == nil {
 		return nil
 	}
-	return res.(map[string]interface{})["goods_details"]
+
+	var li []interface{}
+	for _,d := range res.(map[string]interface{})["goods_details"].([]interface{}){
+		li = append(li,self.stuctured(d))
+	}
+	return li
+	//return res.(map[string]interface{})["goods_details"]
 	//db_.goods_detail_response.goods_details
 }
 func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
