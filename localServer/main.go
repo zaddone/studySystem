@@ -184,15 +184,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	})
-
 	conn.CloseHandler()(2,"end")
-
 
 }
 
 func init(){
 	//flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
+
 	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
 	Router.LoadHTMLGlob(config.Conf.Templates)
 	Router.GET("/",func(c *gin.Context){
@@ -211,22 +210,21 @@ func init(){
 	Router.GET("order/time",HandForward)
 	Router.GET("order_apply",HandForward)
 
-	Router.GET("init",func(c *gin.Context){
-		InitShoppingMap()
-		c.String(http.StatusOK,"success")
-	})
-	Router.GET("run",func(c *gin.Context){
-		go DownOrder()
-		c.String(http.StatusOK,"success")
-	})
+	//Router.GET("init",func(c *gin.Context){
+	//	InitShoppingMap()
+	//	c.String(http.StatusOK,"success")
+	//})
+	//Router.GET("run",func(c *gin.Context){
+	//	go DownOrder()
+	//	c.String(http.StatusOK,"success")
+	//})
 	//Router.POST("updateorder/:py",HandForward)
-	go Router.Run(":8088")
+	go Router.Run(config.Conf.Port)
 }
 func DownOrder(){
 	shopping.ShoppingMap.Range(func(k,v interface{})bool{
+		fmt.Println(k.(string))
 		v_ := v.(shopping.ShoppingInterface)
-		//v_.GetInfo().Update = 0
-		//var orderlist []interface{}
 		err := v_.OrderDown(func(db interface{}){
 			db_,err := json.Marshal(db)
 			if err != nil {

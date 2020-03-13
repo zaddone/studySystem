@@ -11,7 +11,7 @@ import(
 	"encoding/json"
 	"strings"
 	//"bytes"
-	"strconv"
+	//"strconv"
 	"regexp"
 	"github.com/zaddone/studySystem/request"
 	"net/url"
@@ -170,50 +170,11 @@ func (self *Jd) SearchGoods(words ...string)interface{}{
 	u.Add("v","1.0")
 	query := map[string]interface{}{
 		"queryParam":map[string]interface{}{
-			"keywords":words[0],
+			"keywords":strings.Join(words,","),
 		},
-		"pageParam":map[string]interface{}{
-			"pageSize":20,
-		},
-		"orderField":0,
 	}
-	u.Add("access_token",self.Info.Token)
-	body,err := json.Marshal(query)
-	if err != nil {
-		panic(err)
-	}
-	u.Add("360buy_param_json",string(body))
-	db := self.ClientHttp(JdUrl_,u)
-	if db == nil {
-		return nil
-	}
-	res := db.(map[string]interface{})["jd_kpl_open_xuanpin_searchgoods_responce"]
-	if res == nil {
-		fmt.Println("jd_kpl_open_xuanpin_searchgoods_responce")
-		return nil
-	}
-	res = res.(map[string]interface{})["searchgoodsResult"]
-	if res == nil {
-		fmt.Println("searchgoodsResult")
-		return nil
-	}
-	res = res.(map[string]interface{})["result"]
-	if res == nil {
-		fmt.Println("result")
-		return nil
-	}
-	lis := res.(map[string]interface{})["queryVo"]
-	if lis == nil{
-		fmt.Println("queryVo")
-		return nil
-	}
-	var li []interface{}
-	for _, d := range lis.([]interface{}) {
-		fmt.Println(d)
-		li = append(li,self.stuctured_(d))
-	}
-	return li
 
+	u.Add("access_token",self.Info.Token)
 }
 func (self *Jd) SearchGoods_(words ...string)interface{}{
 	ids := self.ProductSearch(words...)
@@ -494,18 +455,4 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 	//jd.union.open.order.query
 	//return io.EOF
 }
-func (self *Jd) stuctured_(data interface{}) (g Goods){
-	d_ := data.(map[string]interface{})
-	p,err:=strconv.ParseFloat(d_["price"].(string),64)
-	f,err:=strconv.ParseFloat(d_["commisionRatioWl"].(string),64)
-	if err != nil {
-		panic(err)
-	}
-	return Goods{
-		Id:d_["skuId"].(string),
-		Img:[]string{"https://img14.360buyimg.com/n1/"+d_["imageUrl"].(string)},
-		Name:d_["wareName"].(string),
-		Price:p,
-		Fprice:f/100,
-	}
-}
+

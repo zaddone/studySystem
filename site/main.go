@@ -31,6 +31,7 @@ var(
 	Router_ = gin.Default()
 	siteDB  = flag.String("db","SiteDB","db")
 	SessionId = "session_id"
+	//SessionFormat = "2006-01-02 15:04"
 	//UpdateMap = time.Now()
 	Html = []byte(`
 <!doctype html>
@@ -212,8 +213,8 @@ func init(){
 	Router.GET("/script",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		session,err := c.Cookie(SessionId)
 		if err != nil {
-			session = shopping.Sha1([]byte( fmt.Sprintf("%.0f%s",time.Now().UnixNano(),c.Request.RemoteAddr)))
-			c.SetCookie(SessionId,session,3600*24*365,"/",".zaddone.com",false,false)
+			session = shopping.Sha1([]byte(fmt.Sprintf("%s%s",time.Now(),c.Request.RemoteAddr)))
+			c.SetCookie(SessionId,session[:32],3600*24*365*10,"/",".zaddone.com",false,false)
 		}
 		js:=""
 		shopping.ShoppingMap.Range(func(k,v interface{})bool{
@@ -244,7 +245,9 @@ func init(){
 				val = append(val,session)
 			}
 		}
-		u := sh.OutUrl(sh.GoodsUrl(val...))
+		db := sh.GoodsUrl(val...)
+		u := sh.OutUrl(db)
+		fmt.Println(u,db)
 		if u == "" {
 			c.JSON(http.StatusNotFound,gin.H{"msg":""})
 		}

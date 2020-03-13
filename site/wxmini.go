@@ -26,7 +26,7 @@ var(
 )
 
 func init(){
-	return
+	//return
 	wxToKenUrl = fmt.Sprintf("%s?%s",wxToKenUrl,
 	(&url.Values{
 		"grant_type":	[]string{"client_credential"},
@@ -35,7 +35,7 @@ func init(){
 	}).Encode())
 	//fmt.Println(wxToKenUrl)
 	k := setToken()
-	fmt.Println("setToKen",k)
+	fmt.Println("setToKen",toKen,k)
 	//k := time.Duration(setToken())*time.Second
 	go func(){
 		for{

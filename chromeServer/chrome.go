@@ -143,60 +143,50 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 	if err != nil {
 		log.Fatal("w:", err)
 	}
-	err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
-	if err != nil {
-		log.Fatal("w:", err)
-	}
-	stop := make(chan bool)
-
+	//err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
+	//if err != nil {
+	//	log.Fatal("w:", err)
+	//}
 	w.Add(2)
 	go func(){
-		defer w.Done()
-		var db interface{}
 		for{
+			var db interface{}
 			err = c.ReadJSON(&db)
 			if err != nil {
-				close(stop)
+				//close(stop)
+				close(writeChan)
+				writeChan = make(chan interface{},5)
+				c.Close()
 				log.Println("stream",err)
 				break
 			}
 			c.SetReadDeadline(time.Now().Add(time.Minute*2))
 			hand(db,c)
 		}
+		w.Done()
 	}()
 	go func(){
-		defer w.Done()
-		for{
-			select{
-			case w:= <-writeChan:
-				if w == nil {
-					log.Println("stream w")
-					return
-				}
-				err := c.WriteJSON(w)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-
-			case <-stop:
-				log.Println("stop stream w")
-				return
+		for w_ := range writeChan{
+			err := c.WriteJSON(w_)
+			if err != nil {
+				fmt.Println(err)
+				break
 			}
 		}
+		w.Done()
 	}()
 	return
 }
 
-func Run(uri string) error {
+
+func Run() error {
 	//go Router.Run(":8001")
-	return start(uri,func(u string)error{
+	//return start(uri,func(u string)error{
+	return start(func(u string)error{
 		w := new(sync.WaitGroup)
-		//handleResponse = CheckLogin
-		//time.Sleep(100*time.Millisecond)
 		return openPage_(func(db interface{})error{
 			_vb := db.(map[string]interface{})
-			time.Sleep(100*time.Millisecond)
+			//time.Sleep(100*time.Millisecond)
 			StreamId = _vb["id"].(string)
 			runStream(_vb["webSocketDebuggerUrl"].(string),w,func(db interface{},c *websocket.Conn){
 				__v := db.(map[string]interface{})
@@ -229,7 +219,7 @@ func Run(uri string) error {
 					if hand == nil {
 						return
 					}
-					hand(rid,u)
+					go hand(rid,u)
 				default:
 				}
 
@@ -260,6 +250,7 @@ func ClosePage(){
 func openPage_(hand func(interface{})error) error {
 	for i:=0;i<10;i++ {
 	//fmt.Println("open",i)
+		time.Sleep(1*time.Second)
 		err := request.ClientHttp_(Ourl+"/json","GET",nil,nil,func(body io.Reader,st int)error {
 			if st != 200 {
 				db,err := ioutil.ReadAll(body)
@@ -279,6 +270,7 @@ func openPage_(hand func(interface{})error) error {
 				return io.EOF
 			}
 			for _,v := range k_{
+				fmt.Println(v)
 				er := hand(v)
 				if er != nil {
 					return er//panic(er)
@@ -292,18 +284,17 @@ func openPage_(hand func(interface{})error) error {
 		if err != io.EOF {
 			return err
 		}
-		time.Sleep(1*time.Second)
 	}
 	return io.EOF
 }
 
-func start(uri string ,hand func(string)error) (err error){
+func start(hand func(string)error) (err error){
 	runout := func(r io.Reader){
-		defer func(){
-			err1 := exec.Command("pkill","chrome").Run()
-			fmt.Println("kill",err1)
-			err = nil
-		}()
+		//defer func(){
+		//	//exec.Command("pkill","chrome").Run()
+		//	fmt.Println("kill",exec.Command("pkill","chrome").Run())
+		//	//err = nil
+		//}()
 		var db [8192]byte
 		for{
 			n,err := r.Read(db[:])
@@ -319,6 +310,7 @@ func start(uri string ,hand func(string)error) (err error){
 				err = hand(string(db[23:n-1]))
 				if err != nil {
 					log.Println("----------------",err)
+					fmt.Println("kill",exec.Command("pkill","chrome").Run())
 					return
 				}
 			}
@@ -328,7 +320,7 @@ func start(uri string ,hand func(string)error) (err error){
 	//log.Println("cmd chrome")
 
 
-	cmd := exec.Command("google-chrome",append(op,uri)... )
+	cmd := exec.Command("google-chrome",op... )
 	//out,err := cmd.StdoutPipe()
 	//if err != nil {
 	//	//return err
@@ -350,6 +342,9 @@ func start(uri string ,hand func(string)error) (err error){
 	//}()
 
 	err = cmd.Run()
+	if err.Error() == "signal: terminated"{
+		return nil
+	}
 	return
 
 
@@ -363,7 +358,7 @@ func GetDoc(h func(map[string]interface{})){
 	writeChan<-map[string]interface{}{
 		"method":"DOM.getDocument",
 		"id":Num,
-		"params":map[string]interface{}{"depth":-1},
+		"params":map[string]interface{}{"depth":-1,"pierce":true},
 	}
 }
 func findNodeValue(val string,root map[string]interface{},hand func(map[string]interface{})bool){
@@ -379,16 +374,44 @@ func findNodeValue(val string,root map[string]interface{},hand func(map[string]i
 	})
 }
 
-func findAttributes(userName string,root map[string]interface{},hand func(map[string]interface{})) {
+func FindAttributes(userName string,root map[string]interface{},hand func(map[string]interface{})bool) {
 	toChrldren(root,func(db map[string]interface{}) bool {
+		//if db["nodeName"].(string) != "INPUT"{
+		//	return true
+		//}
 		attr := db["attributes"]
+		//fmt.Println(db["nodeName"],attr)
 		if attr == nil {
 			return true
 		}
 		for _,d := range attr.([]interface{}){
 			switch c := d.(type){
 			case string:
-				if strings.EqualFold(userName,c){
+				if strings.Contains(c,userName){
+					return hand(db)
+				}
+			default:
+				continue
+			}
+		}
+		return true
+	})
+}
+func findAttributes(userName string,root map[string]interface{},hand func(map[string]interface{})) {
+	toChrldren(root,func(db map[string]interface{}) bool {
+		//if db["nodeName"].(string) != "INPUT"{
+		//	return true
+		//}
+		attr := db["attributes"]
+		//fmt.Println(db["nodeName"],attr)
+		if attr == nil {
+			return true
+		}
+		for _,d := range attr.([]interface{}){
+			switch c := d.(type){
+			case string:
+				//fmt.Println(d)
+				if strings.Contains(userName,c){
 					hand(db)
 					return false
 				}
@@ -399,6 +422,9 @@ func findAttributes(userName string,root map[string]interface{},hand func(map[st
 		return true
 	})
 }
+func ToChrldren(node map[string]interface{},hand func(map[string]interface{})bool)bool{
+	return toChrldren(node,hand)
+}
 func toChrldren(node map[string]interface{},hand func(map[string]interface{})bool)bool{
 	cnode := node["children"]
 	if cnode == nil {
@@ -406,6 +432,7 @@ func toChrldren(node map[string]interface{},hand func(map[string]interface{})boo
 	}
 	for _,d := range cnode.([]interface{}){
 		d_ := d.(map[string]interface{})
+		//fmt.Println(d_["nodeName"])
 		if !hand(d_){
 			return false
 		}
@@ -415,11 +442,14 @@ func toChrldren(node map[string]interface{},hand func(map[string]interface{})boo
 	}
 	return true
 }
-func ClickBoxModel(node map[string]interface{},hand func()){
+func ClickBoxModel(nodeid float64 ,hand func()){
 	Num++
 	handMap[Num] = func(__id_ float64,result map[string]interface{}){
 		delete(handMap,__id_)
-		//fmt.Println(result)
+		if result["quads"]== nil {
+			fmt.Println(result)
+			return
+		}
 		xy := ((result["quads"].([]interface{}))[0]).([]interface{})
 		Mx :=xy[0].(float64) + (xy[2].(float64)-xy[0].(float64))/2
 		My :=xy[1].(float64) + (xy[7].(float64)-xy[1].(float64))/2
@@ -469,6 +499,6 @@ func ClickBoxModel(node map[string]interface{},hand func()){
 	writeChan<-map[string]interface{}{
 		"method":"DOM.getContentQuads",
 		"id":Num,
-		"params":map[string]interface{}{"nodeId":node["nodeId"]},
+		"params":map[string]interface{}{"nodeId":nodeid},
 	}
 }

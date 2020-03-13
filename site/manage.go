@@ -80,7 +80,6 @@ func init(){
 			}
 			//sh.Update = c.DefaultQuery("update",sh.Update)
 			return sh.SaveToDB(db)
-
 		})
 		if err == nil {
 			err = fmt.Errorf("success")
@@ -190,7 +189,36 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":user})
 	})
-	v1.GET("/user/update",func(c *gin.Context){
+	v1.GET("user/order",func(c *gin.Context){
+		u := c.Query("userid")
+		if u == "" {
+			return
+		}
+		o := c.Query("orderid")
+		cou,err := strconv.Atoi(c.DefaultQuery("count","20"))
+		if err != nil {
+			//panic(err)
+			return
+		}
+		var li []interface{}
+		err = shopping.OrderListWithUser(o,u,func(db interface{})error{
+			li = append(li,db)
+			cou--
+			if cou == 0 {
+				return io.EOF
+			}
+			return nil
+		})
+		if err != nil {
+			//panic(err)
+			if err != io.EOF {
+				fmt.Println(err)
+			}
+		}
+		c.JSON(http.StatusOK,li)
+		return
+	})
+	v1.GET("user/update",func(c *gin.Context){
 		m := c.Query("mobile")
 		if m == "" {
 			return

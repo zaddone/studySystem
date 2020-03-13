@@ -147,6 +147,7 @@ func (self *Pdd) GoodsUrl(words ...string) interface{}{
 	//}
 	return self.ClientHttp(u)
 }
+
 func (self *Pdd)OrderMsg(_db interface{}) (str string){
 	db := _db.(map[string]interface{})
 	res := db["order_detail_response"].(map[string]interface{})
@@ -172,16 +173,16 @@ func (self *Pdd)OrderMsg(_db interface{}) (str string){
 
 func (self *Pdd) stuctured(data interface{}) (g Goods){
 	d_ := data.(map[string]interface{})
-	p:= d_["min_group_price"].(float64)
+	p:= d_["min_group_price"].(float64)/100
 	return Goods{
 		Id:fmt.Sprintf("%.0f",d_["goods_id"].(float64)),
 		Img:[]string{d_["goods_thumbnail_url"].(string)},
 		Name:d_["goods_name"].(string),
 		Tag:d_["mall_name"].(string),
 		Price:p,
-		Fprice:p*(d_["promotion_rate"].(float64)/1000.0),
+		Fprice:d_["promotion_rate"].(float64)/1000.0,
 		Coupon:d_["coupon_discount"].(float64)>0,
-		Show:d_["goods_desc"].(string),
+		//Show:d_["goods_desc"].(string),
 	}
 }
 
@@ -325,7 +326,7 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 				l_["goodsImg"] = l_["goods_thumbnail_url"]
 				l_["site"] = self.Info.Py
 				l_["userid"] = l_["custom_parameters"]
-
+				l_["time"] = time.Now().Unix()
 				hand(l)
 			}
 			if len(li) <40 {

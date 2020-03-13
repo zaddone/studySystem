@@ -14,7 +14,8 @@ import(
 var(
 	//uri = "https://www.alimama.com/member/login.htm"
 	orderUrl string = "https://pub.alimama.com/openapi/param2/1/gateway.unionpub/report.getTbkOrderDetails.json?t=1581752650893&_tb_token_=f087e0e378633&jumpType=0&positionIndex=&pageNo=1&startTime=2020-01-01&endTime=2020-02-15&queryType=2&tkStatus=&memberType=&pageSize=40"
-	uri string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
+	Uri string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
+	uri string = "https://login.taobao.com/member/login.jhtml?"
 	tb_token = "_tb_token_"
 	indexUrl = "https://www.alimama.com/index.htm"
 	//Png = config.Conf.Static+"/xcode.png"
@@ -56,8 +57,34 @@ func ControlPhoneEvent(path string){
 }
 func Run() error {
 	//"https://www.alimama.com/index.htm"
-	chromeServer.HandleResponse = CheckLogin
-	return chromeServer.Run(uri)
+	//chromeServer.HandleResponse = CheckLoginPage
+	//chromeServer.PageNavigate(uri,func(db map[string]interface{}){
+	//	fmt.Println(uri)
+	//})
+	GetOrderPage()
+	return chromeServer.Run()
+}
+func GetOrderPage(){
+	chromeServer.HandleResponse = GetOrder_
+	ourl,err := url.Parse(orderUrl)
+	if err != nil {
+		panic(err)
+	}
+	uVal,err := url.ParseQuery(ourl.RawQuery)
+	if err != nil {
+		panic(err)
+	}
+	uVal.Set("startTime",Begin.Format(orderTimeFormat))
+	uVal.Set("endTime",time.Now().Format(orderTimeFormat))
+	uVal.Set("queryType","1")
+	uVal.Set("pageNo","1")
+	uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
+	orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+	chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
+		fmt.Println(res)
+		//getBody(res,qu)
+	})
+
 }
 
 func NextPage(){
@@ -85,12 +112,22 @@ func NextPage(){
 
 }
 
+func GetOrder_(_db interface{}){
+	if !chromeServer.GetBody(_db,uri,func(__id float64,result map[string]interface{}){
+		chromeServer.PageNavigate(Uri,func(res map[string]interface{}){
+			chromeServer.HandleResponse = CheckLoginPage
+		})
+	}){
+
+		CheckLogin(_db)
+	}
+}
 func GetOrder(_db interface{}){
 	chromeServer.GetBody(_db,"gateway.unionpub",func(__id float64,result map[string]interface{}){
+		//fmt.Println(result)
 		if HandOrder == nil {
 			return
 		}
-		fmt.Println(result)
 		body := result["body"]
 		if body == nil {
 			return
@@ -116,6 +153,7 @@ func GetOrder(_db interface{}){
 			l_["goodsName"] = l_["itemTitle"]
 			l_["goodsImg"] = l_["itemImg"]
 			l_["site"] = "taobao"
+			l_["time"] = time.Now().Unix()
 			if l_["tkStatusText"].(string) =="已结算" {
 				l_["status"] = true
 				endt,err := time.Parse(orderTime, l_["tkEarningTime"].(string))
@@ -200,8 +238,38 @@ func LoginSession(_db interface{}){
 	})
 }
 
-func CheckLogin(_db interface{}){
 
+func CheckLoginPage(_db interface{}){
+	if !chromeServer.GetBody(_db,uri,func(__id float64,result map[string]interface{}){
+		fmt.Println("getBody")
+	//for{
+		time.Sleep(3*time.Second)
+		chromeServer.GetDoc(func(body map[string]interface{}){
+		//fmt.Println(body)
+		chromeServer.FindAttributes("J_Static2Quick",body["root"].(map[string]interface{}),func(node map[string]interface{})bool{
+			fmt.Println("find")
+			//isseccess := true
+			chromeServer.ClickBoxModel(node["nodeId"].(float64),func(){
+				fmt.Println(node)
+				//isseccess = false
+			//	fmt.Println("click")
+			//	chromeServer.InputText("zaddone",func(){
+			//		fmt.Println("seccess")
+			//	})
+			})
+			return false
+		})
+		})
+		//if !isseccess {
+		//	return
+		//}
+	//}
+	}){
+		CheckLogin(_db)
+	}
+}
+
+func CheckLogin(_db interface{}){
 	if !chromeServer.GetBody(_db,Png,func(__id float64,result map[string]interface{}){
 		switch result["body"].(type){
 		case string:
@@ -217,7 +285,8 @@ func CheckLogin(_db interface{}){
 				TaobaoLoginEvent(Png)
 			}
 			//fmt.Println("http://127.0.0.1"+":8001/"+Png)
-			chromeServer.HandleResponse = LoginSession
+			//chromeServer.HandleResponse = LoginSession
+			chromeServer.HandleResponse = GetOrder
 		default:
 
 			fmt.Println(result["body"])
@@ -228,7 +297,8 @@ func CheckLogin(_db interface{}){
 		}
 		return
 	}){
-		LoginSession(_db)
+		//LoginSession(_db)
+		GetOrder(_db)
 	}
 
 }

@@ -142,7 +142,7 @@ func (self *Taobao) stuctured(data interface{}) (g Goods){
 		Name:d_["title"].(string),
 		Tag:d_["shop_title"].(string),
 		Price:p,
-		Fprice:r/10000 * p,
+		Fprice:r/10000,
 		//Ext:"https:"+d_["coupon_share_url"].(string),
 		Coupon:len(d_["coupon_id"].(string))>0,
 		Show:d_["item_description"].(string),
@@ -154,8 +154,10 @@ func (self *Taobao) stuctured(data interface{}) (g Goods){
 	}else{
 		g.Ext = "https:"+d_["coupon_share_url"].(string)
 	}
+	if d_["small_images"] != nil {
 	for _,m := range d_["small_images"].(map[string]interface{})["string"].([]interface{}){
 		g.Img = append(g.Img,m.(string))
+	}
 	}
 	return
 
@@ -247,7 +249,6 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 			if st != 200 {
 				return io.EOF
 			}
-
 			//fmt.Println(string(db))
 			uri = string(getTaobaoUrl.Find(db))
 			//fmt.Println(st,uri)
@@ -288,8 +289,9 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 
 	var li_  []interface{}
 	for _,v := range db.([]interface{}) {
-		if id == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
-			li_ = []interface{}{self.stuctured(v)}
+		//if id == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
+		if id == v.(Goods).Id{
+			li_ = []interface{}{v}
 			break
 		}
 	}

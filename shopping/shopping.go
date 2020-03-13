@@ -6,9 +6,12 @@ import(
 	"encoding/json"
 	"io"
 	"bytes"
+	"strings"
+	"time"
 	//"flag"
 	"encoding/hex"
 	"crypto/sha1"
+	//"crypto/md5"
 	"sync"
 	//"encoding/binary"
 )
@@ -47,6 +50,8 @@ type User struct{
 	Mobile string
 	Name string
 	UserId string
+	Users []string
+
 }
 func (self *User) Get() error{
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
@@ -86,6 +91,14 @@ func GetShoppingMap(py string) ShoppingInterface {
 	}
 	return v.(ShoppingInterface)
 }
+//func Md5(data []byte) string {
+//	m := md5.New()
+//	_,err := m.Write(data)
+//	if err != nil {
+//		panic(err)
+//	}
+//	return hex.EncodeToString(md5.Sum([16]byte))
+//}
 func Sha1(data []byte) string {
 	sha1 := sha1.New()
 	sha1.Write(data)
@@ -118,6 +131,7 @@ type ShoppingInfo struct {
 func OrderApply(userid,orderid string)error{
 	o := []byte(orderid)
 	u := []byte(userid)
+	ti := time.Now().Unix()
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 	return DB.Update(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(order)
@@ -132,14 +146,19 @@ func OrderApply(userid,orderid string)error{
 				return err
 			}
 			if db["userid"] != nil {
-				if db["userid"].(string) == userid {
-					return nil
+				us := db["userid"].(string)
+				if !strings.HasPrefix(us,"web_"){
+					if us == userid {
+						return nil
+					}
+					return io.EOF
 				}
-				return io.EOF
+				db["userid"] = userid
 			}
 		}else{
 			db = map[string]interface{}{
 				"userid":userid,
+				"time":ti,
 				//"order_id":orderid,
 			}
 		}
@@ -159,7 +178,7 @@ func OrderApply(userid,orderid string)error{
 		if err != nil {
 			return err
 		}
-		err = ub.Put(o,[]byte{0})
+		err = ub.Put(o,[]byte(fmt.Sprintf("%d",ti)))
 		if err != nil {
 			return err
 		}
@@ -207,8 +226,7 @@ func OrderUpdate(orderid string,db interface{})error{
 		if err != nil {
 			return err
 		}
-		return ub.Put(o,[]byte{0})
-
+		return ub.Put(o,[]byte(fmt.Sprintf("%d",time.Now().Unix())))
 	})
 	})
 }
@@ -245,12 +263,104 @@ func OrderList(orderid string,hand func(map[string]interface{})error)error{
 			return nil
 		})
 	})
-
 }
 
+func OrderListWithUser(orderid,userid string,hand func(interface{})error)error{
+	getDB := func(b *bolt.Bucket,id []byte) error {
+		v := b.Get(id)
+		if v == nil {
+			return nil
+		}
+		var db map[string]interface{}
+		err := json.Unmarshal(v,&db)
+		if err != nil {
+			return err
+		}
+		if db["goodsid"] == nil {
+			return nil
+		}
+		return hand(db)
+	}
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+		return  DB.View(func(t *bolt.Tx)error{
+			b_ := t.Bucket(order)
+			if b_ == nil {
+				return io.EOF
+			}
+			b := t.Bucket(orderUser)
+			if b == nil {
+				return io.EOF
+			}
+			b = b.Bucket([]byte(userid))
+			if b == nil {
+				return io.EOF
+			}
+			c := b.Cursor()
+			var orid []byte
+			if len(orderid) == 0 {
+				orid = []byte{0}
+			}else{
+				orid = []byte(orderid)
+			}
+			//orid := []byte(orderid)
+			k,_ := c.Seek(orid)
+			var err error
+			if !bytes.Equal(orid,k){
+				err = getDB(b_,k)
+				if err != nil {
+					return err
+				}
+			}
+			for k,_ = c.Next();k!=nil;k,_=c.Next(){
+				err = getDB(b_,k)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	})
+
+}
 func OrderGet(orderid,userid string,hand func(interface{}))error{
-	return orderGet(orderid,userid,hand)
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+		return  DB.View(func(t *bolt.Tx)error{
+			b := t.Bucket(orderUser)
+			//b := t.Bucket(order)
+			if b == nil {
+				return io.EOF
+			}
+			b = b.Bucket([]byte(userid))
+			if b == nil {
+				return io.EOF
+			}
+			v := b.Get([]byte(orderid))
+			if v == nil {
+				return io.EOF
+			}
+			b = t.Bucket(order)
+			if b == nil {
+				return io.EOF
+			}
+			v = b.Get([]byte(orderid))
+			if v == nil {
+				return io.EOF
+			}
+			var db map[string]interface{}
+			err := json.Unmarshal(v,&db)
+			if err != nil {
+				return err
+			}
+			if db["goodsid"]== nil {
+				return io.EOF
+			}
+			hand(db)
+			return nil
+		})
+	})
+	//return orderGet(orderid,userid,hand)
 }
+
 func orderGet(orderid,userid string,hand func(interface{}))error{
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 		return  DB.View(func(t *bolt.Tx)error{
@@ -258,7 +368,6 @@ func orderGet(orderid,userid string,hand func(interface{}))error{
 			if b == nil {
 				return io.EOF
 			}
-			//b = b.Bucket([]byte(self.Py))
 			v := b.Get([]byte(orderid))
 			if v == nil {
 				return io.EOF
