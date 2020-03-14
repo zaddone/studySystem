@@ -316,17 +316,35 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 				l_ := l.(map[string]interface{})
 				l_["order_id"] = l_["order_sn"]
 				l_["status"] = false
-				if l_["order_status"].(float64) == 2{
-					l_["status"] = true
-					l_["endTime"] = l_["order_receive_time"]
-				}
-				l_["fee"] = l_["promotion_amount"].(float64)*100
+				//if l_["order_status"].(float64) == 2{
+				//	l_["status"] = true
+				//	l_["endTime"] = l_["order_receive_time"]
+				//}
+				l_["fee"] = l_["promotion_amount"].(float64)/1000
 				l_["goodsid"] =fmt.Sprintf("%.0f",l_["goods_id"].(float64))
 				l_["goodsName"] = l_["goods_name"]
 				l_["goodsImg"] = l_["goods_thumbnail_url"]
 				l_["site"] = self.Info.Py
 				l_["userid"] = l_["custom_parameters"]
 				l_["time"] = time.Now().Unix()
+				l_["text"] = l_["order_status_desc"]
+				//if l_["order_verify_time"] != nil {
+				if l_["order_receive_time"] != nil {
+					l_["status"] = true
+					l_["endTime"] = int64(l_["order_receive_time"].(float64))
+					var ver time.Time
+					if l_["order_verify_time"] == nil {
+						ver = time.Unix(int64(l_["order_receive_time"].(float64)),0)
+					}else{
+						ver = time.Unix(int64(l_["order_verify_time"].(float64)),0)
+					}
+					y,m,d := ver.Date()
+					if d >15{
+						y,m,_ = ver.AddDate(0,1,0).Date()
+					}
+					fmt.Println(y,m)
+					l_["payTime"] = time.Date(y,m,21,0,0,0,0,ver.Location()).Unix()
+				}
 				hand(l)
 			}
 			if len(li) <40 {

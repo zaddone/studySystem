@@ -84,6 +84,17 @@ func (self *User) Update() error{
 	})
 	})
 }
+func ShoppingDel(orderid string)error {
+	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return DB.Batch(func(t *bolt.Tx)error{
+		b := t.Bucket(order)
+		if b == nil {
+			return io.EOF
+		}
+		return b.Delete([]byte(orderid))
+	})
+	})
+}
 func GetShoppingMap(py string) ShoppingInterface {
 	v,_ := ShoppingMap.Load(py)
 	if v == nil {

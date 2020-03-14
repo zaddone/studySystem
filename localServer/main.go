@@ -144,7 +144,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		chanmsg<-k.(string)
 		v_ := v.(shopping.ShoppingInterface)
 		err = v_.OrderDown(func(db interface{}){
-			//fmt.Println(db)
+			fmt.Println(db)
 			db_,err := json.Marshal(db)
 			if err != nil {
 				panic(err)

@@ -86,6 +86,11 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 	})
+	v1.GET("/order/del/:id",func(c *gin.Context){
+		id := c.Param("id")
+
+
+	})
 	v1.GET("/order/list",func(c *gin.Context){
 		num,err := strconv.Atoi(c.DefaultQuery("count","0"))
 		if err != nil {

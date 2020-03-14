@@ -34,9 +34,16 @@ var (
 	dbLast = []byte("last")
 	dbPhone = []byte("Phone")
 	orderTimeFormat = "2006010215"
+	payTimeFormat = "20060102"
 	jdSiteid = "2009626993"
 	//week = []string{""}
 	jdhtmlid = regexp.MustCompile(`//item.jd.com/(\d{12}).html`)
+	OrderType = map[float64]string{
+		15:"待付款",
+		16:"已付款",
+		17:"已完成",
+		18:"已结算",
+	}
 
 
 )
@@ -471,9 +478,15 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				l_["userid"] = l_["ext1"]
 				l_["fee"] = sumFee
 				l_["site"] = self.Info.Py
+				l_["text"] =OrderType[l_["validCode"].(float64)]
 				if l_["finishTime"].(float64)!=0 {
 					l_["status"] = true
-					l_["endTime"] = l_["finishTime"]
+					l_["endTime"] = l_["finishTime"].(float64)/1000
+					//l_["payTime"] =time.Parse(payTimeFormat,l_["payMonth"].(string))
+					pay,err := time.Parse(payTimeFormat,fmt.Sprintf("%.0f",l_["payMonth"].(float64)))
+					if err == nil{
+						l_["payTime"] = pay.AddDate(0,0,1).Unix()
+					}
 				}
 				l_["time"] = time.Now().Unix()
 				//fmt.Println(l_)
