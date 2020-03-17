@@ -17,7 +17,7 @@ import(
 	"net/url"
 	//"github.com/boltdb/bolt"
 	//"encoding/binary"
-	//"github.com/PuerkitoBio/goquery"
+	"github.com/PuerkitoBio/goquery"
 )
 var (
 	JdUrl = "https://router.jd.com/api"
@@ -264,7 +264,43 @@ func (self *Jd) GoodsDetail(words ...string)interface{}{
 	for _,d := range res_["data"].([]interface{}){
 		li = append(li,self.stuctured(d))
 	}
+	if len(li) == 0 {
+		err = self.GoodsReq("https://item.jd.com/"+words[0]+".html",func(title string){
+			li = []interface{}{Goods{Name:title}}
+		})
+		if err != nil {
+			fmt.Println(err)
+			return nil
+		}
+	}
 	return li
+}
+func (self *Jd) GoodsReq(uri string,hand func(string))error{
+	return request.ClientHttp_(uri,"GET",nil,nil,func(body io.Reader,st int)error{
+		doc,err := goquery.NewDocumentFromReader(body)
+		if err != nil {
+			return err
+		}
+		ret := doc.Find("title").Text()
+		if err != nil {
+			return err
+		}
+		tit,err := GbkToUtf8([]byte(ret))
+		if err != nil {
+			return err
+		}
+		//fmt.Println(string(tit))
+		hand(string(tit))
+		//db,err := ioutil.ReadAll(body)
+		//if err != nil {
+		//	return err
+		//}
+		//if st != 200 {
+		//	return io.EOF
+		//}
+		//fmt.Println(string(db))
+		return nil
+	})
 }
 func (self *Jd) GoodsUrl_(words ...string) interface{}{
 	u := &url.Values{}
@@ -480,7 +516,7 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				l_["site"] = self.Info.Py
 				l_["text"] =OrderType[l_["validCode"].(float64)]
 				if l_["finishTime"].(float64)!=0 {
-					l_["status"] = true
+					//l_["status"] = true
 					l_["endTime"] = l_["finishTime"].(float64)/1000
 					//l_["payTime"] =time.Parse(payTimeFormat,l_["payMonth"].(string))
 					pay,err := time.Parse(payTimeFormat,fmt.Sprintf("%.0f",l_["payMonth"].(float64)))

@@ -1,0 +1,28 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/user/form",
+    "pages/index/list",
+    "pages/index/shopping/pinduoduo",
+    "pages/index/shopping/jd",
+    "pages/index/shopping/taobao",
+    "pages/user/order"
+  ],
+  "navigateToMiniProgramAppIdList": [
+    "wx32540bd863b27570",
+    "wx1edf489cb248852c"
+  ],
+  "window": {
+    "backgroundColor": "#F6F6F6",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#F6F6F6",
+    "navigationBarTitleText": "zaddone",
+    "navigationBarTextStyle": "black"
+  },
+  "networkTimeout": {
+    "request": 10000,
+    "downloadFile": 10000
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

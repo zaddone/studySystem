@@ -143,10 +143,10 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 	if err != nil {
 		log.Fatal("w:", err)
 	}
-	//err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
-	//if err != nil {
-	//	log.Fatal("w:", err)
-	//}
+	err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
+	if err != nil {
+		log.Fatal("w:", err)
+	}
 	w.Add(2)
 	go func(){
 		for{

@@ -20,6 +20,7 @@ import(
 var(
 	wxToKenUrl= "https://api.weixin.qq.com/cgi-bin/token"
 	toKen string
+	TimeOut int
 	sendMiniMsgUrl = "https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token="
 
 	SessionChan = make(chan map[string]interface{},100)
@@ -34,14 +35,14 @@ func init(){
 		"secret":	[]string{config.Conf.WXSec},
 	}).Encode())
 	//fmt.Println(wxToKenUrl)
-	k := setToken()
-	fmt.Println("setToKen",toKen,k)
+	TimeOut = setToken()
+	fmt.Println("setToKen",toKen,TimeOut)
 	//k := time.Duration(setToken())*time.Second
 	go func(){
 		for{
 
-			time.Sleep(time.Duration(k)*time.Second)
-			k = setToken()
+			time.Sleep(time.Duration(TimeOut)*time.Second)
+			TimeOut = setToken()
 		}
 	}()
 	Router.POST("/wxmini",handMiniQuery)

@@ -22,6 +22,8 @@ import(
 var (
 	taobaoid = regexp.MustCompile(`[\?|\&]id=(\d+)`)
 	getTaobaoUrl=regexp.MustCompile(`var url = '(\S+)';`)
+	getPageInfo = regexp.MustCompile(`var extraData = (\{.+\})`)
+	checkGoodsID = regexp.MustCompile(`\D`)
 	//Pid = "109998500026"
 )
 func DecodeGBK(s []byte) ([]byte, error) {
@@ -236,43 +238,12 @@ func (self *Taobao) goodsInfo(id string) interface{} {
 	u.Add("num_iids",id)
 	return self.ClientHttp(u)
 }
-func (self *Taobao) GoodsDetail(words ...string)interface{}{
-	//taobao.tbk.item.click.extract
-	uri := words[0]
-	ids := taobaoid.FindStringSubmatch(uri)
-	if len(ids) == 0 {
-		err:= request.ClientHttp_(uri,"GET",nil,nil,func(body io.Reader,st int)error{
-			db,err := ioutil.ReadAll(body)
-			if err != nil {
-				return err
-			}
-			if st != 200 {
-				return io.EOF
-			}
-			//fmt.Println(string(db))
-			uri = string(getTaobaoUrl.Find(db))
-			//fmt.Println(st,uri)
-			return nil
-		})
-		if err != nil {
-			fmt.Println(err)
-			return nil
 
-		}
-		ids = taobaoid.FindStringSubmatch(uri)
-		if len(ids) == 0 {
-			return nil
-		}
-		//return nil
-	}
-	id := ids[1]
-	//return self.SearchGoods(id)
-	//fmt.Println(ids,id)
+func (self *Taobao) goodsForId(id string)interface{}{
 	goodinfo := self.goodsInfo(id)
 	if goodinfo == nil {
 		return nil
 	}
-	//fmt.Println(goodinfo)
 	res := goodinfo.(map[string]interface{})["tbk_item_info_get_response"]
 	if res == nil {
 		return nil
@@ -281,22 +252,113 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	if len(li) == 0 {
 		return nil
 	}
-	//db := li[0].(map[string]interface{})
-	db := self.SearchGoods(li[0].(map[string]interface{})["title"].(string))
-	if db == nil {
-		return nil
+	data := li[0].(map[string]interface{})
+	goods := Goods{
+		Img:[]string{data["pict_url"].(string)},
+		Name:data["title"].(string),
 	}
-
-	var li_  []interface{}
+	db := self.SearchGoods(goods.Name)
+	if db == nil {
+		return []interface{}{goods}
+	}
 	for _,v := range db.([]interface{}) {
-		//if id == fmt.Sprintf("%.0f",v.(map[string]interface{})["item_id"].(float64)){
 		if id == v.(Goods).Id{
-			li_ = []interface{}{v}
-			break
+			return []interface{}{v}
 		}
 	}
-	//reslist["map_data"] = li_
-	return li_
+	return []interface{}{goods}
+
+
+}
+
+func (self *Taobao) GoodsDetail(words ...string)interface{}{
+	//taobao.tbk.item.click.extract
+	uri := words[0]
+	c := checkGoodsID.FindAllString(uri,-1)
+	if len(c) == 0 {
+		return self.goodsForId(uri)
+	}
+
+	ids := taobaoid.FindStringSubmatch(uri)
+	var data map[string]interface{}
+	//pageinfo := ""
+	if len(ids) >0 {
+		return self.goodsForId(ids[1])
+	}
+	err:= request.ClientHttp_(uri,"GET",nil,nil,func(body io.Reader,st int)error{
+		db,err := ioutil.ReadAll(body)
+		if err != nil {
+			return err
+		}
+		if st != 200 {
+			return io.EOF
+		}
+		uri = string(getTaobaoUrl.Find(db))
+		page:=getPageInfo.FindAllSubmatch(db,-1)
+		//fmt.Println(string(page))
+		//for i_,p_:= range page{
+		//	for i,p := range p_{
+		//		fmt.Println(i_,i,string(p))
+		//	}
+		//}
+		if len(page)==1 && len(page[0])==2{
+			return json.Unmarshal(page[0][1],&data)
+		}
+		//fmt.Println(string(db))
+		//fmt.Println(st,uri)
+		return io.EOF
+	})
+	if err != nil {
+		fmt.Println(err)
+		return nil
+
+	}
+	if data == nil {
+		return nil
+	}
+	ids = taobaoid.FindStringSubmatch(uri)
+	if len(ids) == 0 {
+		return nil
+	}
+	id := ids[1]
+
+	//return self.SearchGoods(id)
+	//fmt.Println(ids,id)
+	//goodinfo := self.goodsInfo(id)
+	//if goodinfo == nil {
+	//	return nil
+	//}
+	////fmt.Println(goodinfo)
+	//res := goodinfo.(map[string]interface{})["tbk_item_info_get_response"]
+	//if res == nil {
+	//	return nil
+	//}
+	//li := res.(map[string]interface{})["results"].(map[string]interface{})["n_tbk_item"].([]interface{})
+	//if len(li) == 0 {
+	//	return nil
+	//}
+	//db := li[0].(map[string]interface{})
+	p,err:= strconv.ParseFloat(data["priceL"].(string),64)
+	if err != nil {
+		return nil
+	}
+	goods :=Goods{
+		Price:p,
+		Img:[]string{data["pic"].(string)},
+		Name:data["title"].(string),
+	}
+	db := self.SearchGoods(data["title"].(string))
+	if db == nil {
+		return []interface{}{goods}
+	}
+
+	for _,v := range db.([]interface{}) {
+		if id == v.(Goods).Id{
+			return []interface{}{v}
+		}
+	}
+	return []interface{}{goods}
+
 }
 func (self *Taobao) getResList(db interface{}) []interface{} {
 	res_ := db.(map[string]interface{})["tbk_dg_material_optional_response"]

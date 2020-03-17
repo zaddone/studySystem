@@ -1,0 +1,26 @@
+page {
+  background: #f6f6f6;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.info{
+  padding:20rpx;
+  font-size: 33rpx;  
+      justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+}
+.price{
+   
+  color:red;
+  font-weight:bold;
+  
+}
+.coupon{
+  color:darkorange;
+  font-weight:bold;
+}
+button{
+  width:100%;
+}

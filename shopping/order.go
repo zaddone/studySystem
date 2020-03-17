@@ -13,7 +13,7 @@ type Order struct {
 	Site string `json:"site"`
 	EndTime int64 `json:"endTime"`
 	Time int64 `json:"time"`
-	Text int64 `json:"text"`
+	Text string `json:"text"`
 	PayTime int64 `json:"payTime"`
 }
 

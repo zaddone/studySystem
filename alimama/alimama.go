@@ -162,7 +162,7 @@ func GetOrder(_db interface{}){
 					//panic(err)
 				}
 				//y,m,d := endt.Date()
-				l_["status"] = true
+				//l_["status"] = true
 				l_["endTime"]= endt.Unix()
 				y,m,_ := endt.AddDate(0,1,0).Date()
 				l_["payTime"]= time.Date(y,m,21,0,0,0,0,endt.Location()).Unix()

@@ -84,6 +84,22 @@ func InitShoppingMap()error{
 	})
 }
 
+func downHandler(w http.ResponseWriter, r *http.Request) {
+	var conn *websocket.Conn
+	var err error
+	conn, err = wsupgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println("Failed to set websocket upgrade: %+v", err)
+		return
+	}
+	defer conn.Close()
+        t, reply, err := conn.ReadMessage()
+        if err != nil {
+		fmt.Println(err)
+		return
+        }
+	fmt.Println(t,string(reply))
+}
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	var conn *websocket.Conn
 	var err error
@@ -209,6 +225,11 @@ func init(){
 	Router.GET("order/list",HandForward)
 	Router.GET("order/time",HandForward)
 	Router.GET("order_apply",HandForward)
+	Router.GET("order/del",HandForward)
+	Router.GET("wxtoken",HandForward)
+	Router.GET("down",func(c *gin.Context){
+		downHandler(c.Writer, c.Request)
+	})
 
 	//Router.GET("init",func(c *gin.Context){
 	//	InitShoppingMap()

@@ -8,12 +8,14 @@ import(
 	"bytes"
 	"strings"
 	"time"
-	//"flag"
+	"io/ioutil"
 	"encoding/hex"
 	"crypto/sha1"
 	//"crypto/md5"
 	"sync"
 	//"encoding/binary"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 type NewShopping func(*ShoppingInfo) ShoppingInterface
 var (
@@ -31,10 +33,19 @@ var (
 	FuncMap = map[string]NewShopping{
 		"jd":NewJd,
 		"pinduoduo":NewPdd,
-		"taobao":NewTaobao,
+		//"taobao":NewTaobao,
 	}
 
 )
+
+func GbkToUtf8(s []byte) ([]byte, error) {
+	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
+	d, e := ioutil.ReadAll(reader)
+	if e != nil {
+		return nil, e
+	}
+	return d, nil
+}
 type Goods struct{
 	Id string
 	Img []string
@@ -85,13 +96,39 @@ func (self *User) Update() error{
 	})
 }
 func ShoppingDel(orderid string)error {
+	o := []byte(orderid)
+
 	return openSiteDB(siteDB,func(DB *bolt.DB)error{
 	return DB.Batch(func(t *bolt.Tx)error{
 		b := t.Bucket(order)
 		if b == nil {
 			return io.EOF
 		}
-		return b.Delete([]byte(orderid))
+		db := b.Get(o)
+		var or  Order
+		err := json.Unmarshal(db,&or)
+		if err != nil {
+			return err
+		}
+		err = b.Delete(o)
+		if err != nil {
+			return err
+		}
+
+		if len(or.UserId)==0{
+			return nil
+		}
+		b = t.Bucket(orderUser)
+		if b == nil {
+			return nil
+		}
+		b = b.Bucket([]byte(or.UserId))
+		if b == nil {
+			return nil
+		}
+		fmt.Println(or.UserId,or.GoodsName)
+		return b.Delete(o)
+		//return b.Delete(o)
 	})
 	})
 }
@@ -139,7 +176,7 @@ type ShoppingInfo struct {
 	Token string
 	Update int64
 }
-func OrderApply(userid,orderid string)error{
+func OrderApply(userid,orderid string,hand func(interface{}))error{
 	o := []byte(orderid)
 	u := []byte(userid)
 	ti := time.Now().Unix()
@@ -158,12 +195,14 @@ func OrderApply(userid,orderid string)error{
 			}
 			if db["userid"] != nil {
 				us := db["userid"].(string)
-				if !strings.HasPrefix(us,"web_"){
+				if len(us)>0 && !strings.HasPrefix(us,"web_"){
 					if us == userid {
+						hand(db)
 						return nil
 					}
 					return io.EOF
 				}
+
 				db["userid"] = userid
 			}
 		}else{
@@ -193,6 +232,7 @@ func OrderApply(userid,orderid string)error{
 		if err != nil {
 			return err
 		}
+		hand(db)
 		return nil
 
 	})
@@ -298,6 +338,7 @@ func OrderListWithUser(orderid,userid string,hand func(interface{})error)error{
 			if b_ == nil {
 				return io.EOF
 			}
+
 			b := t.Bucket(orderUser)
 			if b == nil {
 				return io.EOF

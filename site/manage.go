@@ -19,13 +19,16 @@ func init(){
 		return checkManage
 	}()
 	v1 := Router.Group("/v1",manageFunc)
+	v1.GET("/wxtoken",func(c *gin.Context){
+		c.JSON(http.StatusOK,gin.H{"msg":toKen})
+	})
 	v1.GET("/shopping",func(c *gin.Context){
 		var li []interface{}
 		shopping.ShoppingMap.Range(func(k,v interface{})bool{
 			li = append(li,v.(shopping.ShoppingInterface).GetInfo())
 			return true
 		})
-		fmt.Println(li)
+		//fmt.Println(li)
 		c.JSON(http.StatusOK,li)
 	})
 	v1.GET("/shopping/:py",func(c *gin.Context){
@@ -86,9 +89,18 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 	})
-	v1.GET("/order/del/:id",func(c *gin.Context){
-		id := c.Param("id")
-
+	v1.GET("/order/del",func(c *gin.Context){
+		orderid := c.Query("orderid")
+		if orderid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
+			return
+		}
+		err := shopping.ShoppingDel(orderid)
+		if err != nil {
+			c.String(http.StatusNotFound,err.Error())
+			return
+		}
+		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 
 	})
 	v1.GET("/order/list",func(c *gin.Context){
@@ -139,7 +151,9 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
 			return
 		}
-		err := shopping.OrderApply(userid,orderid)
+		err := shopping.OrderApply(userid,orderid,func(db interface{}){
+			c.JSON(http.StatusOK,db)
+		})
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return

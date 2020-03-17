@@ -1,0 +1,24 @@
+page {
+  background: #f6f6f6;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  
+}
+.title{
+  font-size:28rpx;
+    overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.fee{  
+  color:red;
+  padding-right:20rpx;
+}
+.tag{
+  padding-top:10rpx;
+  border-top: 1px solid #eee;  
+  font-size:30rpx;
+}

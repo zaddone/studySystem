@@ -326,12 +326,12 @@ func init(){
 	Router.GET("search/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh == nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not1"})
+			//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not1"})
 			return
 		}
 		keyword := c.Query("keyword")
 		if keyword == "" {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
+			//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 			return
 		}
 		//session,_ := c.Cookie(SessionId)
@@ -340,7 +340,7 @@ func init(){
 		if db == nil{
 			db = sh.(shopping.ShoppingInterface).SearchGoods(keyword)
 			if db == nil{
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not3"})
+				//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not3"})
 				return
 			}
 			saveCache(uri,db)
