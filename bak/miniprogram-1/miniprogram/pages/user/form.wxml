@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="page__bd">  
+
+
+  <form bindsubmit="formSubmit" bindreset="formReset">
+    <mp-cells title="提现设置"  footer="请确认开通了微信手机号收款功能！并且正确填写了手机用户姓名，以便转账核对信息">
+      <mp-cell prop="mobile" title="手机号：" ext-class="">
+        <input name="mobile" class="weui-input" placeholder="请输入手机号" value="{{mobile}}" />
+      </mp-cell>
+      <mp-cell prop="name" title="姓名：" ext-class="">
+        <input name="name" class="weui-input" placeholder="请输入姓名" value="{{name}}" />
+      </mp-cell>
+    </mp-cells> 
+    <mp-toptips  msg="{{error}}" type="error" show="{{error}}" delay="3000" ></mp-toptips>
+    <view class="weui-btn-area">
+      <button class="weui-btn" form-type="submit" type="primary">确定</button>
+    </view>
+    </form>
+  </view>
+</view>

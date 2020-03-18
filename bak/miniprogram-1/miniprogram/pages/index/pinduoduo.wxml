@@ -1,0 +1,6 @@
+<template name="pinduoduo">
+<image mode="aspectFit"  src="{{db.Img[0]}}"></image>
+<view class="info price"><text wx:if="{{db.Coupon}}" class="coupon">有优惠券</text>￥{{db.Price}}-{{db.Fprice}}</view>
+<view class="info">{{db.Name}}<mp-icon bindtap="searchTap" icon="search" color="black" size="{{25}}"></mp-icon></view> 
+<button type="primary" wx:if="{{db.Id}}" style="width:100%" data-id="{{db.Id}}" bindtap="pinduoduoRouter" >去拼多多查看商品详情</button>
+</template>

@@ -33,7 +33,7 @@ var (
 	FuncMap = map[string]NewShopping{
 		"jd":NewJd,
 		"pinduoduo":NewPdd,
-		//"taobao":NewTaobao,
+		"taobao":NewTaobao,
 	}
 
 )

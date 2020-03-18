@@ -1,0 +1,24 @@
+<mp-tabs 
+  tabs="{{tabs}}" 
+  activeTab="{{activeTab}}" 
+  swiperClass="weui-tabs-swiper"
+  bindtabclick="onChange"
+  bindchange="onChange"
+  activeClass="tab-bar-title__selected"  
+>
+  <block  wx:for="{{tabs}}" wx:key="title">
+    <scroll-view style="height:100%"  scroll-y="true" slot="tab-content-{{index}}"> 
+    <block wx:if="{{item.db}}">
+    <view  class="tab-content" data-id="{{ind}}" data-tab="{{index}}" data-goods="{{itemGoods.Id}}" bindtap="details" wx:for="{{item.db}}" wx:key="id" wx:for-item="itemGoods" wx:for-index="ind" >
+    <image src="{{itemGoods.Img[0]}}" mode="aspectFit" ></image>
+    <view class="right_context">
+    <view wx:if="{{itemGoods.Tag}}" class="tag">{{itemGoods.Tag}}</view>
+    <view class="text">{{itemGoods.Name}}</view>
+    <view  class="price" ><text wx:if="{{itemGoods.Coupon}}" class="coupon">券</text>￥{{itemGoods.Price}}-{{itemGoods.Fprice}}</view>
+    </view>
+    </view>
+    </block>
+    <view class="update" wx:else bindtap="onUpdate" data-tab="{{index}}" >没有数据，点击重试</view>
+    </scroll-view>
+  </block>
+</mp-tabs>

@@ -1,0 +1,8 @@
+<template name="jd">
+
+<image mode="aspectFit"  src="{{db.Img[0]}}"></image> 
+<view class="info price">￥{{db.Price}}-{{db.Fprice}}</view>
+
+<view class="info" >{{db.Name}}<mp-icon bindtap="searchTap" icon="search" color="black" size="{{25}}"></mp-icon></view>
+<button type="primary" wx:if="{{db.Id}}" data-id="{{db.Id}}" style="width:100%"  bindtap="jdRouter" >去京东查看商品详情</button>
+</template>

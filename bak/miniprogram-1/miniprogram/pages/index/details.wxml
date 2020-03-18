@@ -1,0 +1,24 @@
+<import src="jd.wxml"/>
+<import src="taobao.wxml"/>
+<import src="pinduoduo.wxml"/>
+<view class="page"  wx:if="{{db}}">
+<template is="{{py}}" data="{{db}}"/>
+  <view class="page__bd">
+      <mp-cells title="下单后复制订单号，回小程序可查看返利"  >
+          <mp-cell title="订单" link hover   bindtap="showorder">
+              <view slot="footer">
+                  <view style="display: inline-block;vertical-align:middle; font-size: 17px;">查看</view>
+                  <!--<mp-badge style="margin-left: 5px;margin-right: 5px;" ext-class="blue"/>-->
+              </view>
+          </mp-cell>
+      </mp-cells>
+      <mp-cells  title="网购有问题，及时联系卖家退换货" footer="联系邮箱:dimon@zaddone.com" >        
+          <mp-cell link hover  bindtap="showuser">      
+              <view style="display: inline-block;vertical-align:middle;">提现</view>
+              <view slot="footer">
+                  <view style="display: inline-block;vertical-align:middle; font-size: 17px;">设置</view>
+              </view>
+          </mp-cell>       
+      </mp-cells>
+  </view>
+</view>
