@@ -34,6 +34,7 @@ var (
 		"jd":NewJd,
 		"pinduoduo":NewPdd,
 		"taobao":NewTaobao,
+		"suning":NewSuning,
 	}
 
 )
@@ -564,6 +565,7 @@ func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
 func InitShoppingMap(dbname string){
 	siteDB = dbname
 	err := ReadShoppingList(dbname,func(sh *ShoppingInfo)error{
+		fmt.Println(sh)
 		hand := FuncMap[sh.Py]
 		if hand != nil {
 			ShoppingMap.Store(sh.Py,hand(sh))

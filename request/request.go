@@ -92,17 +92,21 @@ func ClientHttpR_(path string,ty string,r io.Reader,referer string,h http.Header
 
 }
 func ClientHttp_(path string,ty string,r io.Reader,h http.Header, hand func(io.Reader,int)error) error {
+	//fmt.Println(path)
 	Req, err := http.NewRequest(ty,path,r)
 	if err != nil {
 		return err
 	}
 	if h != nil {
-		for k,v := range h {
-			for _,_v := range v{
-				Req.Header.Add(k,_v)
-			}
-		}
+		Req.Header = h
 	}
+	//	for k,v := range h {
+	//		for _,_v := range v{
+	//			Req.Header.Set(k,_v)
+	//		}
+	//	}
+	//}
+	//fmt.Println(Req.Header)
 	Cli := &http.Client{Jar:Jar}
 	res, err := Cli.Do(Req)
 	if err != nil {

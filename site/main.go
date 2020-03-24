@@ -309,6 +309,10 @@ func init(){
 		if ext != "" {
 			val = append(val,ext)
 		}
+		mini := c.Query("mini")
+		if mini != "" {
+			val = append(val,mini)
+		}
 
 		uri := []byte(c.Request.URL.String())
 		db := checkCache(uri)
@@ -334,11 +338,18 @@ func init(){
 			//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
 			return
 		}
+		key := []string{keyword}
+		ext,_ := c.Cookie("codecity")
+		//ext := c.Query("ext")
+		if ext != "" {
+			key = append(key,ext)
+		}
+
 		//session,_ := c.Cookie(SessionId)
 		uri := []byte(c.Request.URL.String())
 		db := checkCache(uri)
 		if db == nil{
-			db = sh.(shopping.ShoppingInterface).SearchGoods(keyword)
+			db = sh.(shopping.ShoppingInterface).SearchGoods(key...)
 			if db == nil{
 				//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not3"})
 				return
