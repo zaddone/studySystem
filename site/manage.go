@@ -73,6 +73,7 @@ func init(){
 			sh.Client_id = c.DefaultQuery("clientid",sh.Client_id)
 			sh.Client_secret = c.DefaultQuery("clientsecret",sh.Client_secret)
 			sh.Token = c.DefaultQuery("token",sh.Token)
+			sh.ReToken = c.DefaultQuery("retoken",sh.ReToken)
 			up := c.Query("update")
 			if up != "" {
 				in,err := strconv.Atoi(up)
@@ -82,9 +83,11 @@ func init(){
 				sh.Update = int64(in)
 			}
 			//sh.Update = c.DefaultQuery("update",sh.Update)
+
 			return sh.SaveToDB(db)
 		})
 		if err == nil {
+			shopping.InitShoppingMap(*siteDB)
 			err = fmt.Errorf("success")
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})

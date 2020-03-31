@@ -27,9 +27,17 @@ func ClientHttp__(path string,ty string,r io.Reader,h http.Header, hand func(io.
 		return err
 	}
 	if h != nil {
+		//Req.Header = h
 		for k,v := range h {
 			for _,_v := range v{
-				Req.Header.Add(k,_v)
+				Req.Header.Set(k,_v)
+			}
+		}
+	}else{
+		//Req.Header = config.Conf.Header
+		for k,v := range config.Conf.Header {
+			for _,_v := range v {
+				Req.Header.Set(k,_v)
 			}
 		}
 	}

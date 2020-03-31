@@ -35,6 +35,7 @@ var (
 		"pinduoduo":NewPdd,
 		"taobao":NewTaobao,
 		"suning":NewSuning,
+		"mogu":NewMogu,
 	}
 
 )
@@ -163,10 +164,11 @@ type ShoppingInterface interface{
 	OrderMsg(interface{}) string
 	ProductSearch(...string)[]interface{}
 	OrderDown(hand func(interface{}))error
+	GoodsAppMini(...string)interface{}
 	//OrderUpdate(orderid string,db interface{})error
 
 }
-
+//F96BF1AC420D7D482DFFB7153173B5BE
 type ShoppingInfo struct {
 	Py string
 	Name string
@@ -175,6 +177,8 @@ type ShoppingInfo struct {
 	Client_id string
 	Client_secret string
 	Token string
+	ReToken string
+	TimeOut int64
 	Update int64
 }
 func OrderApply(userid,orderid string,hand func(interface{}))error{
@@ -565,7 +569,7 @@ func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
 func InitShoppingMap(dbname string){
 	siteDB = dbname
 	err := ReadShoppingList(dbname,func(sh *ShoppingInfo)error{
-		fmt.Println(sh)
+		//fmt.Println(sh)
 		hand := FuncMap[sh.Py]
 		if hand != nil {
 			ShoppingMap.Store(sh.Py,hand(sh))

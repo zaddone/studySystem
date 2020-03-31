@@ -6,7 +6,7 @@ import(
 	"github.com/boltdb/bolt"
 	"encoding/json"
 	//"compress/gzip"
-	//"io"
+	"regexp"
 	"net/http"
 	"strings"
 	"strconv"
@@ -21,6 +21,7 @@ var(
 	//siteDB  = flag.String("db","SiteDB","db")
 	//SiteDB *bolt.DB
 	//ShoppingMap = map[string]ShoppingInterface{}
+	//uriCheckReg = regexp.MustCompile(`(tb|taobao|jd|pdd|)`)
 	timeFormat = "20060102"
 	OrderDB = "order.db"
 	cacheDB = "cache.db"
@@ -35,14 +36,13 @@ var(
 	//UpdateMap = time.Now()
 	Html = []byte(`
 <!doctype html>
-<html lang="zh" class="h-100">
+<html lang="zh">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="keywords" content="zaddone,米果报,米果,推荐,网购,查价,优惠卷,省钱,链接,交换">
     <meta name="description" content="zaddone.com,米果报,米果推荐,网购查价,优惠卷省钱,链接交换">
     <meta name="author" content="zaddone, 米果报">
-    <meta name="generator" content="Jekyll v3.8.6">
     <title>zaddone米果报</title>
     </head>
 <body><script>
@@ -58,6 +58,14 @@ func runServerClearMap(){
 		time.Sleep(time.Hour*1)
 		MapSession = sync.Map{}
 	}
+}
+
+func getGoodsDetail(py,id string) interface{}{
+	sh,_ := shopping.ShoppingMap.Load(py)
+	if sh == nil {
+		return nil
+	}
+	return sh.(shopping.ShoppingInterface).GoodsDetail(id)
 }
 
 func saveCache(uri []byte,val interface{}){
@@ -158,6 +166,7 @@ func ClearSessionMap(t time.Time){
 		return true
 	})
 }
+
 func IpStrToByte(s string) []byte {
 	ips := strings.Split(s,":")
 	if len(ips) !=2 {
@@ -254,6 +263,52 @@ func init(){
 		c.Redirect(http.StatusMovedPermanently,u)
 
 	})
+	//Router.GET("goodsurl",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	Router.GET("goodsurl",secureFunc,func(c *gin.Context){
+		uri := c.Query("url")
+		if uri == "" {
+			return
+		}
+		if regexp.MustCompile(`yangkeduo`).MatchString(uri){
+			str := regexp.MustCompile(`goods_id=(\d+)`).FindStringSubmatch(uri)
+			if len(str)<2{
+				return
+			}
+			//c.JSON(http.StatusOK,getGoodsDetail("pinduoduo",str[1]))
+			c.JSON(http.StatusOK,gin.H{"py":"pinduoduo","db":getGoodsDetail("pinduoduo",str[1])})
+			return
+		}
+		if regexp.MustCompile(`jd`).MatchString(uri){
+			str := regexp.MustCompile(`(\d+)\.html`).FindStringSubmatch(uri)
+			if len(str)<2{
+				return
+			}
+			c.JSON(http.StatusOK,gin.H{"py":"jd","db":getGoodsDetail("jd",str[1])})
+			//c.JSON(http.StatusOK,getGoodsDetail("jd",str[1]))
+			return
+		}
+		if regexp.MustCompile(`tb|taobao`).MatchString(uri){
+			//c.JSON(http.StatusOK,getGoodsDetail("taobao",uri))
+			c.JSON(http.StatusOK,gin.H{"py":"taobao","db":getGoodsDetail("taobao",uri)})
+			return
+		}
+		if regexp.MustCompile(`mogu`).MatchString(uri){
+			//c.JSON(http.StatusOK,getGoodsDetail("mogu",uri))
+			c.JSON(http.StatusOK,gin.H{"py":"mogu","db":getGoodsDetail("mogu",uri)})
+			return
+		}
+		if regexp.MustCompile(`suning`).MatchString(uri){
+			str := regexp.MustCompile(`(\d+\/\d+)\.html`).FindStringSubmatch(uri)
+			if len(str)<2{
+				return
+			}
+			//fmt.Println("suning",str)
+			c.JSON(http.StatusOK,gin.H{"py":"suning","db":getGoodsDetail("suning",strings.Replace(str[1],"/","-",-1))})
+			return
+		}
+		return
+
+	})
 
 	Router.GET("goodsid/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
@@ -267,7 +322,6 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
-
 		uri := []byte(c.Request.URL.String())
 		db := checkCache(uri)
 		if db == nil{
@@ -280,6 +334,39 @@ func init(){
 		}
 		c.JSON(http.StatusOK,db)
 		return
+	})
+	Router.GET("miniapp/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
+		if sh == nil {
+			return
+		}
+		keyword := c.Query("goodsid")
+		if keyword == "" {
+			return
+		}
+		val := []string{keyword}
+		session:= c.Query("session")
+		if session != ""{
+			val = append(val,session)
+		}
+		ext := c.Query("ext")
+		if ext != "" {
+			val = append(val,ext)
+		}
+		uri := []byte(c.Request.URL.String())
+		db := checkCache(uri)
+		if db == nil{
+			db = sh.(shopping.ShoppingInterface).GoodsAppMini(val...)
+			if db == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				return
+			}
+			saveCache(uri,db)
+		}
+		//fmt.Println(db)
+		c.JSON(http.StatusOK,db)
+		return
+
 	})
 	Router.GET("goods/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
@@ -309,10 +396,10 @@ func init(){
 		if ext != "" {
 			val = append(val,ext)
 		}
-		mini := c.Query("mini")
-		if mini != "" {
-			val = append(val,mini)
-		}
+		//mini := c.Query("mini")
+		//if mini != "" {
+		//	val = append(val,mini)
+		//}
 
 		uri := []byte(c.Request.URL.String())
 		db := checkCache(uri)
@@ -327,6 +414,7 @@ func init(){
 		c.JSON(http.StatusOK,db)
 		return
 	})
+
 	Router.GET("search/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh == nil {

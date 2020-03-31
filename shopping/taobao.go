@@ -211,6 +211,10 @@ func (self *Taobao) ProductSearch(words ...string)(result []interface{}){
 	return result
 
 }
+
+func (self *Taobao)GoodsAppMini(words ...string)interface{}{
+	return nil
+}
 func (self *Taobao) GoodsUrl(words ...string) interface{}{
 	//taobao.tbk.spread.get
 	//taobao.tbk.tpwd.create
@@ -311,7 +315,6 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	if err != nil {
 		fmt.Println(err)
 		return nil
-
 	}
 	if data == nil {
 		return nil

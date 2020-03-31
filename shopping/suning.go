@@ -29,6 +29,7 @@ func NewSuning(sh *ShoppingInfo) (ShoppingInterface){
 		//pid:"658414",
 	}
 }
+
 type Suning struct{
 	Info *ShoppingInfo
 	u url.Values
@@ -292,6 +293,7 @@ func (self *Suning)GoodsDetail(words ...string)interface{}{
 		Coupon:false,
 		},
 	}
+
 }
 func (self *Suning)OrderSearch(words ...string)interface{}{
 	return nil

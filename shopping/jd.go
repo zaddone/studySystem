@@ -50,7 +50,17 @@ var (
 
 func NewJd(sh *ShoppingInfo) (ShoppingInterface){
 	//fmt.Println("jd")
-	return &Jd{Info:sh}
+	j:= &Jd{Info:sh}
+	go func(){
+		for{
+		err := j.ReToken()
+		if err != nil {
+			panic(err)
+		}
+		time.Sleep(time.Second*time.Duration(j.Info.TimeOut-100))
+		}
+	}()
+	return j
 	//if !Open{
 	//	return p
 	//}
@@ -65,6 +75,33 @@ type Jd struct{
 	Info *ShoppingInfo
 	Pid string
 	//OrderDB *bolt.DB
+}
+
+func (self *Jd) ReToken () error {
+	u := url.Values{}
+	u.Set("app_key",self.Info.Client_id)
+	u.Set("app_secret",self.Info.Client_secret)
+	u.Set("grant_type","refresh_token")
+	u.Set("refresh_token",self.Info.ReToken)
+	return request.ClientHttp_(
+		"https://open-oauth.jd.com/oauth2/refresh_token?"+u.Encode(),
+		"GET",nil,nil,
+		func(body io.Reader,start int)error{
+			var res map[string]interface{}
+			err := json.NewDecoder(body).Decode(&res)
+			if err != nil {
+				return err
+			}
+			fmt.Println(res)
+			if res["access_token"] == nil {
+				return io.EOF
+			}
+			self.Info.Token = res["access_token"].(string)
+			self.Info.ReToken=res["refresh_token"].(string)
+			self.Info.TimeOut =int64(res["expires_in"].(float64))
+			return OpenSiteDB(siteDB,self.Info.SaveToDB)
+		},
+	)
 }
 
 func (self *Jd)OrderMsg(_db interface{})(str string){
@@ -216,7 +253,7 @@ func (self *Jd) SearchGoods(words ...string)interface{}{
 	}
 	var li []interface{}
 	for _, d := range lis.([]interface{}) {
-		fmt.Println(d)
+		//fmt.Println(d)
 		li = append(li,self.stuctured_(d))
 	}
 	return li
@@ -228,9 +265,23 @@ func (self *Jd) SearchGoods_(words ...string)interface{}{
 	for _,id := range ids {
 		ids_ = append(ids_,id.(string))
 	}
-	fmt.Println(len(ids))
+	//fmt.Println(len(ids))
 	return self.GoodsDetail(ids_...)
 
+}
+func (self *Jd)GoodsAppMini(words ...string)interface{}{
+	db := self.GoodsUrl(words...)
+	//db.(map[string]interface{})[""]
+	if db == nil {
+		return nil
+	}
+	u:= url.Values{}
+	u.Add("spreadUrl",self.OutUrl(db))
+	return map[string]interface{}{
+		"appid":"wx1edf489cb248852c",
+		"url":"pages/proxy/union/union?"+u.Encode(),
+	}
+	//uri := self.OutUrl(db)
 }
 func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u := &url.Values{}
@@ -467,6 +518,8 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 		for {
 			db := self.getOrder(begin,page)
 			if db == nil {
+				//break
+				time.Sleep(1*time.Second)
 				continue
 			}
 			page++
@@ -514,8 +567,8 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				l_["userid"] = l_["ext1"]
 				l_["fee"] = sumFee
 				l_["site"] = self.Info.Py
-				l_["text"] =OrderType[l_["validCode"].(float64)]
-				if l_["finishTime"].(float64)!=0 {
+				l_["text"] = OrderType[l_["validCode"].(float64)]
+				if l_["finishTime"].(float64) != 0 {
 					//l_["status"] = true
 					l_["endTime"] = l_["finishTime"].(float64)/1000
 					//l_["payTime"] =time.Parse(payTimeFormat,l_["payMonth"].(string))

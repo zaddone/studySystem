@@ -124,8 +124,7 @@ func (self *Pdd) pidQuery() interface{}{
 	u.Add("type","pdd.ddk.goods.pid.query")
 	return self.ClientHttp(u)
 }
-//pdd.ddk.goods.promotion.url.generate
-func (self *Pdd) GoodsUrl(words ...string) interface{}{
+func (self *Pdd)GoodsAppMini(words ...string)interface{}{
 	goodsid := words[0]
 	if len(self.PddPid) == 0 {
 		err := self.getPid()
@@ -138,14 +137,99 @@ func (self *Pdd) GoodsUrl(words ...string) interface{}{
 	u.Add("goods_id_list","["+goodsid+"]")
 	u.Add("p_id",self.PddPid[0])
 	u.Add("generate_short_url","true")
+	//if words[len(words)-1] =="mini"{
+	//	return self.GoodsAppMini(words[:len(words)-1]...)
 	u.Add("generate_we_app","true")
+	//}
 	//if multi{
 	u.Add("multi_group","true")
 	if len(words)>1 {
 		u.Add("custom_parameters",words[1])
 	}
 	//}
-	return self.ClientHttp(u)
+	db := self.ClientHttp(u)
+	res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
+	if res == nil {
+		return nil
+	}
+	res_ := res.(map[string]interface{})["goods_promotion_url_list"]
+	if res == nil {
+		return nil
+	}
+	res__ := res_.([]interface{})
+	if len(res__)== 0 {
+		return nil
+	}
+
+	res___ := res__[0].(map[string]interface{})
+	if res___ == nil {
+		return nil
+	}
+	if res___["we_app_info"] == nil {
+		return nil
+	}
+	app := res___["we_app_info"].(map[string]interface{})
+	return map[string]interface{}{
+		"appid":app["app_id"].(string),
+		"url":app["page_path"].(string),
+	}
+
+}
+//pdd.ddk.goods.promotion.url.generate
+func (self *Pdd) GoodsUrl(words ...string) interface{}{
+
+	goodsid := words[0]
+	if len(self.PddPid) == 0 {
+		err := self.getPid()
+		if err != nil {
+			return err
+		}
+	}
+	u := &url.Values{}
+	u.Add("type","pdd.ddk.goods.promotion.url.generate")
+	u.Add("goods_id_list","["+goodsid+"]")
+	u.Add("p_id",self.PddPid[0])
+	u.Add("generate_short_url","true")
+	//if words[len(words)-1] =="mini"{
+	//	return self.GoodsAppMini(words[:len(words)-1]...)
+	//	u.Add("generate_we_app","true")
+	//}
+	//if multi{
+	u.Add("multi_group","true")
+	if len(words)>1 {
+		u.Add("custom_parameters",words[1])
+	}
+	//}
+	db := self.ClientHttp(u)
+	res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
+	if res == nil {
+		return nil
+	}
+	res_ := res.(map[string]interface{})["goods_promotion_url_list"]
+	if res == nil {
+		return nil
+	}
+	res__ := res_.([]interface{})
+	if len(res__)== 0 {
+		return nil
+	}
+
+	res___ := res__[0].(map[string]interface{})
+	if res___ == nil {
+		return nil
+	}
+	//if res___["we_app_info"] != nil {
+	//	app := res___["we_app_info"].(map[string]interface{})
+	//	return map[string]interface{}{
+	//		"appid":app["app_id"].(string),
+	//		"url":app["page_path"].(string),
+	//	}
+	//}
+
+	return res___
+	//return res___["short_url"].(string)
+
+
 }
 
 func (self *Pdd)OrderMsg(_db interface{}) (str string){
@@ -173,13 +257,13 @@ func (self *Pdd)OrderMsg(_db interface{}) (str string){
 
 func (self *Pdd) stuctured(data interface{}) (g Goods){
 	d_ := data.(map[string]interface{})
-	p:= d_["min_group_price"].(float64)/100
+	//p:= d_["min_group_price"].(float64)/100
 	return Goods{
 		Id:fmt.Sprintf("%.0f",d_["goods_id"].(float64)),
 		Img:[]string{d_["goods_thumbnail_url"].(string)},
 		Name:d_["goods_name"].(string),
 		Tag:d_["mall_name"].(string),
-		Price:p,
+		Price:d_["min_group_price"].(float64)/100,
 		Fprice:d_["promotion_rate"].(float64)/1000.0,
 		Coupon:d_["coupon_discount"].(float64)>0,
 		//Show:d_["goods_desc"].(string),
@@ -211,6 +295,7 @@ func (self *Pdd) searchGoods(words ...string)interface{}{
 	return self.ClientHttp(u)
 }
 //pdd.ddk.goods.detail
+
 func (self *Pdd) goodsDetail(words ...string)interface{}{
 	goodsid := words[0]
 	u := &url.Values{}
@@ -236,6 +321,7 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 	//return res.(map[string]interface{})["goods_details"]
 	//db_.goods_detail_response.goods_details
 }
+
 func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 	//pdd.ddk.order.detail.get
 	if len(keys)<2 {
@@ -253,23 +339,24 @@ func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
 	//return nil
 }
 func (self *Pdd)OutUrl(db interface{}) string {
-	res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
-	if res == nil {
-		return ""
-	}
-	res_ := res.(map[string]interface{})["goods_promotion_url_list"]
-	if res == nil {
-		return ""
-	}
-	res__ := res_.([]interface{})
-	if len(res__)== 0 {
-		return ""
-	}
-	res___ := res__[0].(map[string]interface{})
-	if res___ == nil {
-		return ""
-	}
-	return res___["short_url"].(string)
+	return db.(map[string]interface{})["short_url"].(string)
+	//res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
+	//if res == nil {
+	//	return ""
+	//}
+	//res_ := res.(map[string]interface{})["goods_promotion_url_list"]
+	//if res == nil {
+	//	return ""
+	//}
+	//res__ := res_.([]interface{})
+	//if len(res__)== 0 {
+	//	return ""
+	//}
+	//res___ := res__[0].(map[string]interface{})
+	//if res___ == nil {
+	//	return ""
+	//}
+	//return res___["short_url"].(string)
 }
 func(self *Pdd)GetInfo()*ShoppingInfo {
 	return self.Info
