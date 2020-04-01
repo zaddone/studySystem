@@ -144,7 +144,7 @@ func (self *Taobao) stuctured(data interface{}) (g Goods){
 		Name:d_["title"].(string),
 		Tag:d_["shop_title"].(string),
 		Price:p,
-		Fprice:r/10000,
+		Fprice:fmt.Sprintf("%.2f",r/10000*p*Rate),
 		//Ext:"https:"+d_["coupon_share_url"].(string),
 		Coupon:len(d_["coupon_id"].(string))>0,
 		Show:d_["item_description"].(string),
@@ -349,6 +349,7 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 		Price:p,
 		Img:[]string{data["pic"].(string)},
 		Name:data["title"].(string),
+		Id:"000000",
 	}
 	db := self.SearchGoods(data["title"].(string))
 	if db == nil {

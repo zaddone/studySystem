@@ -140,7 +140,7 @@ func(self *Mogu)stuctured(data interface{})(g Goods){
 		Name:d_["title"].(string),
 		Tag:d_["shopTitle"].(string),
 		Price:p,
-		Fprice:f/100,
+		Fprice:fmt.Sprintf("%.2f",f/100*p*Rate),
 		Show:d_["extendDesc"].(string),
 		Coupon:!strings.EqualFold(d_["dayLeft"].(string), "0"),
 	}

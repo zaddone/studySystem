@@ -201,7 +201,7 @@ func (self *Jd) stuctured(data interface{}) (g Goods){
 			return ""
 		}(),
 		Price:p,
-		Fprice:d_["commisionRatioWl"].(float64)/100,
+		Fprice:fmt.Sprintf("%.2f",d_["commisionRatioWl"].(float64)/100*p*Rate),
 		//Coupon:
 
 	}
@@ -608,6 +608,6 @@ func (self *Jd) stuctured_(data interface{}) (g Goods){
 		Img:[]string{"https://img14.360buyimg.com/n1/"+d_["imageUrl"].(string)},
 		Name:d_["wareName"].(string),
 		Price:p,
-		Fprice:f/100,
+		Fprice:fmt.Sprintf("%.2f",f/100*p*Rate),
 	}
 }

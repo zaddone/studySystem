@@ -111,7 +111,7 @@ func (self *Suning) stuctured(data interface{}) (g Goods){
 		//	info["pictureUrl"].(map[string]interface{})["picUrl"].(string),
 		//},
 		Price:p,
-		Fprice:f,
+		Fprice:fmt.Sprintf("%.2f",f/100*p*Rate),
 		Tag:info["supplierName"].(string),
 		Show:info["sellingPoint"].(string),
 	}
@@ -122,8 +122,6 @@ func (self *Suning) stuctured(data interface{}) (g Goods){
 				g.Img = append(g.Img,p.(map[string]interface{})["picUrl"].(string))
 			}
 		}
-
-
 	}
 	if db["couponInfo"] != nil && db["couponInfo"].(map[string]interface{})["couponUrl"] != nil{
 		g.Coupon = true
@@ -286,7 +284,7 @@ func (self *Suning)GoodsDetail(words ...string)interface{}{
 		Id:query["mertCode"].(string)+"-"+query["goodsCode"].(string),
 		Name:query["goodsName"].(string),
 		Price:p,
-		Fprice:f,
+		Fprice:fmt.Sprintf("%.2f",f*p*Rate),
 		Tag:t,
 		Show:query["promoDesc"].(string),
 		Img:strings.Split(query["pictureUrl"].(string),","),

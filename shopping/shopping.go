@@ -37,6 +37,7 @@ var (
 		"suning":NewSuning,
 		"mogu":NewMogu,
 	}
+	Rate = 0.9
 
 )
 
@@ -53,7 +54,7 @@ type Goods struct{
 	Img []string
 	Name string
 	Price float64
-	Fprice float64
+	Fprice string
 	Tag string
 	Coupon bool
 	Show string

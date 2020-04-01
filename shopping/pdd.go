@@ -257,14 +257,14 @@ func (self *Pdd)OrderMsg(_db interface{}) (str string){
 
 func (self *Pdd) stuctured(data interface{}) (g Goods){
 	d_ := data.(map[string]interface{})
-	//p:= d_["min_group_price"].(float64)/100
+	p:= d_["min_group_price"].(float64)/100
 	return Goods{
 		Id:fmt.Sprintf("%.0f",d_["goods_id"].(float64)),
 		Img:[]string{d_["goods_thumbnail_url"].(string)},
 		Name:d_["goods_name"].(string),
 		Tag:d_["mall_name"].(string),
-		Price:d_["min_group_price"].(float64)/100,
-		Fprice:d_["promotion_rate"].(float64)/1000.0,
+		Price:p,
+		Fprice:fmt.Sprintf("%.2f",d_["promotion_rate"].(float64)/1000.0*p*Rate),
 		Coupon:d_["coupon_discount"].(float64)>0,
 		//Show:d_["goods_desc"].(string),
 	}
