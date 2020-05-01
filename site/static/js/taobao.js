@@ -8,7 +8,7 @@ function taobaoPageHtml(data){
   let that = this
   that.db = []
  $.each(data, function(key, val) {	
-  val.Fprice = val.Fprice.toFixed(2)
+  //val.Fprice = val.Fprice.toFixed(2)
 
   //val.url_ ='https:'+val.url;
   //if (val.coupon_share_url)val.url_ ='https:'+val.coupon_share_url;
@@ -22,27 +22,34 @@ function taobaoPageHtml(data){
 }
 
 function htmltaobao(key,val){
-  $('.list').append('<div class="col-lg-2 top" ><a class="goods card  btn btn-link" href="javascript:ShowTaobaoBox('+key+')"><span class="position-absolute"><span class="badge badge-dark">'+val.Tag+'</span></span><img src="'+val.Img+'" class="card-img-top" alt="'+val.Name+'"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger">￥'+val.Price+'-'+val.Fprice+'</span>'+val.c+'<p class="name">'+val.Name+'</p><p>'+val.Show+'</p></div></div></a></div>')
+  $('.list').append('<div class="col-lg-2 top" ><a class="goods card  btn btn-link" href="javascript:ShowTaobaoBox('+key+')"><span class="position-absolute"><span class="badge badge-dark">'+val.Tag+'</span></span><img src="'+val.Img[0]+'" class="card-img-top" alt="'+val.Name+'"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger">￥'+val.Price+'-'+val.Fprice+'</span>'+val.c+'<p class="name">'+val.Name+'</p><p>'+val.Show+'</p></div></div></a></div>')
 }
 function ShowTaobaoBox(key){
-
   let obj = ShoppingMap.get('taobao')
   let val = obj.db[key]
   $('#myLargeModalLabel').modal('toggle')
   $('.modal-title').html(val.Name)
-  $.each(val.Img,function(k,v){
-    $('.carousel-inner').append('<div class="carousel-item"><img src="'+v+'" class="d-block w-100" ></div>')
-  })
+  $('.carousel-inner').html("")
+  if (val.Img && val.Img.length >0 ) {
+    $('.carousel-inner').append('<div class="carousel-item active"><img src="'+val.Img.shift()+'" class="d-block w-100" ></div>')
+    $.each(val.Img,function(k,v){
+      $('.carousel-inner').append('<div class="carousel-item"><img src="'+v+'" class="d-block w-100" ></div>')
+    })
+  }
   $('.text').html('<span class="badge badge-danger">￥'+val.Price+'返'+val.Fprice+'</span>'+val.c)
   $('.text').append('<p><span class="badge badge-secondary">'+val.Tag+'</span></p>')
   $('.text').append('<p>'+val.Show+'</p>')
   $('.pmsg').hide(); 
-  //if (!isWl()){
-  //   $('.pmsg').html('<p><a  target="_blank" class="btn btn-info"  href="'+val.url_+'">点击这里 到'+val.tname+'领卷下单</a></p>')
-  //   $('.pmsg').append('<p>关注微信公众号 米果推荐 zaddone_com,输入订单号获取返利详情</p>')
-  //   $('.pmsg').show(); 
-  //  return
-  //}
+  if (!val.Ext){
+  	$('.text').append('<p>没有返利</p>')
+  	return
+  }
+  if (!isWl()){
+     $('.pmsg').html('<p><a  target="_blank" class="btn btn-info"  href="'+val.Ext+'">点击这里 到(淘宝/天猫)领卷下单</a></p>')
+     $('.pmsg').append('<p>关注微信公众号 米果推荐 zaddone_com,输入订单号获取返利详情</p>')
+     $('.pmsg').show(); 
+    return
+  }
   $.ajax({
     type: "get",
     dataType: "json",
@@ -56,11 +63,10 @@ function ShowTaobaoBox(key){
      //$('.pmsg').html('<a href="#'+code+'"  class="btn btn-info" >'+code+'</a><p>长按上面代码拷贝复制后,打开'+val.tname+'应用查看</p>')
      $('.pmsg').html('<textarea>'+code+'</textarea><p>拷贝复制上面代码后,打开(淘宝/天猫)app 查看</p>')
      $('.pmsg').append('<p>关注微信公众号 米果推荐 zaddone_com,输入订单号获取返利详情</p>')
-
-     if (isWeixin()){
-     	ShowWX('.pmsg')
-     }
      $('.pmsg').show(); 
+     //if (isWeixin()){
+     //	ShowWX('.pmsg')
+     //}
      //obj.func(db,false)
     },
   });

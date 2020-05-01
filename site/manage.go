@@ -3,6 +3,7 @@ import(
 	"fmt"
 	"github.com/zaddone/studySystem/shopping"
 	"github.com/zaddone/studySystem/config"
+	//"github.com/zaddone/studySystem/article"
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	//"encoding/binary"
@@ -14,11 +15,23 @@ import(
 	"strings"
 	"net/http"
 )
+
 func init(){
 	manageFunc := func() gin.HandlerFunc {
 		return checkManage
 	}()
 	v1 := Router.Group("/v1",manageFunc)
+	//v1.GET("/article/add",func(c *gin.Context){
+	//	ar := &article.Article{
+	//		title:c.Query("title"),
+	//		Content:c.Query("content")
+	//	}
+	//	err := ar.Save()
+	//	if err != nil {
+	//		return
+	//	}
+	//	c.JSON(http.StatusOK,gin.H{"msg":"seccess"})
+	//})
 	v1.GET("/wxtoken",func(c *gin.Context){
 		c.JSON(http.StatusOK,gin.H{"msg":toKen})
 	})
@@ -74,6 +87,15 @@ func init(){
 			sh.Client_secret = c.DefaultQuery("clientsecret",sh.Client_secret)
 			sh.Token = c.DefaultQuery("token",sh.Token)
 			sh.ReToken = c.DefaultQuery("retoken",sh.ReToken)
+			//sh.UpOrder = c.Query("update")
+			upO := c.Query("uporder")
+			if upO != "" {
+				in,err := strconv.Atoi(upO)
+				if err != nil {
+					return err
+				}
+				sh.UpOrder = int64(in)
+			}
 			up := c.Query("update")
 			if up != "" {
 				in,err := strconv.Atoi(up)
@@ -83,7 +105,6 @@ func init(){
 				sh.Update = int64(in)
 			}
 			//sh.Update = c.DefaultQuery("update",sh.Update)
-
 			return sh.SaveToDB(db)
 		})
 		if err == nil {
@@ -98,13 +119,12 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
 			return
 		}
-		err := shopping.ShoppingDel(orderid)
+		err := shopping.OrderDel(orderid)
 		if err != nil {
 			c.String(http.StatusNotFound,err.Error())
 			return
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":"success"})
-
 	})
 	v1.GET("/order/list",func(c *gin.Context){
 		num,err := strconv.Atoi(c.DefaultQuery("count","0"))
@@ -142,6 +162,23 @@ func init(){
 			return
 		}
 		c.JSON(http.StatusOK,dbMap)
+	})
+	v1.GET("order_apply/update",func(c *gin.Context){
+		orderid := c.Query("orderid")
+		if orderid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"orderid error"})
+			return
+		}
+		userid := c.Query("userid")
+		if userid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
+			return
+		}
+		err := shopping.OrderApplyUpdate(userid,orderid)
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+		}
+		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 	})
 	v1.GET("order_apply",func(c *gin.Context){
 		orderid := c.Query("orderid")
@@ -211,12 +248,23 @@ func init(){
 		}
 		c.JSON(http.StatusOK,gin.H{"msg":user})
 	})
+	//v1.GET("user/order/del",func(c *gin.Context){
+	//	u := c.Query("userid")
+	//	if u == "" {
+	//		return
+	//	}
+	//	o := c.Query("numid")
+	//	if o == "" {
+	//		return
+	//	}
+	//	
+	//})
 	v1.GET("user/order",func(c *gin.Context){
 		u := c.Query("userid")
 		if u == "" {
 			return
 		}
-		o := c.Query("orderid")
+		o := c.Query("numid")
 		cou,err := strconv.Atoi(c.DefaultQuery("count","20"))
 		if err != nil {
 			//panic(err)
@@ -240,27 +288,34 @@ func init(){
 		c.JSON(http.StatusOK,li)
 		return
 	})
-	v1.GET("user/update",func(c *gin.Context){
-		m := c.Query("mobile")
-		if m == "" {
-			return
-		}
-		u:=c.Query("userid")
-		if u == "" {
-			return
-		}
-		n:=c.Query("name")
-		if n == "" {
-			return
-		}
-		user := shopping.User{Mobile:m,Name:n,UserId:u}
-		err := user.Update()
-		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK,gin.H{"msg":user})
-	})
+	//v1.GET("user/update",func(c *gin.Context){
+	//	m := c.Query("mobile")
+	//	if m == "" {
+	//		return
+	//	}
+	//	u:=c.Query("userid")
+	//	if u == "" {
+	//		return
+	//	}
+	//	n:=c.Query("name")
+	//	if n == "" {
+	//		return
+	//	}
+	//	err := CheckPhoneCode(m,n)
+	//	if err != nil {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//		return
+	//	}
+
+	//	user := shopping.User{Mobile:m,UserId:u}
+	//	err = user.Update()
+	//	if err != nil {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//		return
+	//	}
+	//	c.JSON(http.StatusOK,gin.H{"msg":user})
+	//})
+
 }
 
 func checkManage(c *gin.Context){

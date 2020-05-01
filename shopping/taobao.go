@@ -21,6 +21,7 @@ import(
 )
 var (
 	taobaoid = regexp.MustCompile(`[\?|\&]id=(\d+)`)
+	tmid = regexp.MustCompile(`i(\d+).htm`)
 	getTaobaoUrl=regexp.MustCompile(`var url = '(\S+)';`)
 	getPageInfo = regexp.MustCompile(`var extraData = (\{.+\})`)
 	checkGoodsID = regexp.MustCompile(`\D`)
@@ -41,7 +42,7 @@ type Taobao struct{
 	//OrderDB *bolt.DB
 	Url string
 }
-func NewTaobao(sh *ShoppingInfo)(ShoppingInterface) {
+func NewTaobao(sh *ShoppingInfo,r string)(ShoppingInterface) {
 	t := &Taobao{Info:sh}
 	t.Pid = "109998500026"
 	t.Url = "https://eco.taobao.com/router/rest"
@@ -294,6 +295,7 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 		if err != nil {
 			return err
 		}
+		//fmt.Println(string(db))
 		if st != 200 {
 			return io.EOF
 		}
@@ -305,6 +307,7 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 		//		fmt.Println(i_,i,string(p))
 		//	}
 		//}
+		//fmt.Println(uri,string(page))
 		if len(page)==1 && len(page[0])==2{
 			return json.Unmarshal(page[0][1],&data)
 		}
@@ -321,7 +324,11 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	}
 	ids = taobaoid.FindStringSubmatch(uri)
 	if len(ids) == 0 {
-		return nil
+		ids = tmid.FindStringSubmatch(uri)
+		if len(ids) == 0 {
+			fmt.Println(uri)
+			return nil
+		}
 	}
 	id := ids[1]
 
@@ -341,9 +348,13 @@ func (self *Taobao) GoodsDetail(words ...string)interface{}{
 	//	return nil
 	//}
 	//db := li[0].(map[string]interface{})
-	p,err:= strconv.ParseFloat(data["priceL"].(string),64)
-	if err != nil {
-		return nil
+	fmt.Println(data)
+	var p float64
+	if data["priceL"] != nil{
+		p,err = strconv.ParseFloat(data["priceL"].(string),64)
+		if err != nil {
+			return nil
+		}
 	}
 	goods :=Goods{
 		Price:p,
@@ -382,6 +393,9 @@ func (self *Taobao) OutUrl(db interface{}) string {
 }
 func (self *Taobao)OrderMsg(_db interface{}) (str string){
 	return ""
+}
+func (self *Taobao)OrderDownSelf(hand func(interface{}))error{
+	return nil
 }
 
 func (self *Taobao)OrderDown(hand func(interface{}))error{

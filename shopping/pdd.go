@@ -27,7 +27,7 @@ type Pdd struct{
 	PddPid []string
 	//OrderDB *bolt.DB
 }
-func NewPdd(sh *ShoppingInfo) (ShoppingInterface) {
+func NewPdd(sh *ShoppingInfo,r string) (ShoppingInterface) {
 	return &Pdd{Info:sh}
 	//if !o {
 	//	return p
@@ -365,6 +365,9 @@ func(self *Pdd)GetInfo()*ShoppingInfo {
 func (self *Pdd) ProductSearch(words ...string)(result []interface{}){
 	return self.searchGoods(words...).([]interface{})
 }
+func (self *Pdd) OrderDownSelf(hand func(interface{}))error{
+	return self.OrderDown(hand)
+}
 func (self *Pdd) OrderDown(hand func(interface{}))error{
 	var begin,end time.Time
 	if self.Info.Update == 0 {
@@ -412,7 +415,7 @@ func (self *Pdd) OrderDown(hand func(interface{}))error{
 				l_["goodsName"] = l_["goods_name"]
 				l_["goodsImg"] = l_["goods_thumbnail_url"]
 				l_["site"] = self.Info.Py
-				l_["userid"] = l_["custom_parameters"]
+				//l_["userid"] = l_["custom_parameters"]
 				l_["time"] = time.Now().Unix()
 				l_["text"] = l_["order_status_desc"]
 				//if l_["order_verify_time"] != nil {
@@ -457,5 +460,12 @@ func (self *Pdd) getOrder(begin,end time.Time,page int)interface{}{
 	u.Add("start_update_time",fmt.Sprintf("%d",begin.Unix()))
 	u.Add("end_update_time",fmt.Sprintf("%d",end.Unix()))
 	u.Add("page",fmt.Sprintf("%d",page))
-	return self.ClientHttp(u)
+	db := self.ClientHttp(u)
+	switch res := db.(type){
+	case map[string]interface{}:
+		return res
+	default:
+		return nil
+	}
+	//return self.ClientHttp(u)
 }

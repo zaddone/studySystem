@@ -18,19 +18,28 @@ import(
 var (
 	regId = regexp.MustCompile(`itemId=([a-zA-Z0-9]+)`)
 )
-func NewMogu(sh *ShoppingInfo) (ShoppingInterface){
+
+func NewMogu(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	m := &Mogu{Info:sh}
-	//go func(){
-	//	for{
-	//		//fmt.Println(m.Info)
-	//	err := m.ReToken()
-	//	if err != nil {
-	//		fmt.Println(err)
-	//		//panic(err)
-	//	}
-	//	time.Sleep(time.Duration(m.Info.TimeOut - time.Now().Unix()-100)*time.Second)
-	//	}
-	//}()
+	//return m
+	if siteDB == "" {
+		return m
+	}
+	go func(){
+		for{
+			//fmt.Println(m.Info)
+		err := m.ReToken(siteDB)
+		if err != nil {
+			fmt.Println(err)
+			//panic(err)
+		}
+		long := m.Info.TimeOut - time.Now().Unix() - 7200
+		//if long < 3600 {
+		//	long = 3600
+		//}
+		time.Sleep(time.Duration(long)*time.Second)
+		}
+	}()
 	return m
 }
 
@@ -40,7 +49,7 @@ type Mogu struct{
 	//OrderDB *bolt.DB
 }
 
-func (self *Mogu) ReToken () error {
+func (self *Mogu) ReToken (siteDB string) error {
 	u := url.Values{}
 	u.Set("app_key",self.Info.Client_id)
 	u.Set("app_secret",self.Info.Client_secret)
@@ -58,7 +67,7 @@ func (self *Mogu) ReToken () error {
 				return err
 			}
 			fmt.Println(res)
-			if res["errorMsg"] != nil {
+			if res["statusCode"] != "0000000" {
 				return fmt.Errorf(res["errorMsg"].(string))
 			}
 			self.Info.Token = res["access_token"].(string)
@@ -374,6 +383,9 @@ func (self *Mogu)getOrder(begin,end time.Time,page int) interface{} {
 	//return order
 
 }
+func(self *Mogu)OrderDownSelf(hand func(interface{}))error{
+	return self.OrderDown(hand)
+}
 func(self *Mogu)OrderDown(hand func(interface{}))error{
 
 	var begin time.Time
@@ -397,6 +409,7 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 				time.Sleep(1*time.Second)
 				continue
 			}
+			//fmt.Println(db)
 			res := db.(map[string]interface{})["result"]
 			if res == nil {
 				break
@@ -412,17 +425,18 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 			li := order.([]interface{})
 			for _,l :=range li{
 				l_ := l.(map[string]interface{})
-				l_["order_id"] = l_["orderNo"].(string)
-				l_["userid"] = l_["feedback"].(string)
+				l_["order_id"] = fmt.Sprintf("%.0f",l_["orderNo"].(float64))
+				//l_["userid"] = l_["feedback"].(string)
 				var id []string
 				var name []string
 				for _,p := range l_["products"].([]interface{}){
 					p_ := p.(map[string]interface{})
 					id = append(id,p_["productNo"].(string))
-					name = append(name,p_["GoodsName"].(string))
+					name = append(name,p_["name"].(string))
 				}
 				l_["goodsid"] = strings.Join(id,",")
 				l_["goodsName"] = strings.Join(name,",")
+				//l_["fee"] = l_["expense"].(float64)
 				fee,err := strconv.ParseFloat(l_["expense"].(string),64)
 				if err == nil {
 					l_["fee"] = fee
@@ -431,9 +445,12 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 					fmt.Println(err)
 				}
 				l_["site"] = self.Info.Py
-				pay,err := time.Parse(payTimeFormat,l_["chargeDate"].(string))
-				if err == nil {
-					l_["PayTime"] =pay.Unix()
+				pay := l_["chargeDate"].(float64)
+				//l_["order_id"] = fmt.Sprintf("%.0f",l_["chargeDate"].(float64))
+				//pay,err := time.Parse(payTimeFormat,l_["chargeDate"].(string))
+				if pay != 0 {
+					l_["endTime"] = int64(l_["updateTime"].(float64))
+					l_["PayTime"] = int64(pay)
 					//panic(err)
 				}else{
 					fmt.Println(err)
@@ -452,6 +469,7 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 			break
 		}
 		begin = end.AddDate(0,0,1)
+		time.Sleep(1*time.Second)
 	}
 	return nil
 

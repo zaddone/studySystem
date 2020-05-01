@@ -7,7 +7,7 @@ function pinduoduoPageHtml(data){
   that.db = []
  $.each(data, function(key, val) {	
   val.c="";
-  val.Fprice = val.Fprice.toFixed(2)
+  //val.Fprice = val.Fprice.toFixed(2)
   if (val.Coupon)val.c = '<span class="badge badge-warning">券</span>';
   that.db.push(val)
   that.html(key,val)

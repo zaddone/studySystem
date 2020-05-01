@@ -11,12 +11,16 @@ function jdPageHtml(data){
  //val.imgurl = 'https://img14.360buyimg.com/ads/'+val.imageUrl
   //if (val.coupon_discount)val.c = '<span class="badge badge-warning">券</span>';
   //console.log(val)
-  val.Fprice = val.Fprice.toFixed(2)
+  //val.Fprice = (val.Price*val.Fprice).toFixed(2)
   that.db.push(val)
   that.html(key,val)
  })
 }
 function htmljd(key,val){
+  if (!val.Img){
+	$('.list').append('<div class="col-lg-2 top" ><p class="name">'+val.Name+'</p><p>没有返利</p></div>')
+  	return
+  }
   $('.list').append('<div class="col-lg-2 top" ><a class="goods card btn btn-link" href="javascript:ShowJdBox('+key+')"><span class="position-absolute"><span class="badge badge-secondary">京东</span><span class="badge badge-dark">'+val.Tag+'</span></span><img src="'+val.Img+'" class="card-img-top" alt="'+val.Name+'"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger">￥'+val.Price+'-'+val.Fprice+'</span><p class="name">'+val.Name+'</p></div></div></a></div>')
 }
 function ShowJdBox(key){

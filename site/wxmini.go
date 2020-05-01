@@ -27,7 +27,7 @@ var(
 )
 
 func init(){
-	//return
+	return
 	wxToKenUrl = fmt.Sprintf("%s?%s",wxToKenUrl,
 	(&url.Values{
 		"grant_type":	[]string{"client_credential"},

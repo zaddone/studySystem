@@ -28,14 +28,15 @@ var(
 	LoginPhone = "192.168.1.51"
 	ShowPhone = "192.168.1.52"
 	TaobaoLoginEvent func(path string) = nil
-
 )
+
 func init(){
-	var err error
-	Begin,err = time.Parse(orderTimeFormat,"2020-01-01")
-	if err != nil {
-		panic(err)
-	}
+	//var err error
+	Begin = time.Now().AddDate(0,0,-90)
+	//Begin,err = time.Parse(orderTimeFormat,"2020-01-01")
+	//if err != nil {
+	//	panic(err)
+	//}
 	TaobaoLoginEvent = ControlPhoneEvent
 }
 func ControlPhoneEvent(path string){
@@ -57,36 +58,22 @@ func ControlPhoneEvent(path string){
 }
 func Run() error {
 	//"https://www.alimama.com/index.htm"
-	chromeServer.HandleResponse = CheckLoginPage
-	chromeServer.PageNavigate(uri,func(db map[string]interface{}){
-		fmt.Println(uri)
-	})
+	//chromeServer.HandleResponse = CheckLoginPage
+	//BeginGetOrder()
+	//chromeServer.HandleResponse = GetOrder
+	//chromeServer.PageNavigate(uri,func(db map[string]interface{}){
+	//	fmt.Println(uri)
+	//})
 	//GetOrderPage()
-	return chromeServer.Run()
+	BeginGetOrder()
+	return chromeServer.Run(indexUrl)
 }
-//func GetOrderPage(){
-//	chromeServer.HandleResponse = GetOrder_
-//	ourl,err := url.Parse(orderUrl)
-//	if err != nil {
-//		panic(err)
-//	}
-//	uVal,err := url.ParseQuery(ourl.RawQuery)
-//	if err != nil {
-//		panic(err)
-//	}
-//	uVal.Set("startTime",Begin.Format(orderTimeFormat))
-//	uVal.Set("endTime",time.Now().Format(orderTimeFormat))
-//	uVal.Set("queryType","1")
-//	uVal.Set("pageNo","1")
-//	uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
-//	orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
-//	chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
-//		fmt.Println(res)
-//		//getBody(res,qu)
+//func BeginLogin(){
+//	//chromeServer.HandleResponse = LoginSession
+//	chromeServer.PageNavigate(uri,func(db map[string]interface{}){
+//		fmt.Println(uri,db)
 //	})
-//
 //}
-
 func NextPage(){
 
 	ourl,err := url.Parse(orderUrl)
@@ -112,16 +99,7 @@ func NextPage(){
 
 }
 
-//func GetOrder_(_db interface{}){
-//	if !chromeServer.GetBody(_db,uri,func(__id float64,result map[string]interface{}){
-//		chromeServer.PageNavigate(Uri,func(res map[string]interface{}){
-//			chromeServer.HandleResponse = CheckLoginPage
-//		})
-//	}){
-//
-//		CheckLogin(_db)
-//	}
-//}
+
 func GetOrder(_db interface{}){
 	chromeServer.GetBody(_db,"gateway.unionpub",func(__id float64,result map[string]interface{}){
 		//fmt.Println(result)
@@ -135,7 +113,11 @@ func GetOrder(_db interface{}){
 		var data map[string]interface{}
 		err := json.Unmarshal([]byte(body.(string)),&data)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("getOrder",err)
+			//BeginLogin()
+			return
+		}
+		if data["data"] == nil {
 			return
 		}
 		res := data["data"].(map[string]interface{})["result"]
@@ -168,15 +150,6 @@ func GetOrder(_db interface{}){
 				l_["payTime"]= time.Date(y,m,21,0,0,0,0,endt.Location()).Unix()
 
 			}
-			//if l_["tkStatusText"].(string) =="已结算" {
-			//	l_["status"] = true
-			//	endt,err := time.Parse(orderTime, l_["tkEarningTime"].(string))
-			//	if err != nil {
-			//		panic(err)
-			//	}
-			//	l_["endTime"] =endt.Unix()
-
-			//}
 			HandOrder(l)
 		}
 		if len(li_) == 40 {
@@ -210,42 +183,54 @@ func GetOrder(_db interface{}){
 		//chromeServer.HandleResponse = GetOrder
 	})
 }
+func BeginGetOrder(){
+	chromeServer.HandleResponse = GetOrder
+	ourl,err := url.Parse(orderUrl)
+	if err != nil {
+		panic(err)
+	}
+	uVal,err := url.ParseQuery(ourl.RawQuery)
+	if err != nil {
+		panic(err)
+	}
+	uVal.Set("startTime",Begin.Format(orderTimeFormat))
+	uVal.Set("endTime",time.Now().Format(orderTimeFormat))
+	uVal.Set("queryType","1")
+	uVal.Set("pageNo","1")
+	uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
+	orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+	//fmt.Println(orderUrl)
+	chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
+		fmt.Println(res)
+		//getBody(res,qu)
+	})
+}
 func LoginSession(_db interface{}){
 	chromeServer.GetBody(_db,indexUrl,func(__id float64,result map[string]interface{}){
 		if RunConTrol != nil {
 			close(RunConTrol)
 		}
-	//PageNavigate(viewOrder,func(res map[string]interface{}){
-		//chromeServer.ShowCookies(func(db_ map[string]interface{}){
-			//fmt.Println(db)
-		chromeServer.HandleResponse = GetOrder
-		ourl,err := url.Parse(orderUrl)
-		if err != nil {
-			panic(err)
-		}
-		uVal,err := url.ParseQuery(ourl.RawQuery)
-		if err != nil {
-			panic(err)
-		}
-		uVal.Set("startTime",Begin.Format(orderTimeFormat))
-		uVal.Set("endTime",time.Now().Format(orderTimeFormat))
-		uVal.Set("queryType","1")
-		uVal.Set("pageNo","1")
-		uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
-		//for _,_c_ := range db_["cookies"].([]interface{}) {
-		//	c_ := _c_.(map[string]interface{})
-		//	name := c_["name"].(string)
-		//	if strings.EqualFold(tb_token,name){
-		//		uVal.Set(tb_token,c_["value"].(string))
-		//		break
-		//	}
+		BeginGetOrder()
+		//chromeServer.HandleResponse = GetOrder
+		//ourl,err := url.Parse(orderUrl)
+		//if err != nil {
+		//	panic(err)
 		//}
-		orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
-		//fmt.Println(orderUrl)
-		chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
-			fmt.Println(res)
-			//getBody(res,qu)
-		})
+		//uVal,err := url.ParseQuery(ourl.RawQuery)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//uVal.Set("startTime",Begin.Format(orderTimeFormat))
+		//uVal.Set("endTime",time.Now().Format(orderTimeFormat))
+		//uVal.Set("queryType","1")
+		//uVal.Set("pageNo","1")
+		//uVal.Set("t",fmt.Sprintf("%d",time.Now().Unix()))
+		//orderUrl = fmt.Sprintf("%s://%s%s?%s",ourl.Scheme,ourl.Host,ourl.Path,uVal.Encode())
+		////fmt.Println(orderUrl)
+		//chromeServer.PageNavigate(orderUrl,func(res map[string]interface{}){
+		//	fmt.Println(res)
+		//	//getBody(res,qu)
+		//})
 		return
 		//})
 	})

@@ -1,5 +1,6 @@
 *.db
 *.go.swp
+*.log
 main
 admin
 bin

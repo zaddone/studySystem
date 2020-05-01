@@ -4,6 +4,7 @@ import(
 	"sort"
 	"time"
 	"crypto/md5"
+	//"os"
 	"io"
 	"io/ioutil"
 	//"sync"
@@ -45,15 +46,18 @@ var (
 		18:"已结算",
 	}
 
-
 )
 
-func NewJd(sh *ShoppingInfo) (ShoppingInterface){
+func NewJd(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	//fmt.Println("jd")
 	j:= &Jd{Info:sh}
+	if siteDB == "" {
+		return j
+	}
+	//return j
 	go func(){
 		for{
-		err := j.ReToken()
+		err := j.ReToken(siteDB)
 		if err != nil {
 			panic(err)
 		}
@@ -77,7 +81,7 @@ type Jd struct{
 	//OrderDB *bolt.DB
 }
 
-func (self *Jd) ReToken () error {
+func (self *Jd) ReToken (siteDB string) error {
 	u := url.Values{}
 	u.Set("app_key",self.Info.Client_id)
 	u.Set("app_secret",self.Info.Client_secret)
@@ -498,6 +502,9 @@ func (self *Jd) getOrder(t time.Time,page int)interface{}{
 	return self.ClientHttp(JdUrl,u)
 
 }
+func (self *Jd) OrderDownSelf(hand func(interface{}))error{
+	return self.OrderDown(hand)
+}
 func (self *Jd) OrderDown(hand func(interface{}))error{
 	//fmt.Println("jd down")
 	var begin time.Time
@@ -564,7 +571,7 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				l_["goodsid"] = strings.Join(goodid,",")
 				//l_["goodsImg"] = l_["goods_thumbnail_url"]
 				l_["goodsName"] = strings.Join(goodsName,",")
-				l_["userid"] = l_["ext1"]
+				//l_["userid"] = l_["ext1"]
 				l_["fee"] = sumFee
 				l_["site"] = self.Info.Py
 				l_["text"] = OrderType[l_["validCode"].(float64)]

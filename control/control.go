@@ -203,6 +203,18 @@ func inputText(name,text string) error {
 		return nil
 	},"-s",name,"shell", "input", "text",text)
 }
+
+func ScreenXml(name,xml string)error{
+	cmdToAdb(func(s string)error{
+		fmt.Println(s)
+		return nil
+	},"-s",name,"shell", "uiautomator", "/sdcard/"+xml)
+	cmdToAdb(func(s string)error{
+		fmt.Println(s)
+		return nil
+	},"-s",name,"pull", "/sdcard/"+xml)
+	return nil
+}
 func Screencap(name,img string)error{
 	cmdToAdb(func(s string)error{
 		fmt.Println(s)

@@ -5,7 +5,9 @@ var jdReg_ = new RegExp(/[\?|\&]sku=(\d+)/);
 var pddReg = new RegExp(/[\?|\&]goods_id=(\d+)/);
 var tbReg = new RegExp(/[\?|\&]id=(\d+)/);
 var tburlReg = new RegExp(/(taobao|tmall|tb)/);
-var urlReg = new RegExp(/(http[\S]+)[\+| ]?/);
+var urlReg = new RegExp(/(http[\:\.\/\?\=\w]+)[\+| ]?/);
+var suningReg = new RegExp(/(\d+\/\d+)\.html/);
+var globalCode = "";
 
 function isWeixin () {
   let wx = navigator.userAgent.toLowerCase()
@@ -36,10 +38,9 @@ function Search(){
     return
   }
   $("#nav"+py).addClass('active');
+  //$("#siteName").text("")
   $('#p').html(key.substring(0,6))
   //$('#searchKey').val(key)
-  $('#clear').toggle()
-  $('#form').toggle()
   //$('.wait').html('<div class="col-lg-12 d-flex justify-content-center"><div class="spinner-border" role="status"> <span class="sr-only">Loading...</span></div></div>')
   jsonGetSearch(py,key)
   //jsonGetSearch('jd',key)
@@ -49,9 +50,9 @@ function Search(){
 function checkInputIsUrl(word){
   let pos = word.indexOf("http");
   if (pos<0)return false;
-  word.slice(pos, word.length)
-  let ret = parseQueryString(word)
-  ret.goods_id
+  //word.slice(pos, word.length)
+  //let ret = parseQueryString(word)
+  //ret.goods_id
   let res = word.slice(pos, word.length);
   pos = res.indexOf("yangkeduo.com")
   if (pos>0){
@@ -76,18 +77,33 @@ function checkInputIsUrl(word){
     ShowGoods("jd",_li[1])
     return true
   }
+  pos = res.indexOf("suning.com")
+  if (pos>0){
+    let li = suningReg.exec(res)
+    if (!li)return
+    //console.log("suning",li)
+    ShowGoods("suning",li[1].replace('\/','-'))
+    return true
+  }
+  pos = res.indexOf("mogu")
+  if (pos>0){
+    ShowGoods("mogu",res)
+    return true
+  }
   if (tburlReg.test(res)>=0){
     console.log(urlReg.exec(res))
     let rui_ =  urlReg.exec(res)
     ShowGoods("taobao",rui_[1])
     return true
   }
+
   
   return false
 }
 
 function ShowGoods(py,goodsid){
   let obj  = ShoppingMap.get(py) 
+  console.log(obj)
   if (!obj)return
   obj.key = goodsid
   //obj.funcHand = "ShowGoods"
@@ -122,10 +138,12 @@ function jsonGetSearch(py,key){
 	//$('.wait').html("")
 	//return
     }
+    window.scrollTo(0,0);
     $('#pyinput').val(obj.py)
-    $('.dropdown-item').removeClass('active');
+    $('.active').removeClass('active');
     $('#nav'+obj.py).addClass('active');
-    $("#dropdownMenuButton").html(obj.name);
+    $("#dropdownMenuButton").html(obj.name+'<svg class="bi bi-caret-down-fill" width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/></svg>');
+    //$("#siteName").html(obj.name)
     if (obj.db.length>0){
 	obj.db.forEach(function(val,key){
 		obj.html(key,val)
@@ -138,11 +156,9 @@ function jsonGetSearch(py,key){
 	if (!key)return
     }
     obj.key = key
-    jsonGet('/search/'+py+"?keyword="+encodeURI(key),obj)
+    jsonGet('/search/'+py+"?keyword="+encodeURI(key)+"&ext="+globalCode,obj)
 }
 function ShowSearch(){
-    $('#form').toggle()
-    $('#clear').toggle()
     $('#searchKey').focus()
     $('.list').html("")
 }
@@ -200,4 +216,25 @@ function isEmpty(a){
    }else {
       return true;
    }
+}
+function getCiteCode(){
+	var x = document.cookie;
+	if (x.search('codecity') > -1)return
+	//console.log(x.search('codecity'))
+	//console.log(x)
+	//if (x.search('codecity'))
+	let u = 'https://ipservice.suning.com/ipQuery.do'
+	$.ajax({
+		type:"get",
+		url:u,
+		dataType:"jsonp",
+		//jsonpCallback:"cookieCallback",
+		success:function(db){
+			console.log(db)
+			//document.cookie = "codecity="+db.cityMDMId;
+			//document.cookie = "codecity="+db.cityCommerceId;
+			document.cookie = "codecity="+db.cityLESId;
+			//if (db.cityLESId)globalCode=db.citylesid
+		}
+	});
 }

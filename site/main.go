@@ -1,11 +1,14 @@
 package main
 import(
 	"github.com/zaddone/studySystem/shopping"
+	//"github.com/zaddone/studySystem/article"
+	"github.com/zaddone/studySystem/config"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	"encoding/json"
 	//"compress/gzip"
+	"io"
 	"regexp"
 	"net/http"
 	"strings"
@@ -14,45 +17,37 @@ import(
 	"flag"
 	"time"
 	"sync"
+	"net/http/httputil"
 )
 var(
-	//Release  = flag.Bool("Release",false,"Release")
-	//Site  = flag.String("Site","www.zaddone.com:443","site")
-	//siteDB  = flag.String("db","SiteDB","db")
-	//SiteDB *bolt.DB
-	//ShoppingMap = map[string]ShoppingInterface{}
-	//uriCheckReg = regexp.MustCompile(`(tb|taobao|jd|pdd|)`)
+
 	timeFormat = "20060102"
-	OrderDB = "order.db"
 	cacheDB = "cache.db"
 	cacheList = []byte("cachelist")
 	//cacheTime = []byte("cachetime")
 	MapSession = sync.Map{}
 	Router = gin.Default()
-	Router_ = gin.Default()
+	//Router_ = gin.Default()
 	siteDB  = flag.String("db","SiteDB","db")
 	SessionId = "session_id"
-	//SessionFormat = "2006-01-02 15:04"
-	//UpdateMap = time.Now()
-	Html = []byte(`
-<!doctype html>
-<html lang="zh">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="keywords" content="zaddone,米果报,米果,推荐,网购,查价,优惠卷,省钱,链接,交换">
-    <meta name="description" content="zaddone.com,米果报,米果推荐,网购查价,优惠卷省钱,链接交换">
-    <meta name="author" content="zaddone, 米果报">
-    <title>zaddone米果报</title>
-    </head>
-<body><script>
-window.location.replace("https://www.zaddone.com")
-</script>
-</body>
-</html>
-    `)
 )
 
+func ReverseProxy() gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		fmt.Println(c.Request.URL)
+		director := func(req *http.Request) {
+			r := c.Request
+			req = r
+			req.URL.Scheme = "http"
+			req.URL.Host = config.Conf.ArticleServer
+			req.Host = "http"
+		}
+		proxy := &httputil.ReverseProxy{Director: director}
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+
+}
 func runServerClearMap(){
 	for{
 		time.Sleep(time.Hour*1)
@@ -131,11 +126,6 @@ func checkCache(uri []byte) (c interface{}) {
 	return
 }
 func checkSession(c *gin.Context){
-	//s,err := c.Cookie(SessionId)
-	//if err != nil {
-	//	c.Abort()
-	//	return
-	//}
 	ip := IpStrToByte(c.Request.RemoteAddr)
 	if ip == nil {
 		c.Abort()
@@ -192,31 +182,98 @@ func init(){
 	secureFunc := func() gin.HandlerFunc {
 		return checkSession
 	}()
-
 	Router.Static("/static","./static")
+	//Router.Static("/article","./article")
 	Router.LoadHTMLGlob("./templates/*")
-	Router_.GET("/",func(c *gin.Context){
-		//c.Data(http.StatusOK,"text/html",Html)
-		c.Data(200,"text/html",Html)
+	//Router_.GET("/",func(c *gin.Context){
+	//	c.Redirect(301,"https://www.zaddone.com")
+	//	//c.Data(http.StatusOK,"text/html",Html)
+	//	//c.Data(200,"text/html",Html)
+	//})
+	//Router.Group("/article",ReverseProxy())
+	//Router.Group("/v1",manageFunc)
+	Router.GET("/sendsms",func(c *gin.Context){
+		phone := c.Query("phone")
+		if phone == "" {
+			return
+		}
+		//c.JSON(http.StatusOK,gin.H{"msg":"success"})
+		//return
+		err := PhoneCode(phone)
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			return
+		}
+		//c.JSON(http.StatusOK,gin.H{"code":randCode()})
+		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 	})
-
+	Router.GET("/checksms",func(c *gin.Context){
+		phone := c.Query("phone")
+		if phone == "" {
+			return
+		}
+		code := c.Query("code")
+		if code == "" {
+			return
+		}
+		//session := c.Query("seccion")
+		//if session == "" {
+		//	return
+		//}
+		err := CheckPhoneCode(phone,code)
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			return
+		}
+		user := shopping.User{UserId:phone}
+		err = user.Get()
+		if err != nil {
+			if err != io.EOF {
+				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+				return
+			}
+			user.Session = shopping.Sha1([]byte(fmt.Sprintf("%s%s%s",time.Now(),c.Request.RemoteAddr,phone)))
+			err = user.Update()
+			if err != nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+				return
+			}
+		}
+		c.JSON(http.StatusOK,gin.H{"msg":"success","user":user})
+	})
 	Router.GET("/",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
-		var li []map[string]string
-		shopping.ShoppingMap.Range(func(k,v interface{})bool{
-			sh := v.(shopping.ShoppingInterface).GetInfo()
-			li = append(li,
-			map[string]string{
-				"Name":sh.Name,
-				"Img":sh.Img,
-				"Uri":sh.Uri,
-				"py":k.(string),
-			})
-			return true
-		})
 		if c.Query("content_type") == "json"{
+			var li []map[string]string
+			shopping.ShoppingMap.Range(func(k,v interface{})bool{
+				sh := v.(shopping.ShoppingInterface).GetInfo()
+				li = append(li,
+				map[string]string{
+					"Name":sh.Name,
+					"Img":sh.Img,
+					"Uri":sh.Uri,
+					"py":k.(string),
+				})
+				return true
+			})
 			c.JSON(http.StatusOK,li)
+			return
+		}else if len(c.Query("keyword"))>0 {
+			var li []map[string]string
+			shopping.ShoppingMap.Range(func(k,v interface{})bool{
+				sh := v.(shopping.ShoppingInterface).GetInfo()
+				li = append(li,
+				map[string]string{
+					"Name":sh.Name,
+					"Img":sh.Img,
+					"Uri":sh.Uri,
+					"py":k.(string),
+				})
+				return true
+			})
+			c.HTML(http.StatusOK,"index_1.tmpl",gin.H{"site":li})
+			return
 		}else{
-			c.HTML(http.StatusOK,"index.tmpl",li)
+			c.HTML(http.StatusOK,"search.tmpl",nil)
 		}
 	})
 	Router.GET("/script",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
@@ -281,7 +338,13 @@ func init(){
 		if regexp.MustCompile(`jd`).MatchString(uri){
 			str := regexp.MustCompile(`(\d+)\.html`).FindStringSubmatch(uri)
 			if len(str)<2{
-				return
+				str = regexp.MustCompile(`sku=(\d+)`).FindStringSubmatch(uri)
+				if len(str)<2{
+					str = regexp.MustCompile(`sku/(\d+)`).FindStringSubmatch(uri)
+					if len(str)<2{
+						return
+					}
+				}
 			}
 			c.JSON(http.StatusOK,gin.H{"py":"jd","db":getGoodsDetail("jd",str[1])})
 			//c.JSON(http.StatusOK,getGoodsDetail("jd",str[1]))
@@ -447,9 +510,38 @@ func init(){
 		c.JSON(http.StatusOK,db)
 		return
 	})
+	//Router_.GET("robots.txt",func(c *gin.Context){
+	//	c.String(http.StatusOK,"User-agent: *\nAllow:　/")
+	//	return
+	//	//User-agent: *
+	//	//Allow:　/
+	//})
+	Router.GET("robots.txt",func(c *gin.Context){
+		c.String(http.StatusOK,"User-agent: *\nAllow:　/")
+		return
+		//User-agent: *
+		//Allow:　/
+	})
+	//Router_.GET("favicon.ico",func(c *gin.Context){
+	//	//c.Redirect()
+	//	c.Redirect(301,"https://img.zaddone.com/static/img/ico/favicon.ico")
+	//	//c.Data(http.StatusOK,)
+	//	//c.String(http.StatusOK,"User-agent: *\nAllow:　/")
+	//	//return
+	//	//User-agent: *
+	//	//Allow:　/
+	//})
+	//Router.GET("favicon.ico",func(c *gin.Context){
+	//	c.Redirect(301,"http://img.zaddone.com/static/img/ico/favicon.ico")
+	//	//c.String(http.StatusOK,"User-agent: *\nAllow:　/")
+	//	return
+	//	//User-agent: *
+	//	//Allow:　/
+	//})
+	///favicon.ico
 }
 func main(){
-	go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
-	go Router_.Run(":80")
+	//go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
+	go Router.Run(":8080")
 	select{}
 }

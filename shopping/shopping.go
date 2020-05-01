@@ -6,20 +6,22 @@ import(
 	"encoding/json"
 	"io"
 	"bytes"
-	"strings"
+	//"strings"
+	//"strconv"
 	"time"
 	"io/ioutil"
 	"encoding/hex"
 	"crypto/sha1"
 	//"crypto/md5"
 	"sync"
-	//"encoding/binary"
+	"encoding/binary"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
-type NewShopping func(*ShoppingInfo) ShoppingInterface
+type NewShopping func(*ShoppingInfo,string) ShoppingInterface
 var (
 	SiteList  = []byte("siteList")
+	//orderDB = []byte("orderDB")
 	order = []byte("order")
 	orderTime = []byte("orderTime")
 	orderUser = []byte("orderUser")
@@ -27,7 +29,8 @@ var (
 	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
 	//ShoppingMap = map[string]ShoppingInterface{}
 	ShoppingMap = sync.Map{}// map[string]ShoppingInterface{}
-	siteDB string
+	//siteDB string = "SiteDB"
+	orderDB string = "orderDB"
 	timeFormat = "2006-01-02 15:04:05"
 	//siteDB  = flag.String("db","SiteDB","db")
 	FuncMap = map[string]NewShopping{
@@ -40,6 +43,19 @@ var (
 	Rate = 0.9
 
 )
+func InterfaceToString(v interface{}) string {
+	switch _v := v.(type){
+	case string :
+		return _v
+	case float64:
+		return fmt.Sprintf("%f",_v)
+	case bool:
+		return fmt.Sprintf("%b",_v)
+	default:
+		return ""
+	}
+	return ""
+}
 
 func GbkToUtf8(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
@@ -61,14 +77,15 @@ type Goods struct{
 	Ext string
 }
 type User struct{
-	Mobile string
-	Name string
+	//Mobile string
+	//Name string
 	UserId string
-	Users []string
+	//Users string
+	Session string
 
 }
 func (self *User) Get() error{
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 	return DB.View(func(t *bolt.Tx)error{
 		b := t.Bucket(UserInfo)
 		if b == nil {
@@ -84,7 +101,7 @@ func (self *User) Get() error{
 
 }
 func (self *User) Update() error{
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 	return DB.Update(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(UserInfo)
 		if err != nil {
@@ -98,10 +115,10 @@ func (self *User) Update() error{
 	})
 	})
 }
-func ShoppingDel(orderid string)error {
-	o := []byte(orderid)
 
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+func OrderDel(orderid string)error {
+	o := []byte(orderid)
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 	return DB.Batch(func(t *bolt.Tx)error{
 		b := t.Bucket(order)
 		if b == nil {
@@ -129,7 +146,7 @@ func ShoppingDel(orderid string)error {
 		if b == nil {
 			return nil
 		}
-		fmt.Println(or.UserId,or.GoodsName)
+		//fmt.Println(or.UserId,or.GoodsName)
 		return b.Delete(o)
 		//return b.Delete(o)
 	})
@@ -164,9 +181,10 @@ type ShoppingInterface interface{
 	OutUrl(interface{}) string
 	OrderMsg(interface{}) string
 	ProductSearch(...string)[]interface{}
-	OrderDown(hand func(interface{}))error
 	GoodsAppMini(...string)interface{}
-	//OrderUpdate(orderid string,db interface{})error
+	OrderDown(hand func(interface{}))error
+	OrderDownSelf(hand func(interface{}))error
+	//OrderDown(orderid string,db interface{})error
 
 }
 //F96BF1AC420D7D482DFFB7153173B5BE
@@ -181,19 +199,40 @@ type ShoppingInfo struct {
 	ReToken string
 	TimeOut int64
 	Update int64
+	UpOrder int64
+}
+func OrderApplyUpdate(userid,orderid string)error {
+	o := []byte(orderid)
+	u := []byte(userid)
+	ti := time.Now().Unix()
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
+	return DB.Update(func(t *bolt.Tx)error{
+		b_,err := t.CreateBucketIfNotExists(orderUser)
+		if err != nil {
+			return err
+		}
+		ub,err := b_.CreateBucketIfNotExists(u)
+		if err != nil {
+			return err
+		}
+		var k_ [8]byte
+		binary.BigEndian.PutUint64(k_[:],uint64(ti))
+		return ub.Put(k_[:],o)
+	})
+	})
 }
 func OrderApply(userid,orderid string,hand func(interface{}))error{
 	o := []byte(orderid)
 	u := []byte(userid)
 	ti := time.Now().Unix()
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 	return DB.Update(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(order)
 		if err != nil {
 			return err
 		}
 		v := b.Get(o)
-		var db map[string]interface{}
+		var db map[string]interface{}  = nil
 		if v != nil {
 			err = json.Unmarshal(v,&db)
 			if err != nil {
@@ -201,21 +240,53 @@ func OrderApply(userid,orderid string,hand func(interface{}))error{
 			}
 			if db["userid"] != nil {
 				us := db["userid"].(string)
-				if len(us)>0 && !strings.HasPrefix(us,"web_"){
-					if us == userid {
-						hand(db)
-						return nil
+				if len(us)>0 {
+					if us != userid {
+						//hand(db)
+						//return nil
+						return io.EOF
 					}
-					return io.EOF
-				}
+					//return io.EOF
+				}else{
 
-				db["userid"] = userid
+					db["userid"] = userid
+				}
 			}
+			ti = int64(db["time"].(float64))
 		}else{
-			db = map[string]interface{}{
-				"userid":userid,
-				"time":ti,
-				//"order_id":orderid,
+			var w sync.WaitGroup
+			dbchan:=make(chan interface{},1000)
+			go func(){
+				for dbc := range dbchan {
+					__db := dbc.(map[string]interface{})
+					oid_ := __db["order_id"].(string)
+					OrderUpdate(oid_,dbc)
+					if db == nil && orderid == oid_{
+						db = __db
+					}
+				}
+			}()
+			ShoppingMap.Range(func(k,v interface{})bool{
+				w.Add(1)
+				go func(s ShoppingInterface){
+				err := s.OrderDownSelf(func(_db interface{}){
+					dbchan<-_db
+				})
+				if err != nil {
+					fmt.Println(err)
+				}
+				w.Done()
+				}(v.(ShoppingInterface))
+				return true
+			})
+			w.Wait()
+			close(dbchan)
+			if db == nil {
+				db = map[string]interface{}{
+					"userid":userid,
+					"time":ti,
+					//"order_id":orderid,
+				}
 			}
 		}
 		val,err := json.Marshal(db)
@@ -234,7 +305,10 @@ func OrderApply(userid,orderid string,hand func(interface{}))error{
 		if err != nil {
 			return err
 		}
-		err = ub.Put(o,[]byte(fmt.Sprintf("%d",ti)))
+		var k_ [8]byte
+		binary.BigEndian.PutUint64(k_[:],uint64(ti))
+		err = ub.Put(k_[:],o)
+		//err = ub.Put([]byte(fmt.Sprintf("%d",ti)),o)
 		if err != nil {
 			return err
 		}
@@ -248,7 +322,7 @@ func OrderApply(userid,orderid string,hand func(interface{}))error{
 func OrderUpdate(orderid string,db interface{})error{
 
 	o := []byte(orderid)
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 	return DB.Batch(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(order)
 		if err != nil {
@@ -288,7 +362,7 @@ func OrderUpdate(orderid string,db interface{})error{
 	})
 }
 func OrderList(orderid string,hand func(map[string]interface{})error)error{
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 		return  DB.View(func(t *bolt.Tx)error{
 			b := t.Bucket(order)
 			if b == nil {
@@ -306,11 +380,14 @@ func OrderList(orderid string,hand func(map[string]interface{})error)error{
 				k,v = c.Seek([]byte(orderid))
 			}
 			for ;k!= nil;k,v=c.Next(){
-				fmt.Println(string(k))
+				//fmt.Println(string(k))
 				var db  map[string]interface{}
 				err := json.Unmarshal(v,&db)
 				if err != nil {
 					return err
+				}
+				if db["order_id"] == nil {
+					db["order_id"] = string(k)
 				}
 				err = hand(db)
 				if err != nil {
@@ -321,12 +398,27 @@ func OrderList(orderid string,hand func(map[string]interface{})error)error{
 		})
 	})
 }
-
-func OrderListWithUser(orderid,userid string,hand func(interface{})error)error{
-	getDB := func(b *bolt.Bucket,id []byte) error {
+func OrderUserDel(numid,userid string) error {
+	return nil
+}
+func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
+	getDB := func(b *bolt.Bucket,k,id []byte) error {
 		v := b.Get(id)
+		t_ := int64(binary.BigEndian.Uint64(k))
+		//fmt.Println(t_,string(id),string(v))
 		if v == nil {
+			//v = b.Get(k)
+			//if v == nil {
+			//t_,err := strconv.Atoi(string(k))
+			//if err != nil {
+			//	return err
+			//}
+			tk := (time.Now().Unix() - t_)
+			if (tk<0) || (tk>604800) {
+				return fmt.Errorf("time out")
+			}
 			return nil
+			//}
 		}
 		var db map[string]interface{}
 		err := json.Unmarshal(v,&db)
@@ -336,15 +428,16 @@ func OrderListWithUser(orderid,userid string,hand func(interface{})error)error{
 		if db["goodsid"] == nil {
 			return nil
 		}
+		db["numid"] = t_
 		return hand(db)
 	}
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
-		return  DB.View(func(t *bolt.Tx)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
+		var del [][]byte
+		err := DB.View(func(t *bolt.Tx)error{
 			b_ := t.Bucket(order)
 			if b_ == nil {
 				return io.EOF
 			}
-
 			b := t.Bucket(orderUser)
 			if b == nil {
 				return io.EOF
@@ -354,34 +447,80 @@ func OrderListWithUser(orderid,userid string,hand func(interface{})error)error{
 				return io.EOF
 			}
 			c := b.Cursor()
-			var orid []byte
-			if len(orderid) == 0 {
-				orid = []byte{0}
-			}else{
-				orid = []byte(orderid)
-			}
-			//orid := []byte(orderid)
-			k,_ := c.Seek(orid)
-			var err error
-			if !bytes.Equal(orid,k){
-				err = getDB(b_,k)
+			var orid,k,v []byte
+			if len(numid) == 0 {
+				k,v = c.Last()
+				//fmt.Println(string(v))
+				err := getDB(b_,k,v)
 				if err != nil {
-					return err
+					if err == io.EOF {
+						return err
+					}
+					//fmt.Println(err)
+					del = append(del,k)
+					//fmt.Println(err,k)
+					//err = b.Delete(k)
+					//fmt.Println(err)
+					//return err
+				}
+				//orid = []byte{0}
+			}else{
+				orid = []byte(numid)
+				k,v = c.Seek(orid)
+				if k == nil {
+					return nil
 				}
 			}
-			for k,_ = c.Next();k!=nil;k,_=c.Next(){
-				err = getDB(b_,k)
+			//orid := []byte(orderid)
+			//k,v := c.Seek(orid)
+			//var err error
+			//if !bytes.Equal(orid,k){
+			//	err = getDB(b_,k,v)
+			//	if err != nil {
+			//		return err
+			//	}
+			//}
+			for k,v = c.Prev();k!=nil;k,v=c.Prev(){
+				err := getDB(b_,k,v)
 				if err != nil {
-					return err
+					if err == io.EOF {
+						return err
+					}
+
+					del = append(del,k)
+					//fmt.Println(err)
+					//err = b.Delete(k)
+					//fmt.Println(err)
 				}
 			}
 			return nil
 		})
+		if err != nil {
+			return err
+		}
+		if len(del) == 0 {
+			return nil
+		}
+		return DB.Batch(func(t *bolt.Tx)error{
+			b := t.Bucket(orderUser)
+			if b == nil {
+				return io.EOF
+			}
+			b = b.Bucket([]byte(userid))
+			if b == nil {
+				return io.EOF
+			}
+			for _,_id := range del{
+				b.Delete(_id)
+			}
+			return nil
+		})
+
 	})
 
 }
 func OrderGet(orderid,userid string,hand func(interface{}))error{
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 		return  DB.View(func(t *bolt.Tx)error{
 			b := t.Bucket(orderUser)
 			//b := t.Bucket(order)
@@ -420,7 +559,7 @@ func OrderGet(orderid,userid string,hand func(interface{}))error{
 }
 
 func orderGet(orderid,userid string,hand func(interface{}))error{
-	return openSiteDB(siteDB,func(DB *bolt.DB)error{
+	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 		return  DB.View(func(t *bolt.Tx)error{
 			b := t.Bucket(order)
 			if b == nil {
@@ -488,7 +627,7 @@ func (self *ShoppingInfo) SaveToDB(db *bolt.DB) error {
 }
 
 func OrderWithTime(ti []byte,hand func(string,interface{}))error{
-	return OpenSiteDB(siteDB,func(DB *bolt.DB)error{
+	return OpenSiteDB(orderDB,func(DB *bolt.DB)error{
 		return DB.View(func(t *bolt.Tx)error{
 			b:= t.Bucket(orderTime)
 			if b == nil {
@@ -508,8 +647,9 @@ func OrderWithTime(ti []byte,hand func(string,interface{}))error{
 		})
 	})
 }
+
 func OrderUpdateTime(orderid,py string,ti []byte)error{
-	return OpenSiteDB(siteDB,func(DB *bolt.DB)error{
+	return OpenSiteDB(orderDB,func(DB *bolt.DB)error{
 		return DB.Batch(func(t *bolt.Tx)error{
 			b,err := t.CreateBucketIfNotExists(orderTime)
 			if err != nil {
@@ -568,12 +708,12 @@ func ReadShoppingList(dbname string,h func(*ShoppingInfo)error)error{
 
 }
 func InitShoppingMap(dbname string){
-	siteDB = dbname
+	//siteDB = dbname
 	err := ReadShoppingList(dbname,func(sh *ShoppingInfo)error{
 		//fmt.Println(sh)
 		hand := FuncMap[sh.Py]
 		if hand != nil {
-			ShoppingMap.Store(sh.Py,hand(sh))
+			ShoppingMap.Store(sh.Py,hand(sh,dbname))
 		}
 		return nil
 	})

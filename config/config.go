@@ -15,6 +15,7 @@ func init(){
 	Conf = NewConfig(*LogFileName)
 }
 type Config struct {
+	ArticleServer string
 	Proxy string
 	Port string
 	DbPath string
@@ -37,6 +38,8 @@ type Config struct {
 	//Site []*SitePage
 	Minitoken string
 	WXtoken string
+	AliyunKeyid string
+	AliyunSecret string
 }
 func (self *Config) Save(fileName string){
 	fi,err := os.OpenFile(fileName,os.O_CREATE|os.O_WRONLY,0777)
@@ -54,6 +57,7 @@ func NewConfig(fileName string)  *Config {
 	var c Config
 	_,err := os.Stat(fileName)
 	if err != nil {
+		c.ArticleServer = "127.0.0.1:8080"
 		c.Coll = true
 		c.Proxy = ""
 		c.MaxPage = 60000

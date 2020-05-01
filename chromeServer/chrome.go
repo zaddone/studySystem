@@ -23,16 +23,14 @@ import(
 type Hfunc func(interface{})
 var (
 	port = "9222"
-	//rooturl string = "https://login.taobao.com/member/login.jhtml?style=mini&newMini2=true&from=alimama"
-	//rooturl string = "https://www.alimama.com/index.htm"
-	//orderUrl string = "https://pub.alimama.com/openapi/param2/1/gateway.unionpub/report.getTbkOrderDetails.json?t=1581752650893&_tb_token_=f087e0e378633&jumpType=0&positionIndex=&pageNo=1&startTime=2020-01-01&endTime=2020-02-15&queryType=2&tkStatus=&memberType=&pageSize=40"
-	//tb_token = "_tb_token_"
-	//indexUrl = "https://www.alimama.com/index.htm"
-	//viewOrder = "https://pub.alimama.com/manage/effect/overview_orders.htm"
 	chromekey = []byte{10,68,101,118,84,111,111,108,115,32}
 	op =[]string{
 		"--remote-debugging-port="+port,
-		"--headless",
+		"--disable-plugins",
+		"--start-maximized",
+		//"–disk-cache-dir=./chromeCache",
+		//"--headless",
+		//"--user-agent",
 		"--disable-gpu",
 		"--no-sandbox",
 		"--no-default-browser-check",
@@ -43,10 +41,9 @@ var (
 	handleFinish = map[string]func(string,map[string]interface{}){}
 	HandleResponse Hfunc = nil
 	Num float64 = 0
-	//Png = "xcode.png"
 	writeChan = make(chan interface{},5)
-	//Router = gin.Default()
 	StreamId string
+	RunChrome bool
 )
 
 func init(){
@@ -143,10 +140,10 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 	if err != nil {
 		log.Fatal("w:", err)
 	}
-	err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
-	if err != nil {
-		log.Fatal("w:", err)
-	}
+	//err = c.WriteJSON(map[string]interface{}{"method":"Network.clearBrowserCookies","id":1})
+	//if err != nil {
+	//	log.Fatal("w:", err)
+	//}
 	w.Add(2)
 	go func(){
 		for{
@@ -160,7 +157,7 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 				log.Println("stream",err)
 				break
 			}
-			c.SetReadDeadline(time.Now().Add(time.Minute*2))
+			//c.SetReadDeadline(time.Now().Add(time.Minute*2))
 			hand(db,c)
 		}
 		w.Done()
@@ -177,58 +174,110 @@ func runStream(u string,w *sync.WaitGroup,hand func(interface{},*websocket.Conn)
 	}()
 	return
 }
+func openPage(u string,hand func(interface{})error)error{
+	//for i:=0;i<10;i++ {
+	//fmt.Println("open",i)
+		//time.Sleep(1*time.Second)
+	return request.ClientHttp_(Ourl+"/json/new?"+u,"GET",nil,nil,func(body io.Reader,st int)error {
+		if st != 200 {
+			db,err := ioutil.ReadAll(body)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("%d %s",st,db)
+		}
+		var k interface{}
+		err := json.NewDecoder(body).Decode(&k)
+		if err != nil {
+			return err
+		}
+		return hand(k)
+		//k_ := k.([]interface{})
+		//if len(k_)==0 {
+		//	return io.EOF
+		//}
+		//for _,v := range k_{
+		//	fmt.Println(v)
+		//	er := hand(v)
+		//	if er != nil {
+		//		return er//panic(er)
+		//	}
+		//}
+		//return nil
 
+	})
+	//	if err != io.EOF {
+	//		return err
+	//	}
+	//}
+	//return io.EOF
 
-func Run() error {
+}
+func View(uri string) error {
+	op = append(op,uri)
+	return start(nil)
+	//return start(func(u string)error{
+	//	fmt.Println(u)
+	//	//err:= openPage_(nil)
+	//	//if err != nil {
+	//	//	return err
+	//	//}
+	//})
+}
+
+func Run(u string) error {
 	//go Router.Run(":8001")
 	//return start(uri,func(u string)error{
-	return start(func(u string)error{
-		w := new(sync.WaitGroup)
-		return openPage_(func(db interface{})error{
-			_vb := db.(map[string]interface{})
-			//time.Sleep(100*time.Millisecond)
-			StreamId = _vb["id"].(string)
-			runStream(_vb["webSocketDebuggerUrl"].(string),w,func(db interface{},c *websocket.Conn){
-				__v := db.(map[string]interface{})
-				id__ := __v["id"]
-				if id__ != nil{
-					_id__ := id__.(float64)
-					h := handMap[_id__]
-					if h != nil {
-						//fmt.Println(db)
-						db_ := db.(map[string]interface{})
-						if db_["result"] == nil {
-							go h(_id__,db_)
-						}else{
-							go h(_id__,(db_["result"]).(map[string]interface{}))
-						}
+	//return start(func(u string)error{
+	if !RunChrome{
+		return fmt.Errorf("chrome not run")
+	}
+	w := new(sync.WaitGroup)
+	return openPage(u,func(db interface{})error{
+		_vb := db.(map[string]interface{})
+		//time.Sleep(100*time.Millisecond)
+		StreamId = _vb["id"].(string)
+		runStream(_vb["webSocketDebuggerUrl"].(string),w,func(db interface{},c *websocket.Conn){
+			__v := db.(map[string]interface{})
+			id__ := __v["id"]
+			if id__ != nil{
+				_id__ := id__.(float64)
+				h := handMap[_id__]
+				if h != nil {
+					//fmt.Println(db)
+					db_ := db.(map[string]interface{})
+					if db_["result"] == nil {
+						go h(_id__,db_)
+					}else{
+						go h(_id__,(db_["result"]).(map[string]interface{}))
 					}
+				}
 
+				return
+			}
+			switch __v["method"]{
+			case "Network.responseReceived":
+				if HandleResponse == nil {
 					return
 				}
-				switch __v["method"]{
-				case "Network.responseReceived":
-					if HandleResponse == nil {
-						return
-					}
-					HandleResponse(__v["params"])
-				case "Network.loadingFinished":
-					u:= __v["params"].(map[string]interface{})
-					rid := u["requestId"].(string)
-					hand := handleFinish[rid]
-					if hand == nil {
-						return
-					}
-					go hand(rid,u)
-				default:
+				HandleResponse(__v["params"])
+			case "Network.loadingFinished":
+				u:= __v["params"].(map[string]interface{})
+				rid := u["requestId"].(string)
+				hand := handleFinish[rid]
+				if hand == nil {
+					return
 				}
+				go hand(rid,u)
+			default:
+			}
 
-			})
-			w.Wait()
-			ClosePage()
-			return io.EOF
 		})
+		w.Wait()
+		ClosePage()
+		return io.EOF
 	})
+	//})
 }
 func ClosePage(){
 	log.Println("close",StreamId)
@@ -265,6 +314,9 @@ func openPage_(hand func(interface{})error) error {
 				return err
 			}
 			//fmt.Println(k)
+			if  hand == nil {
+				return nil
+			}
 			k_ := k.([]interface{})
 			if len(k_)==0 {
 				return io.EOF
@@ -289,12 +341,11 @@ func openPage_(hand func(interface{})error) error {
 }
 
 func start(hand func(string)error) (err error){
+	RunChrome = true
+	defer func(){
+		RunChrome = false
+	}()
 	runout := func(r io.Reader){
-		//defer func(){
-		//	//exec.Command("pkill","chrome").Run()
-		//	fmt.Println("kill",exec.Command("pkill","chrome").Run())
-		//	//err = nil
-		//}()
 		var db [8192]byte
 		for{
 			n,err := r.Read(db[:])
@@ -304,8 +355,6 @@ func start(hand func(string)error) (err error){
 					return
 				}
 			}
-			//fmt.Println(string(db[:n]))
-			//continue
 			if bytes.HasPrefix(db[:n],chromekey){
 				err = hand(string(db[23:n-1]))
 				if err != nil {
@@ -316,36 +365,20 @@ func start(hand func(string)error) (err error){
 			}
 		}
 	}
-	//append(op,uri)
-	//log.Println("cmd chrome")
-
-
-	cmd := exec.Command("google-chrome",op... )
-	//out,err := cmd.StdoutPipe()
-	//if err != nil {
-	//	//return err
-	//	log.Fatal(err)
-	//}else{
-	//	go runout(out)
-	//}
-
-	outerr,err := cmd.StderrPipe()
-	if err != nil {
-		//return err
-		log.Fatal(err)
-	}else{
-		go runout(outerr)
+	cmd := exec.Command("google-chrome-stable",op... )
+	if hand != nil {
+		outerr,err := cmd.StderrPipe()
+		if err != nil {
+			log.Fatal(err)
+		}else{
+			go runout(outerr)
+		}
 	}
-
-	//defer func(){
-	//	fmt.Println("start end")
-	//}()
-
 	err = cmd.Run()
-	if err.Error() == "signal: terminated"{
+	if err== nil ||  err.Error() == "signal: terminated"{
 		return nil
 	}
-	return
+	return err
 
 
 }

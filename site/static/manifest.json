@@ -3,12 +3,12 @@
   "short_name": "米果推荐",
   "icons": [
     {
-      "src": "/static/img/favicons192.png",
+      "src": "//img.zaddone.com/static/img/ico/favicons_192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/static/img/favicons512.png",
+      "src": "//img.zaddone.com/static/img/ico/favicons_512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

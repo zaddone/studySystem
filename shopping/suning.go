@@ -19,7 +19,7 @@ var (
 	uriVal =&url.Values{}
 )
 
-func NewSuning(sh *ShoppingInfo) (ShoppingInterface){
+func NewSuning(sh *ShoppingInfo,r string) (ShoppingInterface){
 	return &Suning{
 		Info:sh,
 		u:url.Values{
@@ -304,6 +304,9 @@ func (self *Suning)OrderMsg(interface{}) string{
 }
 func (self *Suning)ProductSearch(k ...string)[]interface{}{
 	return nil
+}
+func (self *Suning)OrderDownSelf(hand func(interface{}))error{
+	return self.OrderDown(hand)
 }
 func (self *Suning)OrderDown(hand func(interface{}))error{
 	return nil
