@@ -126,6 +126,7 @@ func checkCache(uri []byte) (c interface{}) {
 	return
 }
 func checkSession(c *gin.Context){
+	fmt.Println(c.Request.RemoteAddr)
 	ip := IpStrToByte(c.Request.RemoteAddr)
 	if ip == nil {
 		c.Abort()
@@ -201,11 +202,11 @@ func init(){
 		//return
 		err := PhoneCode(phone)
 		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
 		//c.JSON(http.StatusOK,gin.H{"code":randCode()})
-		c.JSON(http.StatusOK,gin.H{"msg":"success"})
+		c.JSONP(http.StatusOK,gin.H{"msg":"success"})
 	})
 	Router.GET("/checksms",func(c *gin.Context){
 		phone := c.Query("phone")
@@ -222,27 +223,38 @@ func init(){
 		//}
 		err := CheckPhoneCode(phone,code)
 		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
 			return
 		}
 		user := shopping.User{UserId:phone}
 		err = user.Get()
 		if err != nil {
 			if err != io.EOF {
-				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+				c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
 				return
 			}
 			user.Session = shopping.Sha1([]byte(fmt.Sprintf("%s%s%s",time.Now(),c.Request.RemoteAddr,phone)))
 			err = user.Update()
 			if err != nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+				c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
 				return
 			}
 		}
-		c.JSON(http.StatusOK,gin.H{"msg":"success","user":user})
+		c.JSONP(http.StatusOK,gin.H{"msg":"success","user":user})
 	})
 	Router.GET("/",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
+		//session,err := c.Cookie(SessionId)
+		//if err != nil {
+		//	session = shopping.Sha1([]byte(fmt.Sprintf("%s%s",time.Now(),c.Request.RemoteAddr)))
+		//	c.SetCookie(SessionId,session[:32],3600*24*365*10,"/",".zaddone.com",false,false)
+		//}
 		if c.Query("content_type") == "json"{
+
+			session,err := c.Cookie(SessionId)
+			if err != nil {
+				session = shopping.Sha1([]byte(fmt.Sprintf("%s%s",time.Now(),c.Request.RemoteAddr)))
+				c.SetCookie(SessionId,session[:32],3600*24*365*10,"/",".zaddone.com",false,false)
+			}
 			var li []map[string]string
 			shopping.ShoppingMap.Range(func(k,v interface{})bool{
 				sh := v.(shopping.ShoppingInterface).GetInfo()
@@ -255,26 +267,27 @@ func init(){
 				})
 				return true
 			})
-			c.JSON(http.StatusOK,li)
+			c.JSONP(http.StatusOK,li)
 			return
-		}else if len(c.Query("keyword"))>0 {
-			var li []map[string]string
-			shopping.ShoppingMap.Range(func(k,v interface{})bool{
-				sh := v.(shopping.ShoppingInterface).GetInfo()
-				li = append(li,
-				map[string]string{
-					"Name":sh.Name,
-					"Img":sh.Img,
-					"Uri":sh.Uri,
-					"py":k.(string),
-				})
-				return true
-			})
-			c.HTML(http.StatusOK,"index_1.tmpl",gin.H{"site":li})
-			return
-		}else{
-			c.HTML(http.StatusOK,"search.tmpl",nil)
+		//}else if len(c.Query("keyword"))>0 {
+		//	var li []map[string]string
+		//	shopping.ShoppingMap.Range(func(k,v interface{})bool{
+		//		sh := v.(shopping.ShoppingInterface).GetInfo()
+		//		li = append(li,
+		//		map[string]string{
+		//			"Name":sh.Name,
+		//			"Img":sh.Img,
+		//			"Uri":sh.Uri,
+		//			"py":k.(string),
+		//		})
+		//		return true
+		//	})
+		//	c.HTML(http.StatusOK,"index_1.tmpl",gin.H{"site":li})
+		//	return
+		//}else{
+		//	c.HTML(http.StatusOK,"search.tmpl",nil)
 		}
+		c.HTML(http.StatusOK,"index_1.tmpl",nil)
 	})
 	Router.GET("/script",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		session,err := c.Cookie(SessionId)
@@ -296,7 +309,7 @@ func init(){
 	Router.GET("/p/:py/:id",secureFunc,func(c *gin.Context){
 		sh_,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh_ == nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
 		sh := sh_.(shopping.ShoppingInterface)
@@ -315,12 +328,12 @@ func init(){
 		u := sh.OutUrl(db)
 		fmt.Println(u,db)
 		if u == "" {
-			c.JSON(http.StatusNotFound,gin.H{"msg":""})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":""})
 		}
 		c.Redirect(http.StatusMovedPermanently,u)
 
 	})
-	//Router.GET("goodsurl",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	//Router.GET("goodsurl",secureFunc,gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 	Router.GET("goodsurl",secureFunc,func(c *gin.Context){
 		uri := c.Query("url")
 		if uri == "" {
@@ -332,7 +345,7 @@ func init(){
 				return
 			}
 			//c.JSON(http.StatusOK,getGoodsDetail("pinduoduo",str[1]))
-			c.JSON(http.StatusOK,gin.H{"py":"pinduoduo","db":getGoodsDetail("pinduoduo",str[1])})
+			c.JSONP(http.StatusOK,gin.H{"py":"pinduoduo","db":getGoodsDetail("pinduoduo",str[1])})
 			return
 		}
 		if regexp.MustCompile(`jd`).MatchString(uri){
@@ -346,18 +359,18 @@ func init(){
 					}
 				}
 			}
-			c.JSON(http.StatusOK,gin.H{"py":"jd","db":getGoodsDetail("jd",str[1])})
+			c.JSONP(http.StatusOK,gin.H{"py":"jd","db":getGoodsDetail("jd",str[1])})
 			//c.JSON(http.StatusOK,getGoodsDetail("jd",str[1]))
 			return
 		}
 		if regexp.MustCompile(`tb|taobao`).MatchString(uri){
 			//c.JSON(http.StatusOK,getGoodsDetail("taobao",uri))
-			c.JSON(http.StatusOK,gin.H{"py":"taobao","db":getGoodsDetail("taobao",uri)})
+			c.JSONP(http.StatusOK,gin.H{"py":"taobao","db":getGoodsDetail("taobao",uri)})
 			return
 		}
 		if regexp.MustCompile(`mogu`).MatchString(uri){
 			//c.JSON(http.StatusOK,getGoodsDetail("mogu",uri))
-			c.JSON(http.StatusOK,gin.H{"py":"mogu","db":getGoodsDetail("mogu",uri)})
+			c.JSONP(http.StatusOK,gin.H{"py":"mogu","db":getGoodsDetail("mogu",uri)})
 			return
 		}
 		if regexp.MustCompile(`suning`).MatchString(uri){
@@ -366,23 +379,22 @@ func init(){
 				return
 			}
 			//fmt.Println("suning",str)
-			c.JSON(http.StatusOK,gin.H{"py":"suning","db":getGoodsDetail("suning",strings.Replace(str[1],"/","-",-1))})
+			c.JSONP(http.StatusOK,gin.H{"py":"suning","db":getGoodsDetail("suning",strings.Replace(str[1],"/","-",-1))})
 			return
 		}
 		return
 
 	})
-
-	Router.GET("goodsid/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	Router.GET("goodsid/:py",secureFunc,gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		//sh := shopping.ShoppingMap[c.Param("py")]
 		if sh == nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
 		keyword := c.DefaultQuery("goodsid","")
 		if keyword == "" {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
 		uri := []byte(c.Request.URL.String())
@@ -390,15 +402,15 @@ func init(){
 		if db == nil{
 			db = sh.(shopping.ShoppingInterface).GoodsDetail(keyword)
 			if db == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
 			saveCache(uri,db)
 		}
-		c.JSON(http.StatusOK,db)
+		c.JSONP(http.StatusOK,db)
 		return
 	})
-	Router.GET("miniapp/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	Router.GET("miniapp/:py",secureFunc,gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh == nil {
 			return
@@ -421,25 +433,25 @@ func init(){
 		if db == nil{
 			db = sh.(shopping.ShoppingInterface).GoodsAppMini(val...)
 			if db == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
 			saveCache(uri,db)
 		}
 		//fmt.Println(db)
-		c.JSON(http.StatusOK,db)
+		c.JSONP(http.StatusOK,db)
 		return
 
 	})
-	Router.GET("goods/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	Router.GET("goods/:py",secureFunc,gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
 		if sh == nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
 		keyword := c.DefaultQuery("goodsid","")
 		if keyword == "" {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+			c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 			return
 		}
 
@@ -469,21 +481,24 @@ func init(){
 		if db == nil{
 			db = sh.(shopping.ShoppingInterface).GoodsUrl(val...)
 			if db == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":"fond not"})
+				c.JSONP(http.StatusNotFound,gin.H{"msg":"fond not"})
 				return
 			}
 			saveCache(uri,db)
 		}
-		c.JSON(http.StatusOK,db)
+		c.JSONP(http.StatusOK,db)
 		return
 	})
 
-	Router.GET("search/:py",gzip.Gzip(gzip.DefaultCompression),secureFunc,func(c *gin.Context){
+	//Router.GET("search/:py",secureFunc,gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
+	Router.GET("search/:py",secureFunc,func(c *gin.Context){
 		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
+		fmt.Println("py",sh)
 		if sh == nil {
 			//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not1"})
 			return
 		}
+
 		keyword := c.Query("keyword")
 		if keyword == "" {
 			//c.JSON(http.StatusNotFound,gin.H{"msg":"fond not2"})
@@ -494,6 +509,15 @@ func init(){
 		//ext := c.Query("ext")
 		if ext != "" {
 			key = append(key,ext)
+		}
+		session:= c.Query("session")
+		if session != ""{
+			key = append(key,session)
+		}else{
+			session,err := c.Cookie(SessionId)
+			if err == nil{
+				key = append(key,session)
+			}
 		}
 
 		//session,_ := c.Cookie(SessionId)
@@ -507,7 +531,7 @@ func init(){
 			}
 			saveCache(uri,db)
 		}
-		c.JSON(http.StatusOK,db)
+		c.JSONP(http.StatusOK,db)
 		return
 	})
 	//Router_.GET("robots.txt",func(c *gin.Context){

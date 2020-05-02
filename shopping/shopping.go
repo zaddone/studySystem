@@ -39,6 +39,7 @@ var (
 		"taobao":NewTaobao,
 		"suning":NewSuning,
 		"mogu":NewMogu,
+		"vip":NewVip,
 	}
 	Rate = 0.9
 

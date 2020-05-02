@@ -21,7 +21,7 @@ var (
 
 func NewMogu(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	m := &Mogu{Info:sh}
-	//return m
+	return m
 	if siteDB == "" {
 		return m
 	}

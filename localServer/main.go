@@ -18,14 +18,14 @@ import(
 	"net/http"
 	"encoding/json"
 	"sync"
-	//"flag"
+	"flag"
 )
 
 var(
 	//flag.String("site","127.0.0.1")
 	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
-	Remote = "https://www.zaddone.com/v1"
+	Remote = flag.String("r", "https://www.zaddone.com/v1","remote")
 	wsupgrader = websocket.Upgrader{
 		ReadBufferSize:   1024,
 		WriteBufferSize:  1024,
@@ -67,7 +67,7 @@ func HandForward(c *gin.Context){
 }
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
 	addSign(&u)
-	return request.ClientHttp__(Remote+path+"?"+u.Encode(),Method,body,nil,hand)
+	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
 }
 func InitShoppingMap()error{
 	return requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
@@ -212,7 +212,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func init(){
-	//flag.Parse()
+	flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
 
 	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)

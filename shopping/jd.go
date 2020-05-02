@@ -54,7 +54,7 @@ func NewJd(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	if siteDB == "" {
 		return j
 	}
-	//return j
+	return j
 	go func(){
 		for{
 		err := j.ReToken(siteDB)
