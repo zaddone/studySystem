@@ -452,8 +452,8 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 					l_["endTime"] = int64(l_["updateTime"].(float64))
 					l_["PayTime"] = int64(pay)
 					//panic(err)
-				}else{
-					fmt.Println(err)
+				//}else{
+				//	fmt.Println(err)
 				}
 				//l_[""]
 				hand(l_)

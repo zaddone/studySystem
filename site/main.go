@@ -30,6 +30,7 @@ var(
 	//Router_ = gin.Default()
 	siteDB  = flag.String("db","SiteDB","db")
 	SessionId = "session_id"
+	Port = flag.String("p",":8080","port")
 )
 
 func ReverseProxy() gin.HandlerFunc {
@@ -382,6 +383,16 @@ func init(){
 			c.JSONP(http.StatusOK,gin.H{"py":"suning","db":getGoodsDetail("suning",strings.Replace(str[1],"/","-",-1))})
 			return
 		}
+		if regexp.MustCompile(`vip`).MatchString(uri){
+			//https://detail.vip.com/detail-1711197624-6918740352580831640.html
+			str := regexp.MustCompile(`\-(\d+)\.html`).FindStringSubmatch(uri)
+			//fmt.Println(str)
+			if len(str)<2{
+				return
+			}
+			c.JSONP(http.StatusOK,gin.H{"py":"vip","db":getGoodsDetail("vip",str[1])})
+			return
+		}
 		return
 
 	})
@@ -566,6 +577,6 @@ func init(){
 }
 func main(){
 	//go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")
-	go Router.Run(":8080")
+	go Router.Run(*Port)
 	select{}
 }

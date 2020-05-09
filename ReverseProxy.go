@@ -7,6 +7,15 @@ import (
 
 func main() {
 	redi := http.NewServeMux()
+	redi.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
+		director := func(req *http.Request) {
+			req.URL.Path = req.URL.Path[3:]
+			req.URL.Scheme = "http"
+			req.URL.Host = "127.0.0.1:8082"
+		}
+		proxy := &httputil.ReverseProxy{Director: director}
+		proxy.ServeHTTP(w, r)
+	})
 	redi.HandleFunc("/article/", func(w http.ResponseWriter, r *http.Request) {
 		director := func(req *http.Request) {
 			req.URL.Path = req.URL.Path[8:]
@@ -36,6 +45,7 @@ func main() {
 	mux := http.NewServeMux()
 	//mux.HandleFunc("/", Redirect301Handler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		//r.Header.Add("Access-Control-Allow-Origin","https://www.zaddone.com")
 		if r.URL.String() =="/"{
 			http.Redirect(w, r, "https://www.miguotuijian.cn", http.StatusMovedPermanently)
 			return

@@ -518,7 +518,7 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 		begin = time.Unix(self.Info.Update,0)
 	}
 
-	fmt.Println(begin)
+	//fmt.Println(begin)
 	for{
 		page := 1
 		//fmt.Println(begin)

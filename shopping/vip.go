@@ -100,7 +100,9 @@ func (self *Vip)stuctured(d_ interface{})(g Goods){
 	}
 	img := []string{d["goodsMainPicture"].(string)}
 	if d["goodsCarouselPictures"] != nil {
-		img = append(img,d["goodsCarouselPictures"].([]string)...)
+		for _,u := range d["goodsCarouselPictures"].([]interface{}){
+			img = append(img,u.(string))
+		}
 	}
 	return Goods{
 		Id:d["goodsId"].(string),
@@ -181,7 +183,35 @@ func (self *Vip) GoodsUrl(words ...string) interface{}{
 }
 
 func (self *Vip) GoodsDetail(words ...string)interface{}{
-	return nil
+	u := &url.Values{}
+	u.Add("service","com.vip.adp.api.open.service.UnionGoodsService")
+	u.Add("method","getByGoodsIds")
+	if len(words)==1{
+		words = append(words,"zaddone")
+	}
+	body,err :=json.Marshal(
+		map[string]interface{}{
+			"goodsIdList":[]string{words[0]},
+			"requestId":words[1],
+		})
+	if err != nil {
+		panic(err)
+	}
+	db := self.ClientHttp(u,string(body))
+	//fmt.Println(db)
+	if db == nil {
+		return nil
+	}
+	req := db.(map[string]interface{})["result"]
+	if req == nil {
+		return nil
+	}
+	var li []interface{}
+	for _,d := range req.([]interface{}){
+		li = append(li,self.stuctured(d))
+	}
+	return li
+
 }
 func (self *Vip)OrderSearch(keys ...string)interface{}{
 	return nil
@@ -212,9 +242,111 @@ func (self *Vip)GoodsAppMini(words ...string)interface{}{
 		"url":db.(map[string]interface{})["vipWxUrl"].(string),
 	}
 }
+func (self *Vip)getOrder(begin,end time.Time,page int) interface{} {
+	u := &url.Values{}
+	u.Add("service","com.vip.adp.api.open.service.UnionOrderService")
+	u.Add("method","orderList")
+	body,err :=json.Marshal(
+	map[string]interface{}{
+		"queryModel":map[string]interface{}{
+		"orderTimeStart":begin.Unix()*1000,
+		"orderTimeEnd":end.Unix()*1000,
+		"page":page,
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return self.ClientHttp(u,string(body))
+	//if db == nil {
+	//	return nil
+	//}
+	////db_ := db.(map[string]interface{})
+	////if db_["returnCode"].(string) != "0"{
+	////	return fmt.Errorf(db_["returnMessage"].(string))
+	////}
+	//return db.(map[string]interface{})["result"]
+	//res.(map[string]interface{})["total"]
+
+}
 func (self *Vip)OrderDown(hand func(interface{}))error{
+
+	var begin time.Time
+	if self.Info.Update == 0 {
+		var err error
+		begin,err = time.Parse(timeFormat,"2020-04-01 16:00:00")
+		if err != nil {
+			panic(err)
+		}
+	}else{
+		begin = time.Unix(self.Info.Update,0)
+	}
+	for{
+		page := 1
+		end := begin.AddDate(0,0,9)
+		for{
+			db := self.getOrder(begin,end,page)
+			if db == nil {
+				//return io.EOF
+				time.Sleep(1*time.Second)
+				continue
+			}
+			res := db.(map[string]interface{})["result"]
+			if res== nil {
+				break
+			}
+			data := res.(map[string]interface{})["orderInfoList"]
+			if data == nil {
+				break
+			}
+			li := data.([]interface{})
+			for _,l :=range li{
+				l_ := l.(map[string]interface{})
+				l_["order_id"] = l_["orderSn"].(string)
+				end:=int64(l_["settledTime"].(float64))
+				if end>0{
+					l_["endTime"] =int64(l_["signTime"].(float64))
+					l_["PayTime"] = end
+				}
+				var id []string
+				var name []string
+				for _,p := range l_["detailList"].([]interface{}){
+					p_ := p.(map[string]interface{})
+					id = append(id,p_["goodsId"].(string))
+					name = append(name,p_["goodsName"].(string))
+
+				}
+
+				l_["goodsid"] = strings.Join(id,",")
+				l_["goodsName"] = strings.Join(name,",")
+				fee,err := strconv.ParseFloat(l_["commission"].(string),64)
+				if err == nil {
+					l_["fee"] = fee
+					//fee += f
+				}else{
+					fmt.Println(err)
+					//panic(err)
+				}
+				l_["site"] = self.Info.Py
+				hand(l_)
+			}
+			if page < int(res.(map[string]interface{})["total"].(float64)){
+				page++
+			}else{
+				break
+			}
+
+		}
+		Now := time.Now().Unix()
+		if end.Unix()> Now {
+			self.Info.Update = Now
+			break
+		}
+		begin = end
+		time.Sleep(1*time.Second)
+	}
 	return nil
 }
 func (self *Vip)OrderDownSelf(hand func(interface{}))error{
-	return nil
+	return self.OrderDown(hand)
 }
