@@ -25,7 +25,7 @@ var(
 	//flag.String("site","127.0.0.1")
 	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
-	Remote = flag.String("r", "https://www.zaddone.com/v1","remote")
+	Remote = flag.String("r", "https://www.zaddone.com/v2","remote")
 	wsupgrader = websocket.Upgrader{
 		ReadBufferSize:   1024,
 		WriteBufferSize:  1024,

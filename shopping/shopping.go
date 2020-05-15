@@ -8,6 +8,7 @@ import(
 	"bytes"
 	//"strings"
 	//"strconv"
+	//"encoding/gob"
 	"time"
 	"io/ioutil"
 	"encoding/hex"
@@ -21,18 +22,21 @@ import(
 type NewShopping func(*ShoppingInfo,string) ShoppingInterface
 var (
 
-	OrderMsgHand func(...interface{})
+	OrderMsgHand func(...interface{}) = nil
 	SiteList  = []byte("siteList")
 	//orderDB = []byte("orderDB")
 	order = []byte("order")
-	orderTime = []byte("orderTime")
-	orderUser = []byte("orderUser")
 	UserInfo = []byte("UserInfo")
 	iMsg = "请仔细核对商品，若有问题及时申请售后\n"
 	//ShoppingMap = map[string]ShoppingInterface{}
 	ShoppingMap = sync.Map{}// map[string]ShoppingInterface{}
 	//siteDB string = "SiteDB"
+
+	orderTime = []byte("orderTime")
+	orderUser = []byte("orderUser")
 	orderDB string = "orderDB"
+	//userDB string = "userDB"
+
 	timeFormat = "2006-01-02 15:04:05"
 	//siteDB  = flag.String("db","SiteDB","db")
 	FuncMap = map[string]NewShopping{
@@ -44,7 +48,7 @@ var (
 		"vip":NewVip,
 	}
 	Rate = 0.9
-
+	DownOrder = make(chan bool,100)
 )
 func InterfaceToString(v interface{}) string {
 	switch _v := v.(type){
@@ -105,7 +109,7 @@ func (self *User) Get() error{
 }
 func (self *User) Update() error{
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-	return DB.Update(func(t *bolt.Tx)error{
+	return DB.Batch(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(UserInfo)
 		if err != nil {
 			return err
@@ -158,16 +162,16 @@ type ShoppingInterface interface{
 	SearchGoods(...string)interface{}
 	GoodsUrl(...string)interface{}
 	GoodsDetail(...string)interface{}
-	OrderSearch(...string)interface{}
+	//OrderSearch(...string)interface{}
 	OutUrl(interface{}) string
 	OrderMsg(interface{}) string
 	ProductSearch(...string)[]interface{}
 	GoodsAppMini(...string)interface{}
 	OrderDown(hand func(interface{}))error
 	OrderDownSelf(hand func(interface{}))error
-	//OrderDown(orderid string,db interface{})error
-
+	Test()interface{}
 }
+//OrderDown(orderid string,db interface{})error
 //F96BF1AC420D7D482DFFB7153173B5BE
 type ShoppingInfo struct {
 	Py string
@@ -182,187 +186,234 @@ type ShoppingInfo struct {
 	Update int64
 	UpOrder int64
 }
-func OrderApplyUpdateDB(userid,orderid string,DB *bolt.DB)error {
+
+type OrderApplyStruct struct{
+	Fee float64
+	Date int64
+}
+func (self *OrderApplyStruct) encode() []byte {
+    var buf bytes.Buffer
+    err := gob.NewEncoder(&buf).Encode(self)
+    if err != nil {
+	panic(err)
+    }
+    return buf.Bytes()
+}
+
+func (self *OrderApplyStruct) decode(data []byte) error {
+    return gob.NewDecoder(bytes.NewBuffer(data)).Decode(self)
+}
+func OrderApplyUpdateDB(userid,orderid string,t *bolt.Tx)error {
 	o := []byte(orderid)
 	u := []byte(userid)
-	//ti := time.Now().Unix()
+	ti := time.Now().Unix()
 	var k_ [8]byte
-	binary.BigEndian.PutUint64(k_[:],uint64(time.Now().Unix()))
-	return DB.Batch(func(t *bolt.Tx)error{
-		b_,err := t.CreateBucketIfNotExists(orderUser)
-		if err != nil {
-			return err
-		}
-		ub,err :=b_.CreateBucketIfNotExists(u)
-		if err != nil {
-			return err
-		}
-		uub,err := ub.CreateBucketIfNotExists([]byte("order"))
-		if err != nil {
-			return err
-		}
-		uub_,err := ub.CreateBucketIfNotExists([]byte("time"))
-		if err != nil {
-			return err
-		}
+	binary.BigEndian.PutUint64(k_[:],uint64(ti))
+	b_,err := t.CreateBucketIfNotExists(orderUser)
+	if err != nil {
+		return err
+	}
+	ub,err :=b_.CreateBucketIfNotExists(u)
+	if err != nil {
+		return err
+	}
+	uub,err := ub.CreateBucketIfNotExists([]byte("order"))
+	if err != nil {
+		return err
+	}
+	uub_,err := ub.CreateBucketIfNotExists([]byte("time"))
+	if err != nil {
+		return err
+	}
 
-		vid := uub.Get(o)
-		if vid != nil {
-			uub_.Delete(vid)
-			//return nil
+	vid := uub.Get(o)
+	var oa *OrderApplyStruct
+	if vid != nil {
+		uub_.Delete(vid)
+		//return nil
+		oa = &OrderApplyStruct{}
+		oa.decode(vid)
+		oa.Date = ti
+	}else{
+		_b := t.Bucket(order)
+		order_val := _b.Get(o)
+		if order_val == nil {
+			return fmt.Errorf("order is nil")
 		}
-		err = uub.Put(o,k_[:])
+		var order_map map[string]interface{}
+		err := json.Unmarshal(order_val,&order_map)
 		if err != nil {
 			return err
 		}
-		return uub_.Put(k_[:],o)
-	})
+		oa = &OrderApplyStruct{Fee:order_map["fee"].(float64),Date:ti}
+	}
+	err = uub.Put(o,oa.encode())
+	if err != nil {
+		return err
+	}
+	return uub_.Put(k_[:],o)
+
 }
+
 func OrderApplyUpdate(userid,orderid string)error {
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		return OrderApplyUpdateDB(userid,orderid,DB)
+		t,err := DB.Begin(true)
+		if err != nil {
+			return err
+		}
+		err = OrderApplyUpdateDB(userid,orderid,t)
+		if err != nil {
+			return err
+		}
+		return t.Commit()
 	})
 }
+
 func DownOrderAll(hand func(db interface{})) {
 	var w sync.WaitGroup
 	ShoppingMap.Range(func(k,v interface{})bool{
+		//fmt.Println(k)
 		w.Add(1)
 		go func(s ShoppingInterface){
 			err := s.OrderDownSelf(hand)
 			if err != nil {
 				fmt.Println(err)
 			}
+
 			w.Done()
+			fmt.Println(k)
 		}(v.(ShoppingInterface))
 		return true
 	})
 	w.Wait()
 	return
-
 }
-func OrderApplyDB(userid,orderid string,DB *bolt.DB,hand func(interface{}))error{
+
+func OrderApplyDB(userid,orderid string,t *bolt.Tx,hand func(interface{}))error{
+	b,err := t.CreateBucketIfNotExists(order)
+	if err != nil {
+		return err
+	}
 	o := []byte(orderid)
-	//u := []byte(userid)
-	ti := time.Now().Unix()
-	var db map[string]interface{}  = nil
-	down := func(){
+	v := b.Get(o)
+	var db map[string]interface{}
+	if v == nil {
 		DownOrderAll(func(_db interface{}){
+			fmt.Println(_db)
 			__db := _db.(map[string]interface{})
 			oid_ := __db["order_id"].(string)
-			OrderUpdateDB(oid_,_db,DB)
 			if oid_ == orderid {
-				db =  __db
-				hand(db)
-				if err := OrderApplyUpdateDB(userid,orderid,DB);err != nil {
-					panic(err)
-				}
+				//db =  __db
+				__db["userid"] = userid
+				hand(__db)
 			}
-		})
-	}
-	return DB.Batch(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(order)
-		if err != nil {
-			return err
-		}
-		v := b.Get(o)
-		if v != nil {
-			err = json.Unmarshal(v,&db)
-			if err != nil {
-				return err
-			}
-			if db["userid"] != nil  {
-				us := db["userid"].(string)
-				if len(us)>0{
-					if us != userid {
-						return io.EOF
-					}
-					if db["order_id"] != nil {
-						hand(db)
-					}else{
-						down()
-					}
-					return nil
-				}
-			}
-			db["userid"] = userid
-			hand(db)
-			err=OrderApplyUpdateDB(userid,orderid,DB)
+			err = OrderUpdateDB(oid_,__db,t)
 			if err != nil {
 				panic(err)
 			}
+		})
+		return nil
+	}
+	if err = json.Unmarshal(v,&db); err != nil {
+		return err
+	}
+	if db["userid"] != nil {
+		us := db["userid"].(string)
+		if len(us)>0 {
+			if us != userid {
+				return nil
+			}else{
+				hand(db)
+			}
 			return nil
 		}
-		down()
-		if db != nil {
-			return nil
-		}
-		db = map[string]interface{}{
-			"userid":userid,
-			"time":ti,
-		}
-		val,err := json.Marshal(db)
-		if err != nil {
-			return err
-		}
-		return b.Put(o,val)
+	}
+	db["userid"] = userid
+	hand(db)
+	v,_ = json.Marshal(db)
+	if err = b.Put(o,v); err != nil {
+		return err
+	}
+	return OrderApplyUpdateDB(userid,orderid,t)
 
-
-	})
 }
+
+
 func OrderApply(userid,orderid string,hand func(interface{}))error{
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		return OrderApplyDB(userid,orderid,DB,hand)
+		t,err := DB.Begin(true)
+		if err != nil {
+			return err
+		}
+		err = OrderApplyDB(userid,orderid,t,hand)
+		if err != nil {
+			return err
+		}
+		return t.Commit()
 	})
 }
-func OrderUpdateDB(orderid string,db interface{},DB *bolt.DB)error{
+
+func OrderUpdateDB(orderid string,db interface{},t *bolt.Tx)error{
+
 	o := []byte(orderid)
-	return DB.Batch(func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(order)
+	//fmt.Println("r orderupdateDB")
+	b,err := t.CreateBucketIfNotExists(order)
+	if err != nil {
+		return err
+	}
+	db_ := db.(map[string]interface{})
+	val := b.Get(o)
+	if val != nil {
+		var valdb map[string]interface{}
+		err := json.Unmarshal(val,&valdb)
 		if err != nil {
 			return err
 		}
-		db_ := db.(map[string]interface{})
-		val := b.Get(o)
-		if val != nil {
-			var valdb map[string]interface{}
-			err := json.Unmarshal(val,&valdb)
-			if err != nil {
-				return err
-			}
+		if valdb["userid"] != nil &&
+		len(valdb["userid"].(string))>0 {
 			db_["userid"] = valdb["userid"]
-			if valdb["order_id"] == nil {
-				OrderMsgHand(valdb["userid"],db_)
-			}
+			//OrderMsgHand(db_)
 		}
-		str,err := json.Marshal(db_)
-		if err != nil {
-			return err
-		}
-		err=  b.Put(o,str)
-		if err != nil {
-			return err
-		}
-		if db_["userid"]==nil || len(db_["userid"].(string)) == 0{
-			return nil
-		}
-		return OrderApplyUpdateDB(db_["userid"].(string),orderid,DB)
-	})
+
+	}
+	str,err := json.Marshal(db_)
+	if err != nil {
+		return err
+	}
+	err=  b.Put(o,str)
+	if err != nil {
+		return err
+	}
+	if db_["userid"]!=nil && len(db_["userid"].(string)) > 0{
+		return OrderApplyUpdateDB(db_["userid"].(string),orderid,t)
+	}
+	return nil
 
 }
 
 func OrderUpdate(orderid string,db interface{})error{
-	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		return OrderUpdateDB(orderid,db,DB)
+	return openSiteDB(orderDB,func(DB *bolt.DB) error {
+		t,err := DB.Begin(true)
+		if err != nil {
+			return err
+		}
+		err = OrderUpdateDB(orderid,db,t)
+		if err != nil {
+			return err
+		}
+		return t.Commit()
 	})
 }
+
 func OrderListDB(orderid string,DB *bolt.DB,hand func(map[string]interface{})error)error{
 	return  DB.View(func(t *bolt.Tx)error{
 		b := t.Bucket(order)
 		if b == nil {
 			return io.EOF
 		}
+		//defer fmt.Println("end read list db")
 		//fmt.Println("read",order)
-		c:=b.Cursor()
+		c := b.Cursor()
 		//k_,_ := c.First()
 		//fmt.Println(string(k_))
 		//var k,v []byte
@@ -371,6 +422,9 @@ func OrderListDB(orderid string,DB *bolt.DB,hand func(map[string]interface{})err
 			k,v = c.First()
 		}else{
 			k,v = c.Seek([]byte(orderid))
+			if bytes.Equal(k,[]byte(orderid)){
+				k,v = c.Next()
+			}
 		}
 		for ;k!= nil;k,v=c.Next(){
 			//fmt.Println(string(k))
@@ -385,6 +439,7 @@ func OrderListDB(orderid string,DB *bolt.DB,hand func(map[string]interface{})err
 			}
 			err = hand(db)
 			if err != nil {
+				//fmt.Println(err)
 				return err
 			}
 		}
@@ -399,11 +454,18 @@ func OrderList(orderid string,hand func(map[string]interface{})error)error{
 func OrderUserDel(numid,userid string) error {
 	return nil
 }
+
 func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 	getDB := func(b *bolt.Bucket,k,id []byte) error {
+		//fmt.Println(string(id))
 		v := b.Get(id)
+		t:= int64(binary.BigEndian.Uint64(k))
 		if v == nil {
-			return fmt.Errorf("is nil")
+			if time.Now().Unix()-t > 604800{
+				return fmt.Errorf("is nil")
+			}else{
+				return io.EOF
+			}
 		}
 		var db map[string]interface{}
 		err := json.Unmarshal(v,&db)
@@ -413,7 +475,8 @@ func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 		if db["goodsid"] == nil {
 			return nil
 		}
-		db["numid"] = binary.BigEndian.Uint64(k)
+
+		db["numid"] = t
 		return hand(db)
 	}
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
@@ -431,6 +494,7 @@ func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 			if b == nil {
 				return io.EOF
 			}
+
 			b = b.Bucket([]byte("time"))
 			c := b.Cursor()
 			var orid,k,v []byte
@@ -471,7 +535,7 @@ func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 		if len(del) == 0 {
 			return nil
 		}
-		return DB.Batch(func(t *bolt.Tx)error{
+		return DB.Update(func(t *bolt.Tx)error{
 			b := t.Bucket(orderUser)
 			if b == nil {
 				return io.EOF
@@ -492,73 +556,72 @@ func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 	})
 
 }
-func OrderGet(orderid,userid string,hand func(interface{}))error{
-	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		return  DB.View(func(t *bolt.Tx)error{
-			b := t.Bucket(orderUser)
-			//b := t.Bucket(order)
-			if b == nil {
-				return io.EOF
-			}
-			b = b.Bucket([]byte(userid))
-			if b == nil {
-				return io.EOF
-			}
-			v := b.Get([]byte(orderid))
-			if v == nil {
-				return io.EOF
-			}
-			b = t.Bucket(order)
-			if b == nil {
-				return io.EOF
-			}
-			v = b.Get([]byte(orderid))
-			if v == nil {
-				return io.EOF
-			}
-			var db map[string]interface{}
-			err := json.Unmarshal(v,&db)
-			if err != nil {
-				return err
-			}
-			if db["goodsid"]== nil {
-				return io.EOF
-			}
-			hand(db)
-			return nil
-		})
-	})
-	//return orderGet(orderid,userid,hand)
-}
-
-func orderGet(orderid,userid string,hand func(interface{}))error{
-	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		return  DB.View(func(t *bolt.Tx)error{
-			b := t.Bucket(order)
-			if b == nil {
-				return io.EOF
-			}
-			v := b.Get([]byte(orderid))
-			if v == nil {
-				return io.EOF
-			}
-			var db map[string]interface{}
-			err := json.Unmarshal(v,&db)
-			if err != nil {
-				return err
-			}
-			if userid != ""{
-			//fmt.Println(db)
-			uid := db["userid"]
-			if uid != nil &&  uid.(string) != userid {
-				return io.EOF
-			}
-			}
-			hand(db)
-			return nil
-		})
-	})
-}
+//func OrderGet(orderid,userid string,hand func(interface{}))error{
+//	return openSiteDB(orderDB,func(DB *bolt.DB)error{
+//		return  DB.View(func(t *bolt.Tx)error{
+//			b := t.Bucket(orderUser)
+//			//b := t.Bucket(order)
+//			if b == nil {
+//				return io.EOF
+//			}
+//			b = b.Bucket([]byte(userid))
+//			if b == nil {
+//				return io.EOF
+//			}
+//			v := b.Get([]byte(orderid))
+//			if v == nil {
+//				return io.EOF
+//			}
+//			b = t.Bucket(order)
+//			if b == nil {
+//				return io.EOF
+//			}
+//			v = b.Get([]byte(orderid))
+//			if v == nil {
+//				return io.EOF
+//			}
+//			var db map[string]interface{}
+//			err := json.Unmarshal(v,&db)
+//			if err != nil {
+//				return err
+//			}
+//			if db["goodsid"]== nil {
+//				return io.EOF
+//			}
+//			hand(db)
+//			return nil
+//		})
+//	})
+//	//return orderGet(orderid,userid,hand)
+//}
+//func orderGet(orderid,userid string,hand func(interface{}))error{
+//	return openSiteDB(orderDB,func(DB *bolt.DB)error{
+//		return  DB.View(func(t *bolt.Tx)error{
+//			b := t.Bucket(order)
+//			if b == nil {
+//				return io.EOF
+//			}
+//			v := b.Get([]byte(orderid))
+//			if v == nil {
+//				return io.EOF
+//			}
+//			var db map[string]interface{}
+//			err := json.Unmarshal(v,&db)
+//			if err != nil {
+//				return err
+//			}
+//			if userid != ""{
+//			//fmt.Println(db)
+//			uid := db["userid"]
+//			if uid != nil &&  uid.(string) != userid {
+//				return io.EOF
+//			}
+//			}
+//			hand(db)
+//			return nil
+//		})
+//	})
+//}
 func (self *ShoppingInfo)Load(db *bolt.DB) error {
 	if self.Py == "" {
 		return fmt.Errorf("name = nil")
@@ -591,7 +654,7 @@ func (self *ShoppingInfo) toByte() []byte {
 }
 
 func (self *ShoppingInfo) SaveToDB(db *bolt.DB) error {
-	return db.Update(func(t *bolt.Tx)error{
+	return db.Batch(func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(SiteList)
 		if err != nil {
 			return err
@@ -616,9 +679,7 @@ func OrderUpdateTime(orderid,py string,ti []byte)error{
 			//}
 			return b_.Put([]byte(orderid),[]byte(py))
 		})
-
 	})
-
 }
 
 func OpenSiteDB(dbname string,h func(*bolt.DB)error)error{
@@ -663,7 +724,9 @@ func InitShoppingMap(dbname string){
 		//fmt.Println(sh)
 		hand := FuncMap[sh.Py]
 		if hand != nil {
-			ShoppingMap.Store(sh.Py,hand(sh,dbname))
+			shop := hand(sh,dbname)
+			ShoppingMap.Store(sh.Py,shop)
+
 		}
 		return nil
 	})

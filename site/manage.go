@@ -20,7 +20,7 @@ func init(){
 	manageFunc := func() gin.HandlerFunc {
 		return checkManage
 	}()
-	v1 := Router.Group("/v1",manageFunc)
+	v1 := Router.Group("/v2",manageFunc)
 	//v1.GET("/article/add",func(c *gin.Context){
 	//	ar := &article.Article{
 	//		title:c.Query("title"),
@@ -147,22 +147,22 @@ func init(){
 		}
 		c.JSON(http.StatusOK,li)
 	})
-	v1.GET("/order/time",func(c *gin.Context){
-		t := c.Query("t")
-		if t == "" {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"t error"})
-			return
-		}
-		dbMap := map[string][]interface{}{}
-		shopping.OrderWithTime([]byte(t),func(k string,db interface{}){
-			dbMap[k] = append(dbMap[k],db)
-		})
-		if len(dbMap) == 0 {
-			c.JSON(http.StatusNotFound,gin.H{"msg":"error"})
-			return
-		}
-		c.JSON(http.StatusOK,dbMap)
-	})
+	//v1.GET("/order/time",func(c *gin.Context){
+	//	t := c.Query("t")
+	//	if t == "" {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"t error"})
+	//		return
+	//	}
+	//	dbMap := map[string][]interface{}{}
+	//	shopping.OrderWithTime([]byte(t),func(k string,db interface{}){
+	//		dbMap[k] = append(dbMap[k],db)
+	//	})
+	//	if len(dbMap) == 0 {
+	//		c.JSON(http.StatusNotFound,gin.H{"msg":"error"})
+	//		return
+	//	}
+	//	c.JSON(http.StatusOK,dbMap)
+	//})
 	v1.GET("order_apply/update",func(c *gin.Context){
 		orderid := c.Query("orderid")
 		if orderid == "" {

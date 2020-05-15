@@ -2,13 +2,13 @@ package main
 import(
 	"github.com/zaddone/studySystem/shopping"
 	//"github.com/zaddone/studySystem/article"
-	"github.com/zaddone/studySystem/config"
+	//"github.com/zaddone/studySystem/config"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	"encoding/json"
 	//"compress/gzip"
-	"io"
+	//"io"
 	"regexp"
 	"net/http"
 	"strings"
@@ -17,7 +17,7 @@ import(
 	"flag"
 	"time"
 	"sync"
-	"net/http/httputil"
+	//"net/http/httputil"
 )
 var(
 
@@ -33,22 +33,6 @@ var(
 	Port = flag.String("p",":8080","port")
 )
 
-func ReverseProxy() gin.HandlerFunc {
-
-	return func(c *gin.Context) {
-		fmt.Println(c.Request.URL)
-		director := func(req *http.Request) {
-			r := c.Request
-			req = r
-			req.URL.Scheme = "http"
-			req.URL.Host = config.Conf.ArticleServer
-			req.Host = "http"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(c.Writer, c.Request)
-	}
-
-}
 func runServerClearMap(){
 	for{
 		time.Sleep(time.Hour*1)
@@ -126,9 +110,11 @@ func checkCache(uri []byte) (c interface{}) {
 	}
 	return
 }
+
 func checkSession(c *gin.Context){
-	fmt.Println(c.Request.RemoteAddr)
-	ip := IpStrToByte(c.Request.RemoteAddr)
+	//fmt.Println("remote addr",c.Request.RemoteAddr)
+	//fmt.Printf("%s",c.Request.Header["X-Forwarded-For"])
+	ip := IpStrToByte(c.Request.Header.Get("X-Forwarded-For"))
 	if ip == nil {
 		c.Abort()
 		return
@@ -161,7 +147,7 @@ func ClearSessionMap(t time.Time){
 
 func IpStrToByte(s string) []byte {
 	ips := strings.Split(s,":")
-	if len(ips) !=2 {
+	if len(ips) < 1 {
 		return nil
 	}
 	var ipaddr [4]byte
@@ -193,56 +179,56 @@ func init(){
 	//	//c.Data(200,"text/html",Html)
 	//})
 	//Router.Group("/article",ReverseProxy())
-	//Router.Group("/v1",manageFunc)
-	Router.GET("/sendsms",func(c *gin.Context){
-		phone := c.Query("phone")
-		if phone == "" {
-			return
-		}
-		//c.JSON(http.StatusOK,gin.H{"msg":"success"})
-		//return
-		err := PhoneCode(phone)
-		if err != nil {
-			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
-			return
-		}
-		//c.JSON(http.StatusOK,gin.H{"code":randCode()})
-		c.JSONP(http.StatusOK,gin.H{"msg":"success"})
-	})
-	Router.GET("/checksms",func(c *gin.Context){
-		phone := c.Query("phone")
-		if phone == "" {
-			return
-		}
-		code := c.Query("code")
-		if code == "" {
-			return
-		}
-		//session := c.Query("seccion")
-		//if session == "" {
-		//	return
-		//}
-		err := CheckPhoneCode(phone,code)
-		if err != nil {
-			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
-			return
-		}
-		user := shopping.User{UserId:phone}
-		err = user.Get()
-		if err != nil {
-			if err != io.EOF {
-				c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
-				return
-			}
-			user.Session = shopping.Sha1([]byte(fmt.Sprintf("%s%s%s",time.Now(),c.Request.RemoteAddr,phone)))
-			err = user.Update()
-			if err != nil {
-				c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
-				return
-			}
-		}
-		c.JSONP(http.StatusOK,gin.H{"msg":"success","user":user})
-	})
+	//Router.GET("/sendsms",func(c *gin.Context){
+	//	phone := c.Query("phone")
+	//	if phone == "" {
+	//		return
+	//	}
+	//	//c.JSON(http.StatusOK,gin.H{"msg":"success"})
+	//	//return
+	//	err := PhoneCode(phone)
+	//	if err != nil {
+	//		c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//		return
+	//	}
+	//	//c.JSON(http.StatusOK,gin.H{"code":randCode()})
+	//	c.JSONP(http.StatusOK,gin.H{"msg":"success"})
+	//})
+	//Router.GET("/checksms",func(c *gin.Context){
+	//	phone := c.Query("phone")
+	//	if phone == "" {
+	//		return
+	//	}
+	//	code := c.Query("code")
+	//	if code == "" {
+	//		return
+	//	}
+	//	//session := c.Query("seccion")
+	//	//if session == "" {
+	//	//	return
+	//	//}
+	//	err := CheckPhoneCode(phone,code)
+	//	if err != nil {
+	//		c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//		return
+	//	}
+	//	user := shopping.User{UserId:phone}
+	//	err = user.Get()
+	//	if err != nil {
+	//		if err != io.EOF {
+	//			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//			return
+	//		}
+	//		user.Session = shopping.Sha1([]byte(fmt.Sprintf("%s%s%s",time.Now(),c.Request.RemoteAddr,phone)))
+	//		err = user.Update()
+	//		if err != nil {
+	//			c.JSONP(http.StatusNotFound,gin.H{"msg":err.Error()})
+	//			return
+	//		}
+	//	}
+	//	c.JSONP(http.StatusOK,gin.H{"msg":"success","user":user})
+	//})
+	//search := Router.Group("/search",manageFunc)
 	Router.GET("/",gzip.Gzip(gzip.DefaultCompression),func(c *gin.Context){
 		//session,err := c.Cookie(SessionId)
 		//if err != nil {

@@ -23,6 +23,16 @@ var (
 func NewVip(sh *ShoppingInfo,r string) ShoppingInterface{
 	t := &Vip{Info:sh}
 	t.Url = "https://gw.vipapis.com"
+	//go func(){
+	//	for _ = range t.DownChan{
+	//		t.OrderDownSelf(func(db interface{}){
+	//			err := OrderUpdate(db.(map[string]interface{})["order_id"].(string),db)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//			}
+	//		})
+	//	}
+	//}()
 	return t
 }
 func Hmac(key, data string) string {
@@ -34,6 +44,7 @@ type Vip struct{
 	Info *ShoppingInfo
 	VipPid []string
 	Url string
+	//DownChan chan bool
 }
 func (self *Vip)addSign(u *url.Values,body string){
 	u.Add("appKey",self.Info.Client_id)
@@ -306,7 +317,7 @@ func (self *Vip)OrderDown(hand func(interface{}))error{
 				end:=int64(l_["settledTime"].(float64))
 				if end>0{
 					l_["endTime"] =int64(l_["signTime"].(float64))
-					l_["PayTime"] = end
+					l_["payTime"] = end
 				}
 				var id []string
 				var name []string
@@ -338,7 +349,7 @@ func (self *Vip)OrderDown(hand func(interface{}))error{
 
 		}
 		Now := time.Now().Unix()
-		if end.Unix()> Now {
+		if end.Unix() > Now {
 			self.Info.Update = Now
 			break
 		}
@@ -349,4 +360,8 @@ func (self *Vip)OrderDown(hand func(interface{}))error{
 }
 func (self *Vip)OrderDownSelf(hand func(interface{}))error{
 	return self.OrderDown(hand)
+}
+
+func (self *Vip) Test()interface{}{
+	return nil
 }

@@ -25,10 +25,23 @@ var (
 type Pdd struct{
 	Info *ShoppingInfo
 	PddPid []string
+	//DownChan chan bool
 	//OrderDB *bolt.DB
 }
 func NewPdd(sh *ShoppingInfo,r string) (ShoppingInterface) {
-	return &Pdd{Info:sh}
+	j :=&Pdd{Info:sh}
+	//go func(){
+	//	for _ = range j.DownChan{
+	//		j.OrderDownSelf(func(db interface{}){
+	//			err := OrderUpdate(db.(map[string]interface{})["order_id"].(string),db)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//			}
+	//		})
+	//	}
+	//}()
+	return j
+
 	//if !o {
 	//	return p
 	//}
@@ -321,23 +334,22 @@ func (self *Pdd) GoodsDetail(words ...string)interface{}{
 	//return res.(map[string]interface{})["goods_details"]
 	//db_.goods_detail_response.goods_details
 }
-
-func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
-	//pdd.ddk.order.detail.get
-	if len(keys)<2 {
-		return nil
-	}
-	err := orderGet(keys[0],keys[1],func(db interface{}){
-		d = db
-		//d = string(db.([]byte))
-	})
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-	return
-	//return nil
-}
+//func (self *Pdd)OrderSearch(keys ...string)(d interface{}){
+//	//pdd.ddk.order.detail.get
+//	if len(keys)<2 {
+//		return nil
+//	}
+//	err := orderGet(keys[0],keys[1],func(db interface{}){
+//		d = db
+//		//d = string(db.([]byte))
+//	})
+//	if err != nil {
+//		fmt.Println(err)
+//		return nil
+//	}
+//	return
+//	//return nil
+//}
 func (self *Pdd)OutUrl(db interface{}) string {
 	return db.(map[string]interface{})["short_url"].(string)
 	//res := db.(map[string]interface{})["goods_promotion_url_generate_response"]
@@ -469,3 +481,7 @@ func (self *Pdd) getOrder(begin,end time.Time,page int)interface{}{
 	}
 	//return self.ClientHttp(u)
 }
+func (self *Pdd) Test()interface{}{
+	return nil
+}
+

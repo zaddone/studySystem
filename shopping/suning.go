@@ -20,19 +20,33 @@ var (
 )
 
 func NewSuning(sh *ShoppingInfo,r string) (ShoppingInterface){
-	return &Suning{
+	s:= &Suning{
 		Info:sh,
 		u:url.Values{
 			"appkey":[]string{sh.Client_id},
 			"versionNo":[]string{"v1.2"},
 		},
 		//pid:"658414",
+		//DownChan:make(chan bool,100),
 	}
+	//go func(){
+	//	for _ = range s.DownChan{
+	//		s.OrderDownSelf(func(db interface{}){
+	//			err := OrderUpdate(db.(map[string]interface{})["order_id"].(string),db)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//			}
+	//		})
+	//	}
+	//}()
+	return s
+
 }
 
 type Suning struct{
 	Info *ShoppingInfo
 	u url.Values
+	//DownChan chan bool
 	//pid string
 }
 
@@ -309,5 +323,8 @@ func (self *Suning)OrderDownSelf(hand func(interface{}))error{
 	return self.OrderDown(hand)
 }
 func (self *Suning)OrderDown(hand func(interface{}))error{
+	return nil
+}
+func (self *Suning) Test()interface{}{
 	return nil
 }

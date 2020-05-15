@@ -35,6 +35,7 @@ var (
 	dbLast = []byte("last")
 	dbPhone = []byte("Phone")
 	orderTimeFormat = "2006010215"
+	orderTimeFormatList = "20060102150405"
 	payTimeFormat = "20060102"
 	jdSiteid = "2009626993"
 	//week = []string{""}
@@ -54,7 +55,17 @@ func NewJd(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	if siteDB == "" {
 		return j
 	}
-	return j
+	//go func (){
+	//	for _ = range j.DownChan{
+	//		j.OrderDownSelf(func(db interface{}){
+	//			err := OrderUpdate(db.(map[string]interface{})["order_id"].(string),db)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//			}
+	//		})
+	//	}
+	//}()
+	//return j
 	go func(){
 		for{
 		err := j.ReToken(siteDB)
@@ -79,6 +90,7 @@ type Jd struct{
 	Info *ShoppingInfo
 	Pid string
 	//OrderDB *bolt.DB
+	//DownChan chan bool
 }
 
 func (self *Jd) ReToken (siteDB string) error {
@@ -404,20 +416,20 @@ func (self *Jd) GoodsUrl(words ...string) interface{}{
 	return self.ClientHttp(JdUrl,u)
 
 }
-func (self *Jd)OrderSearch(keys ...string)(d interface{}){
-	if len(keys)<2 {
-		return
-	}
-	err := orderGet(keys[0],keys[1],func(db interface{}){
-		d = db
-		//d = string(db.([]byte))
-	})
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-	return
-}
+//func (self *Jd)OrderSearch(keys ...string)(d interface{}){
+//	if len(keys)<2 {
+//		return
+//	}
+//	err := orderGet(keys[0],keys[1],func(db interface{}){
+//		d = db
+//		//d = string(db.([]byte))
+//	})
+//	if err != nil {
+//		fmt.Println(err)
+//		return nil
+//	}
+//	return
+//}
 
 func (self *Jd)OutUrl_(db interface{}) string {
 	//fmt.Println(db)
@@ -499,14 +511,47 @@ func (self *Jd) getOrder(t time.Time,page int)interface{}{
 		panic(err)
 	}
 	u.Add("param_json",string(body))
+	//fmt.Println(t)
 	return self.ClientHttp(JdUrl,u)
+}
 
+func (self *Jd) getOrder_(t,e time.Time,page int)interface{}{
+	u := &url.Values{}
+	u.Add("method","jd.kepler.order.getlist")
+	u.Add("v","1.0")
+	u.Add("access_token",self.Info.Token)
+	query := map[string]interface{}{
+		"beginTime":t.Format(orderTimeFormatList),
+		"endTime":e.Format(orderTimeFormatList),
+		"pageIndex":page,
+		"pageSize":30,
+	}
+	body,err := json.Marshal(query)
+	if err != nil {
+		panic(err)
+	}
+	u.Add("param_json",string(body))
+	//fmt.Println(t)
+	return self.ClientHttp(JdUrl,u)
+}
+
+func (self *Jd) Test()interface{}{
+	//jd.kepler.order.getorderdetail
+	var li []interface{}
+	err := self.OrderDown(func(l interface{}){
+		fmt.Println(l)
+		li = append(li,l)
+
+	})
+	if err != nil {
+		return err
+	}
+	return li
 }
 func (self *Jd) OrderDownSelf(hand func(interface{}))error{
 	return self.OrderDown(hand)
 }
-func (self *Jd) OrderDown(hand func(interface{}))error{
-	//fmt.Println("jd down")
+func (self *Jd) OrderDown_(hand func(interface{}))error{
 	var begin time.Time
 	if self.Info.Update == 0 {
 		var err error
@@ -517,17 +562,65 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 	}else{
 		begin = time.Unix(self.Info.Update,0)
 	}
-
-	//fmt.Println(begin)
 	for{
 		page := 1
-		//fmt.Println(begin)
+		end := begin.AddDate(0,0,6)
+		for {
+			db := self.getOrder_(begin,end,page)
+			if db == nil {
+				return io.EOF
+			}
+			fmt.Println(db)
+			page++
+			res := db.(map[string]interface{})["jd_kepler_order_getlist_response"]
+			if res == nil {
+				fmt.Println("response",db)
+				return io.EOF
+			}
+			li := res.(map[string]interface{})["orders"]
+			if li == nil {
+				fmt.Println("order",db)
+				return io.EOF
+				//break
+			}
+			li_ := li.([]interface{})
+			for _,l := range li_ {
+				fmt.Println(l)
+				hand(l)
+			}
+			if len(li_) <20 {
+				break
+			}
+		}
+		now := time.Now().Unix()
+		if now < end.Unix() {
+			//self.Info.Update = now
+			break
+		}
+		begin = end
+		time.Sleep(1*time.Second)
+	}
+	//self.Info.Update = begin.Unix()
+	return nil
+}
+
+func (self *Jd) OrderDown(hand func(interface{}))error{
+	var begin time.Time
+	if self.Info.Update == 0 {
+		var err error
+		begin,err = time.Parse(timeFormat,"2020-02-03 16:00:00")
+		if err != nil {
+			panic(err)
+		}
+	}else{
+		begin = time.Unix(self.Info.Update,0)
+	}
+	for{
+		page := 1
 		for {
 			db := self.getOrder(begin,page)
 			if db == nil {
-				//break
-				time.Sleep(1*time.Second)
-				continue
+				return io.EOF
 			}
 			page++
 			res := db.(map[string]interface{})["jd_union_open_order_query_response"]
@@ -592,13 +685,16 @@ func (self *Jd) OrderDown(hand func(interface{}))error{
 				break
 			}
 		}
-		begin = begin.Add(1*time.Hour)
-		now := time.Now()
-		if now.Unix()< begin.Unix() && now.Hour() < begin.Hour(){
+		now := time.Now().Unix()
+		if now< begin.Unix() {
+			self.Info.Update = now
 			break
 		}
+		begin = begin.Add(1*time.Hour)
+		//begin = end
+		//time.Sleep(1*time.Second)
 	}
-	self.Info.Update = begin.Unix()
+	//self.Info.Update = begin.Unix()
 	return nil
 	//jd.union.open.order.query
 	//return io.EOF

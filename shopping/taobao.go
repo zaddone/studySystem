@@ -412,3 +412,6 @@ func (self *Taobao)OrderDown(hand func(interface{}))error{
 	//return nil
 }
 
+func (self *Taobao) Test()interface{}{
+	return nil
+}

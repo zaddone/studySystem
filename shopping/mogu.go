@@ -21,10 +21,21 @@ var (
 
 func NewMogu(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 	m := &Mogu{Info:sh}
-	return m
+	//return m
 	if siteDB == "" {
 		return m
 	}
+
+	//go func (){
+	//	for _ = range m.DownChan{
+	//		m.OrderDownSelf(func(db interface{}){
+	//			err := OrderUpdate(db.(map[string]interface{})["order_id"].(string),db)
+	//			if err != nil {
+	//				fmt.Println(err)
+	//			}
+	//		})
+	//	}
+	//}()
 	go func(){
 		for{
 			//fmt.Println(m.Info)
@@ -47,6 +58,7 @@ type Mogu struct{
 	Info *ShoppingInfo
 	//Pid string
 	//OrderDB *bolt.DB
+	//DownChan chan bool
 }
 
 func (self *Mogu) ReToken (siteDB string) error {
@@ -473,4 +485,7 @@ func(self *Mogu)OrderDown(hand func(interface{}))error{
 	}
 	return nil
 
+}
+func (self *Mogu) Test()interface{}{
+	return nil
 }

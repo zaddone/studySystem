@@ -7,6 +7,7 @@ import(
 	"time"
 	"strings"
 	"sort"
+	//"sync"
 	"strconv"
 	"github.com/gin-gonic/gin"
 	"github.com/zaddone/studySystem/shopping"
@@ -19,7 +20,7 @@ var(
 	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
 	Port = flag.String("p",":8082","port")
-	Remote = flag.String("r", "https://www.zaddone.com/v1","remote")
+	Remote = flag.String("r", "http://127.0.0.1:8080/v2","remote")
 )
 
 func addSign(u *url.Values){
@@ -34,6 +35,21 @@ func addSign(u *url.Values){
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
 	addSign(&u)
 	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
+}
+
+func UpdateShopping(sh *shopping.ShoppingInfo) error {
+	return requestHttp(
+		"/updatesite/"+sh.Py,
+		"GET",
+		url.Values{"update":[]string{fmt.Sprintf("%d",sh.Update)}},
+		nil,
+		func(body io.Reader,res *http.Response)error{
+			if res.StatusCode != 200 {
+				return fmt.Errorf(res.Status)
+			}
+			fmt.Println(sh)
+			return nil
+	})
 }
 func InitShoppingMap()error{
 	return requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
@@ -89,6 +105,7 @@ func checkManage(c *gin.Context){
 		c.Abort()
 		return
 	}
+	fmt.Println("next")
 	c.Next()
 }
 func init(){
@@ -162,14 +179,35 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":"userid error"})
 			return
 		}
-		err := shopping.OrderApply(userid,orderid,func(db interface{}){
-			c.JSON(http.StatusOK,db)
-		})
-		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+		w := make(chan bool)
+		go func (){
+			err := shopping.OrderApply(userid,orderid,func(db interface{}){
+				c.JSON(http.StatusOK,db)
+				w<-true
+			})
+			if err == io.EOF{
+			close(w)
+			shopping.ShoppingMap.Range(func(k,v interface{})bool{
+				sh := v.(shopping.ShoppingInterface)
+				err = UpdateShopping(sh.GetInfo())
+				if err != nil {
+					fmt.Println(err)
+				}
+				return true
+			})
+			}
+		}()
+		<-w
+		return
+	})
+
+	Router.GET("test/:py",func(c *gin.Context){
+		sh_,_ := shopping.ShoppingMap.Load(c.Param("py"))
+		if sh_ == nil {
 			return
 		}
-		return
+		c.JSON(http.StatusOK,gin.H{"msg":sh_.(shopping.ShoppingInterface).Test()})
+
 	})
 	Router.POST("/updateorder/:py",manageFunc,func(c *gin.Context){
 		py := c.Param("py")
@@ -204,6 +242,7 @@ func init(){
 		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 		return
 	})
+
 
 	Router.GET("user/order",manageFunc,func(c *gin.Context){
 		u := c.Query("userid")
