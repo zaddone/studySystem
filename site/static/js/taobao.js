@@ -52,9 +52,9 @@ function ShowTaobaoBox(key){
   }
   $.ajax({
     type: "get",
-    dataType: "json",
-    cache:false,
-    url: '/goods/taobao',
+    dataType: "jsonp",
+    //cache:false,
+    url: 'https://www.zaddone.com/site/goods/taobao',
     data:{"goodsid":val.Ext,"ext":val.Name},	  
     success: function(db){
      //console.log(db)

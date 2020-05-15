@@ -157,7 +157,7 @@ func(self *Mogu)stuctured(data interface{})(g Goods){
 	}
 	g= Goods{
 		Id:d_["itemId"].(string),
-		Img:[]string{d_["pictUrlForH5"].(string)},
+		Img:[]string{strings.Replace(d_["pictUrlForH5"].(string),"http:","",-1)},
 		Name:d_["title"].(string),
 		Tag:d_["shopTitle"].(string),
 		Price:p,

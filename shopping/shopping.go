@@ -7,7 +7,7 @@ import(
 	"io"
 	"bytes"
 	//"strings"
-	//"strconv"
+	"strconv"
 	//"encoding/gob"
 	"time"
 	"io/ioutil"
@@ -186,29 +186,49 @@ type ShoppingInfo struct {
 	Update int64
 	UpOrder int64
 }
-
 type OrderApplyStruct struct{
 	Fee float64
+	//FeeP float64
 	Date int64
 }
 func (self *OrderApplyStruct) encode() []byte {
-    var buf bytes.Buffer
-    err := gob.NewEncoder(&buf).Encode(self)
-    if err != nil {
-	panic(err)
-    }
-    return buf.Bytes()
+	var buf bytes.Buffer
+	err := gob.NewEncoder(&buf).Encode(self)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
 }
 
 func (self *OrderApplyStruct) decode(data []byte) error {
-    return gob.NewDecoder(bytes.NewBuffer(data)).Decode(self)
+	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(self)
 }
-func OrderApplyUpdateDB(userid,orderid string,t *bolt.Tx)error {
+func (self *OrderApplyStruct) getkey() []byte {
+	var k_ [8]byte
+	binary.BigEndian.PutUint64(k_[:],uint64(self.Date))
+	return k_[:]
+}
+func OrderApplyUpdateDB(userid,orderid string,ordermap interface{},t *bolt.Tx)error {
 	o := []byte(orderid)
 	u := []byte(userid)
-	ti := time.Now().Unix()
-	var k_ [8]byte
-	binary.BigEndian.PutUint64(k_[:],uint64(ti))
+	var order_map map[string]interface{}
+	if ordermap == nil {
+		_b := t.Bucket(order)
+		if _b == nil {
+			return fmt.Errorf("order bucket is nil")
+		}
+		order_val := _b.Get(o)
+		if order_val == nil {
+			return fmt.Errorf("order is nil")
+		}
+		err := json.Unmarshal(order_val,&order_map)
+		if err != nil {
+			return err
+		}
+	}else{
+		order_map = ordermap.(map[string]interface{})
+	}
+
 	b_,err := t.CreateBucketIfNotExists(orderUser)
 	if err != nil {
 		return err
@@ -225,34 +245,38 @@ func OrderApplyUpdateDB(userid,orderid string,t *bolt.Tx)error {
 	if err != nil {
 		return err
 	}
-
-	vid := uub.Get(o)
-	var oa *OrderApplyStruct
-	if vid != nil {
-		uub_.Delete(vid)
-		//return nil
-		oa = &OrderApplyStruct{}
-		oa.decode(vid)
-		oa.Date = ti
-	}else{
-		_b := t.Bucket(order)
-		order_val := _b.Get(o)
-		if order_val == nil {
-			return fmt.Errorf("order is nil")
-		}
-		var order_map map[string]interface{}
-		err := json.Unmarshal(order_val,&order_map)
+	var Sum float64
+	sumFee := ub.Get([]byte("sum"))
+	if sumFee != nil {
+		Sum,err = strconv.ParseFloat(string(sumFee),64)
 		if err != nil {
-			return err
+			panic(err)
 		}
-		oa = &OrderApplyStruct{Fee:order_map["fee"].(float64),Date:ti}
+	}
+	oa := &OrderApplyStruct{}
+	vid := uub.Get(o)
+	if vid != nil {
+		oa.decode(vid)
+		Sum -= oa.Fee
+		uub_.Delete(oa.getkey())
+	}
+	if order_map["payTime"] == nil{
+		oa.Date = order_map["time"].(int64)
+		oa.Fee = 0
+	}else{
+		oa.Date = order_map["payTime"].(int64)
+		oa.Fee = order_map["fee"].(float64)
+	}
+	Sum += oa.Fee
+	err = ub.Put([]byte("sum"),[]byte(fmt.Sprintf("%.2f",Sum)))
+	if err != nil {
+		return err
 	}
 	err = uub.Put(o,oa.encode())
 	if err != nil {
 		return err
 	}
-	return uub_.Put(k_[:],o)
-
+	return uub_.Put(oa.getkey(),o)
 }
 
 func OrderApplyUpdate(userid,orderid string)error {
@@ -261,7 +285,7 @@ func OrderApplyUpdate(userid,orderid string)error {
 		if err != nil {
 			return err
 		}
-		err = OrderApplyUpdateDB(userid,orderid,t)
+		err = OrderApplyUpdateDB(userid,orderid,nil,t)
 		if err != nil {
 			return err
 		}
@@ -290,6 +314,7 @@ func DownOrderAll(hand func(db interface{})) {
 }
 
 func OrderApplyDB(userid,orderid string,t *bolt.Tx,hand func(interface{}))error{
+
 	b,err := t.CreateBucketIfNotExists(order)
 	if err != nil {
 		return err
@@ -303,7 +328,6 @@ func OrderApplyDB(userid,orderid string,t *bolt.Tx,hand func(interface{}))error{
 			__db := _db.(map[string]interface{})
 			oid_ := __db["order_id"].(string)
 			if oid_ == orderid {
-				//db =  __db
 				__db["userid"] = userid
 				hand(__db)
 			}
@@ -334,7 +358,7 @@ func OrderApplyDB(userid,orderid string,t *bolt.Tx,hand func(interface{}))error{
 	if err = b.Put(o,v); err != nil {
 		return err
 	}
-	return OrderApplyUpdateDB(userid,orderid,t)
+	return OrderApplyUpdateDB(userid,orderid,db,t)
 
 }
 
@@ -385,7 +409,7 @@ func OrderUpdateDB(orderid string,db interface{},t *bolt.Tx)error{
 		return err
 	}
 	if db_["userid"]!=nil && len(db_["userid"].(string)) > 0{
-		return OrderApplyUpdateDB(db_["userid"].(string),orderid,t)
+		return OrderApplyUpdateDB(db_["userid"].(string),orderid,db_,t)
 	}
 	return nil
 
@@ -446,11 +470,13 @@ func OrderListDB(orderid string,DB *bolt.DB,hand func(map[string]interface{})err
 		return nil
 	})
 }
+
 func OrderList(orderid string,hand func(map[string]interface{})error)error{
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
 		return OrderListDB(orderid,DB,hand)
 	})
 }
+
 func OrderUserDel(numid,userid string) error {
 	return nil
 }
