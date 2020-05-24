@@ -190,6 +190,7 @@ type OrderApplyStruct struct{
 	Fee float64
 	//FeeP float64
 	Date int64
+	//Date_ int64
 }
 func (self *OrderApplyStruct) encode() []byte {
 	var buf bytes.Buffer
@@ -204,6 +205,9 @@ func (self *OrderApplyStruct) decode(data []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(self)
 }
 func (self *OrderApplyStruct) getkey() []byte {
+	if self.Date == 0 {
+		self.Date = time.Now().Unix()
+	}
 	var k_ [8]byte
 	binary.BigEndian.PutUint64(k_[:],uint64(self.Date))
 	return k_[:]
@@ -241,16 +245,17 @@ func OrderApplyUpdateDB(userid,orderid string,ordermap interface{},t *bolt.Tx)er
 	if err != nil {
 		return err
 	}
-	uub_,err := ub.CreateBucketIfNotExists([]byte("time"))
-	if err != nil {
-		return err
-	}
+	//uub_,err := ub.CreateBucketIfNotExists([]byte("time"))
+	//if err != nil {
+	//	return err
+	//}
 	var Sum float64
 	sumFee := ub.Get([]byte("sum"))
 	if sumFee != nil {
 		Sum,err = strconv.ParseFloat(string(sumFee),64)
 		if err != nil {
-			panic(err)
+			return err
+			//panic(err)
 		}
 	}
 	oa := &OrderApplyStruct{}
@@ -258,25 +263,29 @@ func OrderApplyUpdateDB(userid,orderid string,ordermap interface{},t *bolt.Tx)er
 	if vid != nil {
 		oa.decode(vid)
 		Sum -= oa.Fee
-		uub_.Delete(oa.getkey())
+		//uub_.Delete(oa.getkey())
 	}
+
+	//fmt.Println("order map")
+	//fmt.Println(order_map)
 	if order_map["payTime"] == nil{
-		oa.Date = order_map["time"].(int64)
+		oa.Date = int64(order_map["time"].(float64))
 		oa.Fee = 0
 	}else{
-		oa.Date = order_map["payTime"].(int64)
+		oa.Date =int64( order_map["payTime"].(float64))
 		oa.Fee = order_map["fee"].(float64)
 	}
+	//fmt.Println("order map 1")
 	Sum += oa.Fee
 	err = ub.Put([]byte("sum"),[]byte(fmt.Sprintf("%.2f",Sum)))
 	if err != nil {
 		return err
 	}
-	err = uub.Put(o,oa.encode())
-	if err != nil {
-		return err
-	}
-	return uub_.Put(oa.getkey(),o)
+	return uub.Put(o,oa.encode())
+	//if err != nil {
+	//	return err
+	//}
+	//return uub_.Put(oa.getkey(),o)
 }
 
 func OrderApplyUpdate(userid,orderid string)error {
@@ -291,6 +300,33 @@ func OrderApplyUpdate(userid,orderid string)error {
 		}
 		return t.Commit()
 	})
+}
+func GetUserSum(userid string) interface{} {
+	var val string
+	err := openSiteDB(orderDB,func(DB *bolt.DB)error{
+		t,err := DB.Begin(false)
+		if err != nil {
+			return err
+		}
+		b_ := t.Bucket(orderUser)
+		if b_ == nil {
+			return io.EOF
+		}
+		ub :=b_.Bucket([]byte(userid))
+		if ub == nil {
+			return io.EOF
+		}
+		v := ub.Get([]byte("sum"))
+		if v == nil {
+			return fmt.Errorf("sum is nil")
+		}
+		val = string(v)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return val
 }
 
 func DownOrderAll(hand func(db interface{})) {
@@ -314,7 +350,6 @@ func DownOrderAll(hand func(db interface{})) {
 }
 
 func OrderApplyDB(userid,orderid string,t *bolt.Tx,hand func(interface{}))error{
-
 	b,err := t.CreateBucketIfNotExists(order)
 	if err != nil {
 		return err
@@ -482,32 +517,31 @@ func OrderUserDel(numid,userid string) error {
 }
 
 func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
-	getDB := func(b *bolt.Bucket,k,id []byte) error {
+	getDB := func(b *bolt.Bucket,k []byte) error {
 		//fmt.Println(string(id))
-		v := b.Get(id)
-		t:= int64(binary.BigEndian.Uint64(k))
+		v := b.Get(k)
+		//t:= int64(binary.BigEndian.Uint64(k))
 		if v == nil {
-			if time.Now().Unix()-t > 604800{
-				return fmt.Errorf("is nil")
-			}else{
-				return io.EOF
-			}
+			//if time.Now().Unix()-t > 604800{
+			//	return fmt.Errorf("is nil")
+			//}else{
+			return io.EOF
+			//}
 		}
 		var db map[string]interface{}
 		err := json.Unmarshal(v,&db)
 		if err != nil {
 			return err
 		}
-		if db["goodsid"] == nil {
-			return nil
-		}
-
-		db["numid"] = t
+		//if db["goodsid"] == nil {
+		//	return nil
+		//}
+		db["numid"] = string(k)
 		return hand(db)
 	}
 	return openSiteDB(orderDB,func(DB *bolt.DB)error{
-		var del [][][]byte
-		err := DB.View(func(t *bolt.Tx)error{
+		//var del [][][]byte
+		return DB.View(func(t *bolt.Tx)error{
 			b_ := t.Bucket(order)
 			if b_ == nil {
 				return io.EOF
@@ -521,63 +555,66 @@ func OrderListWithUser(numid,userid string,hand func(interface{})error)error{
 				return io.EOF
 			}
 
-			b = b.Bucket([]byte("time"))
+			b = b.Bucket([]byte("order"))
 			c := b.Cursor()
-			var orid,k,v []byte
+			var orid,k []byte
 			if len(numid) == 0 {
-				k,v = c.Last()
-				err := getDB(b_,k,v)
+				k,_ = c.Last()
+				err := getDB(b_,k)
+				fmt.Println(err,k)
 				if err != nil {
-					if err == io.EOF{
-						return err
-					}
-					del = append(del,[][]byte{k,v})
+					//if err == io.EOF{
+					return err
+					//}
+					//del = append(del,[][]byte{k,v})
 				}
 			}else{
 				orid = []byte(numid)
-				k,v = c.Seek(orid)
+				k,_ = c.Seek(orid)
 				if k == nil {
 					return nil
 				}
 			}
-			for k,v = c.Prev();k!=nil;k,v=c.Prev(){
-				err := getDB(b_,k,v)
+			for k,_ = c.Prev();k!=nil;k,_=c.Prev(){
+				//fmt.Println(k)
+				err := getDB(b_,k)
 				if err != nil {
-					if err == io.EOF {
-						return err
-					}
+					//if err == io.EOF {
+					return err
+					//}
 					//del = append(del,k)
-					del = append(del,[][]byte{k,v})
+					//del = append(del,[][]byte{k,v})
 				}
 			}
+			//fmt.Println("end")
 			return nil
 		})
-		if err != nil {
-			if err != io.EOF{
-				fmt.Println(err)
-			}
-			return err
-		}
-		if len(del) == 0 {
-			return nil
-		}
-		return DB.Update(func(t *bolt.Tx)error{
-			b := t.Bucket(orderUser)
-			if b == nil {
-				return io.EOF
-			}
-			b = b.Bucket([]byte(userid))
-			if b == nil {
-				return io.EOF
-			}
-			b_o := b.Bucket([]byte("order"))
-			b_t := b.Bucket([]byte("time"))
-			for _,_id := range del{
-				b_o.Delete(_id[1])
-				b_t.Delete(_id[0])
-			}
-			return nil
-		})
+		//if err != nil {
+		//	if err != io.EOF{
+		//		fmt.Println(err)
+		//	}
+		//	return err
+		//}
+		//if len(del) == 0 {
+		//	return nil
+		//}
+		//return DB.Update(func(t *bolt.Tx)error{
+		//	b := t.Bucket(orderUser)
+		//	if b == nil {
+		//		return io.EOF
+		//	}
+		//	b = b.Bucket([]byte(userid))
+		//	if b == nil {
+		//		return io.EOF
+		//	}
+		//	b_o := b.Bucket([]byte("order"))
+		//	b_t := b.Bucket([]byte("time"))
+		//	for _,_id := range del{
+		//		b_o.Delete(_id[1])
+		//		b_t.Delete(_id[0])
+		//	}
+		//	return nil
+		//})
 
 	})
 

@@ -105,7 +105,7 @@ func checkManage(c *gin.Context){
 		c.Abort()
 		return
 	}
-	fmt.Println("next")
+	//fmt.Println("next")
 	c.Next()
 }
 func init(){
@@ -185,8 +185,9 @@ func init(){
 				c.JSON(http.StatusOK,db)
 				w<-true
 			})
-			if err == io.EOF{
+			fmt.Println(err)
 			close(w)
+			if err == io.EOF{
 			shopping.ShoppingMap.Range(func(k,v interface{})bool{
 				sh := v.(shopping.ShoppingInterface)
 				err = UpdateShopping(sh.GetInfo())
@@ -243,22 +244,38 @@ func init(){
 		return
 	})
 
+	Router.GET("user/sum",manageFunc,func(c *gin.Context){
+		u := c.Query("userid")
+		if u == "" {
+			return
+		}
+		val := shopping.GetUserSum(u)
+		switch v:=val.(type){
+			case error:
+				c.JSON(http.StatusNotFound,gin.H{"msg":v.Error()})
+				return
+			case string:
+				c.JSON(http.StatusOK,gin.H{"sum":v})
+				return
+		}
+		return
 
+	})
 	Router.GET("user/order",manageFunc,func(c *gin.Context){
 		u := c.Query("userid")
 		if u == "" {
 			return
 		}
-		o := c.Query("numid")
 		cou,err := strconv.Atoi(c.DefaultQuery("count","20"))
 		if err != nil {
 			//panic(err)
 			return
 		}
 		var li []interface{}
-		err = shopping.OrderListWithUser(o,u,func(db interface{})error{
+		err = shopping.OrderListWithUser(c.Query("numid"),u,func(db interface{})error{
 			li = append(li,db)
 			cou--
+			fmt.Println(cou)
 			if cou == 0 {
 				return io.EOF
 			}
@@ -268,6 +285,7 @@ func init(){
 			//panic(err)
 			if err != io.EOF {
 				fmt.Println(err)
+				return
 			}
 		}
 		c.JSON(http.StatusOK,li)

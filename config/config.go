@@ -40,6 +40,8 @@ type Config struct {
 	WXtoken string
 	AliyunKeyid string
 	AliyunSecret string
+	Apikeyv3 string
+	MerchantId string
 }
 func (self *Config) Save(fileName string){
 	fi,err := os.OpenFile(fileName,os.O_CREATE|os.O_WRONLY,0777)
@@ -71,6 +73,8 @@ func NewConfig(fileName string)  *Config {
 		c.CollPath = "/data"
 		c.Minitoken = ""
 		c.WXtoken = ""
+		c.Apikeyv3 = ""
+		c.MerchantId = ""
 		_,err = os.Stat(c.CollPath)
 		if err != nil {
 			err = os.MkdirAll(c.CollPath,0777)

@@ -8,6 +8,15 @@ import (
 
 func main() {
 	redi := http.NewServeMux()
+	redi.HandleFunc("/wxpay/", func(w http.ResponseWriter, r *http.Request) {
+		director := func(req *http.Request) {
+			req.URL.Path = req.URL.Path[6:]
+			req.URL.Scheme = "http"
+			req.URL.Host = "127.0.0.1:8083"
+		}
+		proxy := &httputil.ReverseProxy{Director: director}
+		proxy.ServeHTTP(w, r)
+	})
 	redi.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
 		director := func(req *http.Request) {
 			req.URL.Path = req.URL.Path[3:]

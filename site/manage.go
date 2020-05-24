@@ -111,6 +111,7 @@ func init(){
 			shopping.InitShoppingMap(*siteDB)
 			err = fmt.Errorf("success")
 		}
+		fmt.Println(sh)
 		c.JSON(http.StatusOK,gin.H{"msg":err.Error(),"content":sh})
 	})
 	v1.GET("/order/del",func(c *gin.Context){
