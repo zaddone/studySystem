@@ -5,6 +5,7 @@ import(
 	"github.com/zaddone/studySystem/shopping"
 	"github.com/zaddone/studySystem/config"
 	"github.com/zaddone/studySystem/alimama"
+	"github.com/zaddone/studySystem/alibaba"
 	"github.com/zaddone/studySystem/chromeServer"
 	"github.com/gorilla/websocket"
 	"github.com/gin-gonic/gin"
@@ -210,6 +211,23 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn.CloseHandler()(2,"end")
 
 }
+func initAlibaba(hand func(*shopping.Alibaba))error{
+
+	Info:= &shopping.ShoppingInfo{}
+	err := requestHttp("http://127.0.0.1:8008/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
+		return json.NewDecoder(body).Decode(Info)
+	})
+	if err != nil {
+		return err
+	}
+	hand(shopping.NewAlibaba(Info,""))
+}
+func handAlibabaGoods(db interface{}){
+	db_:= db.(map[string]interface{})
+	productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
+	itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
+
+}
 
 func init(){
 	flag.Parse()
@@ -222,6 +240,18 @@ func init(){
 	})
 	Router.GET("ws",func(c *gin.Context){
 		WsHandler(c.Writer, c.Request)
+	})
+	Router.GET("downgoods",func(c *gin.Context){
+		err := initAlibaba(func(ali *shopping.Alibaba){
+			alibaba.HandGoods = func(db interface{}){
+				db_:= db.(map[string]interface{})
+				productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
+				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
+				li = append(li,db)
+			}
+			alibaba.Run()
+		})
+		c.JSON(http.StatusOK,err)
 	})
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)

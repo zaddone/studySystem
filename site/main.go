@@ -531,35 +531,15 @@ func init(){
 		c.JSONP(http.StatusOK,db)
 		return
 	})
-	//Router_.GET("robots.txt",func(c *gin.Context){
-	//	c.String(http.StatusOK,"User-agent: *\nAllow:　/")
-	//	return
-	//	//User-agent: *
-	//	//Allow:　/
-	//})
+	Router.GET("test",func(c *gin.Context){
+		c.JSON(http.StatusOK,shopping.BuyShopping.GoodsDetail("618279451491"))
+		return
+	})
 	Router.GET("robots.txt",func(c *gin.Context){
 		c.String(http.StatusOK,"User-agent: *\nAllow:　/")
 		return
-		//User-agent: *
-		//Allow:　/
 	})
-	//Router_.GET("favicon.ico",func(c *gin.Context){
-	//	//c.Redirect()
-	//	c.Redirect(301,"https://img.zaddone.com/static/img/ico/favicon.ico")
-	//	//c.Data(http.StatusOK,)
-	//	//c.String(http.StatusOK,"User-agent: *\nAllow:　/")
-	//	//return
-	//	//User-agent: *
-	//	//Allow:　/
-	//})
-	//Router.GET("favicon.ico",func(c *gin.Context){
-	//	c.Redirect(301,"http://img.zaddone.com/static/img/ico/favicon.ico")
-	//	//c.String(http.StatusOK,"User-agent: *\nAllow:　/")
-	//	return
-	//	//User-agent: *
-	//	//Allow:　/
-	//})
-	///favicon.ico
+
 }
 func main(){
 	//go Router.RunTLS(":443","./3375181_zaddone.com.pem","./3375181_zaddone.com.key")

@@ -406,6 +406,7 @@ func (self *Taobao)OrderDown(hand func(interface{}))error{
 	alimama.HandOrder = hand
 	defer func(){
 		self.Info.Update = alimama.Begin.Unix()
+		alimama.HandOrder = nil
 	}()
 	return alimama.Run()
 	//return  nil

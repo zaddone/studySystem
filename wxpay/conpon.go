@@ -32,7 +32,7 @@ var (
 	header = http.Header{}
 	rand_str = rand.New(rand.NewSource(time.Now().Unix()))
 	publicKey []byte
-	rfcTime = "2006-01-02T15:04:05.000Z"
+	rfcTime = "2006-01-02T15:04:05.000-0700"
 	//timeFormat = "2006010215"
 
 )

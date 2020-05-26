@@ -46,10 +46,10 @@ var (
 	RunChrome bool
 )
 
-func init(){
+//func init(){
 	//Router.Static("/","./")
 	//go Router.Run(":8001")
-}
+//}
 func InputText(str string,endHand func()){
 	Num++
 	handMap[Num] = func(id__ float64,req_ map[string]interface{}){

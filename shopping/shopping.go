@@ -185,6 +185,7 @@ type ShoppingInfo struct {
 	TimeOut int64
 	Update int64
 	UpOrder int64
+	ReTimeOut string
 }
 type OrderApplyStruct struct{
 	Fee float64
@@ -703,6 +704,9 @@ func (self *ShoppingInfo)Load(db *bolt.DB) error {
 	})
 
 }
+func (self *ShoppingInfo) LoadByte(b []byte) error {
+	return self.loadByte(b)
+}
 
 func (self *ShoppingInfo) loadByte(b []byte) error {
 	return gob.NewDecoder(bytes.NewBuffer(b)).Decode(self)
@@ -790,6 +794,9 @@ func InitShoppingMap(dbname string){
 			shop := hand(sh,dbname)
 			ShoppingMap.Store(sh.Py,shop)
 
+		}
+		if sh.Py == "1688" {
+			BuyShopping = NewAlibaba(sh,dbname)
 		}
 		return nil
 	})

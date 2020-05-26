@@ -45,9 +45,31 @@ func init(){
 		c.JSON(http.StatusOK,li)
 	})
 	v1.GET("/shopping/:py",func(c *gin.Context){
-		sh,_ := shopping.ShoppingMap.Load(c.Param("py"))
+		py := c.Param("py")
+		sh,_ := shopping.ShoppingMap.Load(py)
 		if sh == nil {
-			c.JSON(http.StatusNotFound,nil)
+			err := shopping.OpenSiteDB(*siteDB,func(db *bolt.DB)error{
+				return db.View(func(t *bolt.Tx)error{
+					b := t.Bucket(shopping.SiteList)
+					if b == nil {
+						return fmt.Errorf("b == nil")
+					}
+					v := b.Get([]byte(py))
+					if v == nil {
+						return fmt.Errorf("v == nil")
+					}
+					Shinfo := &shopping.ShoppingInfo{}
+					err := Shinfo.LoadByte(v)
+					if err != nil {
+						return err
+					}
+					c.JSON(http.StatusOK,Shinfo)
+					return nil
+				})
+			})
+			if err != nil {
+				c.JSON(http.StatusNotFound,nil)
+			}
 			return
 		}
 		c.JSON(http.StatusOK,sh.(shopping.ShoppingInterface).GetInfo())

@@ -299,14 +299,14 @@ func (self *Jd)GoodsAppMini(words ...string)interface{}{
 	}
 	//uri := self.OutUrl(db)
 }
-func (self *Jd) GoodsCoupons(words ...string)interface{}{
-	//jd.kpl.open.item.findjoinactives
-	u := &url.Values{}
-	u.Add("method","jd.kpl.open.item.findjoinactives")
-	u.Add("v","1.0")
-	u.Add("access_token",self.Info.Token)
-
-}
+//func (self *Jd) GoodsCoupons(words ...string)interface{}{
+//	//jd.kpl.open.item.findjoinactives
+//	u := &url.Values{}
+//	u.Add("method","jd.kpl.open.item.findjoinactives")
+//	u.Add("v","1.0")
+//	u.Add("access_token",self.Info.Token)
+//
+//}
 func (self *Jd) GoodsDetail(words ...string)interface{}{
 	u := &url.Values{}
 	u.Add("method","jd.union.open.goods.promotiongoodsinfo.query")

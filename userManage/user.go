@@ -16,6 +16,7 @@ import(
 	"net/http"
 	"net/url"
 )
+
 var(
 	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
