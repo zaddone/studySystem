@@ -7,6 +7,7 @@ import(
 	"crypto/hmac"
 	"crypto/sha1"
 	"github.com/zaddone/studySystem/request"
+	"github.com/boltdb/bolt"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -22,12 +23,28 @@ var (
 
 type Alibaba struct{
 	Info *ShoppingInfo
+	DbPath string
 	//Pid string
+}
+type AlAddrForOrder struct {
+	FullName string `json:"fullName"`
+	Mobile string `json:"mobile"`
+	CityText string `json:"cityText"`
+	ProvinceText string `json:"provinceText"`
+	AreaText string `json:"areaText"`
+	TownText string `json:"townText"`
+	Address string `json:"address"`
+}
+
+type AlProductForOrder struct {
+	Offerid float64 `json:"offerid"`
+	SpecId string `json:"specId"`
+	Quantity float64 `json:"quantity"`
 }
 
 func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 
-	j:= &Alibaba{Info:sh}
+	j:= &Alibaba{Info:sh,DbPath:"alibaba.db"}
 	if siteDB == "" {
 		return j
 	}
@@ -192,6 +209,30 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
+func (self *Alibaba) CreateOrder(
+	a *AlAddrForOrder,
+	p *AlProductForOrder)interface{}{
+	addr_,err := json.Marshal(a)
+	if err != nil {
+		return err
+	}
+	product_,err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	//com.alibaba.trade:alibaba.trade.fastCreateOrder-1
+	uri := "1/com.alibaba.trade/alibaba.trade.fastCreateOrder"
+	u := &url.Values{}
+	u.Add("flow","saleproxy" )
+	u.Add("addressParam",string(addr_))
+	u.Add("cargoParamList",string(product_))
+	u.Add("access_token",self.Info.Token)
+	obj := self.ClientHttp(uri,u)
+	//fmt.Println(obj)
+	return obj
+
+
+}
 func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	uri := "1/com.alibaba.product/alibaba.agent.product.simple.get"
 	u := &url.Values{}
@@ -202,6 +243,39 @@ func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	fmt.Println(obj)
 	return obj
 }
+
+func (self *Alibaba) OpenDB (read bool,hand func(*bolt.Tx)error) error {
+
+	db,err := bolt.Open(self.DbPath,0600,nil)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	t,err := db.Begin(read)
+	if err != nil {
+		return err
+	}
+	if read {
+		defer t.Commit()
+	}
+	return hand(t)
+
+}
+func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
+
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists([]byte("product"))
+		if err != nil {
+			return err
+		}
+		v,err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(k),v)
+	})
+}
+
 
 func (self *Alibaba) SearchGoods(words ...string)interface{}{
 

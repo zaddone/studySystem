@@ -67,6 +67,9 @@ func HandForward(c *gin.Context){
 
 }
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
+	if u == nil {
+		u = url.Values{}
+	}
 	addSign(&u)
 	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
 }
@@ -211,7 +214,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn.CloseHandler()(2,"end")
 
 }
-func initAlibaba(hand func(*shopping.Alibaba))error{
+func initAlibaba(hand func(*shopping.Alibaba)error)error{
 
 	Info:= &shopping.ShoppingInfo{}
 	err := requestHttp("http://127.0.0.1:8008/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
@@ -220,14 +223,10 @@ func initAlibaba(hand func(*shopping.Alibaba))error{
 	if err != nil {
 		return err
 	}
-	hand(shopping.NewAlibaba(Info,""))
-}
-func handAlibabaGoods(db interface{}){
-	db_:= db.(map[string]interface{})
-	productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
-	itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
+	return hand(shopping.NewAlibaba(Info,""))
 
 }
+
 
 func init(){
 	flag.Parse()
@@ -242,16 +241,30 @@ func init(){
 		WsHandler(c.Writer, c.Request)
 	})
 	Router.GET("downgoods",func(c *gin.Context){
-		err := initAlibaba(func(ali *shopping.Alibaba){
+		var li []interface{}
+		err := initAlibaba(func(ali *shopping.Alibaba)error {
 			alibaba.HandGoods = func(db interface{}){
+				//li = append(li,db)
+
 				db_:= db.(map[string]interface{})
 				productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
 				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
-				li = append(li,db)
+				obj := ali.GoodsDetail(productId)
+				obj.(map[string]interface{})["itemid"] = itemId
+				err := ali.SaveProduct(productId,obj)
+				if err != nil {
+					//return err
+					panic(err)
+				}
+				li = append(li,obj)
 			}
-			alibaba.Run()
+			return alibaba.Run()
 		})
-		c.JSON(http.StatusOK,err)
+		if err != nil {
+			c.JSON(http.StatusOK,err)
+			return
+		}
+		c.JSON(http.StatusOK,li)
 	})
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)
