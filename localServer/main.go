@@ -217,7 +217,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
 
 	Info:= &shopping.ShoppingInfo{}
-	err := requestHttp("http://127.0.0.1:8008/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
+	err := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
 		return json.NewDecoder(body).Decode(Info)
 	})
 	if err != nil {
@@ -245,7 +245,6 @@ func init(){
 		err := initAlibaba(func(ali *shopping.Alibaba)error {
 			alibaba.HandGoods = func(db interface{}){
 				//li = append(li,db)
-
 				db_:= db.(map[string]interface{})
 				productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
 				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
@@ -348,7 +347,7 @@ func main(){
 	//DownOrder()
 	//sh,_ := shopping.ShoppingMap.Load("pinduoduo")
 	rooturl := fmt.Sprintf("http://127.0.0.1%s",config.Conf.Port)
-	fmt.Println(rooturl)
+	//fmt.Println(rooturl)
 	chromeServer.View(rooturl)
 	//select{}
 }

@@ -218,6 +218,9 @@ func View(uri string) error {
 	return start(nil)
 	//return start(func(u string)error{
 	//	fmt.Println(u)
+	//	select{}
+	//	return nil
+	//	//return nil
 	//	//err:= openPage_(nil)
 	//	//if err != nil {
 	//	//	return err
@@ -356,16 +359,20 @@ func start(hand func(string)error) (err error){
 				}
 			}
 			if bytes.HasPrefix(db[:n],chromekey){
-				err = hand(string(db[23:n-1]))
-				if err != nil {
-					log.Println("----------------",err)
-					fmt.Println("kill",exec.Command("pkill","chrome").Run())
-					return
+				if hand != nil {
+					err = hand(string(db[23:n-1]))
+					if err != nil {
+						log.Println("----------------",err)
+						fmt.Println("kill",exec.Command("pkill","chrome").Run())
+						return
+					}
 				}
 			}
 		}
 	}
 	cmd := exec.Command("google-chrome-stable",op... )
+	//cmd := exec.Command("google-chrome",op... )
+	//fmt.Println(cmd.String())
 	if hand != nil {
 		outerr,err := cmd.StderrPipe()
 		if err != nil {
@@ -378,6 +385,7 @@ func start(hand func(string)error) (err error){
 	if err== nil ||  err.Error() == "signal: terminated"{
 		return nil
 	}
+	//panic(err)
 	return err
 
 
