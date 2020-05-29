@@ -26,6 +26,7 @@ var(
 	//flag.String("site","127.0.0.1")
 	WXtoken = config.Conf.Minitoken
 	Router = gin.Default()
+	//shop = Router.Group("wxshop")
 	Remote = flag.String("r", "https://www.zaddone.com/site/v2","remote")
 	wsupgrader = websocket.Upgrader{
 		ReadBufferSize:   1024,
@@ -228,6 +229,7 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 }
 
 
+
 func init(){
 	flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
@@ -240,7 +242,39 @@ func init(){
 	Router.GET("ws",func(c *gin.Context){
 		WsHandler(c.Writer, c.Request)
 	})
-	Router.GET("downgoods",func(c *gin.Context){
+	Router.GET("goods/list",func(c *gin.Context){
+		var li []interface{}
+		err := initAlibaba(func(ali *shopping.Alibaba)error {
+			return ali.GoodsShow(
+				[]byte(c.Query("goodsid")),
+				func(db interface{})error{
+				li = append(li,db)
+				return nil
+			})
+		})
+		if err != nil {
+			c.JSON(http.StatusOK,err)
+			return
+		}
+		c.JSON(http.StatusOK,li)
+
+	})
+	Router.GET("goods/order",func(c *gin.Context){
+		err := initAlibaba(func(ali *shopping.Alibaba)error {
+			o := new(shopping.AlAddrForOrder)
+			p := new(shopping.AlProductForOrder)
+			o.LoadTestDB()
+			p.LoadTestDB()
+			obj := ali.CreateOrder(o,[]*shopping.AlProductForOrder{p})
+			c.JSON(http.StatusOK,obj)
+			return nil
+		})
+		if err != nil {
+			c.JSON(http.StatusOK,err)
+			return
+		}
+	})
+	Router.GET("goods/down",func(c *gin.Context){
 		var li []interface{}
 		err := initAlibaba(func(ali *shopping.Alibaba)error {
 			alibaba.HandGoods = func(db interface{}){

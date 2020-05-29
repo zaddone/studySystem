@@ -12,6 +12,7 @@ import(
 	"io"
 	"io/ioutil"
 	"sort"
+	"bytes"
 	"strconv"
 )
 var (
@@ -19,6 +20,7 @@ var (
 	Url1688 = "https://gw.open.1688.com/openapi/"
 	BuyShopping *Alibaba
 	alibabatimeFormat = "20060102150405000-0700"
+	goodsDB = []byte("product")
 )
 
 type Alibaba struct{
@@ -35,11 +37,25 @@ type AlAddrForOrder struct {
 	TownText string `json:"townText"`
 	Address string `json:"address"`
 }
+func (self *AlAddrForOrder) LoadTestDB() {
+	self.FullName = "赵伟杰"
+	self.Mobile = "18628175526"
+	self.CityText = "成都市"
+	self.ProvinceText = "四川省"
+	self.AreaText = "郫都区"
+	self.TownText = "犀浦街道"
+	self.Address = "校园路55号交大卡布里城1栋1单元1708号"
+}
 
 type AlProductForOrder struct {
-	Offerid float64 `json:"offerid"`
+	Offerid float64 `json:"offerId"`
 	SpecId string `json:"specId"`
 	Quantity float64 `json:"quantity"`
+}
+func (self *AlProductForOrder)LoadTestDB(){
+	self.Offerid = 609079420580
+	self.SpecId = "2a6b5fbe4d682e1c87a3e9e2455096df"
+	self.Quantity = 1
 }
 
 func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
@@ -209,9 +225,8 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
-func (self *Alibaba) CreateOrder(
-	a *AlAddrForOrder,
-	p *AlProductForOrder)interface{}{
+func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
+
 	addr_,err := json.Marshal(a)
 	if err != nil {
 		return err
@@ -231,7 +246,40 @@ func (self *Alibaba) CreateOrder(
 	//fmt.Println(obj)
 	return obj
 
-
+}
+func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
+	return self.OpenDB(false,func(t *bolt.Tx)error{
+		b := t.Bucket(goodsDB)
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		var k,v []byte
+		if len(num) == 0 {
+			k,v = c.First()
+			if k == nil {
+				return nil
+			}
+		}else{
+			k,v = c.Seek(num)
+			if bytes.Equal(k,num){
+				k,v  = c.Next()
+			}
+		}
+		var err error
+		for ;k != nil;k,v = c.Next() {
+			var db map[string]interface{}
+			err = json.Unmarshal(v,&db)
+			if err != nil {
+				return err
+			}
+			err = hand(db)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	uri := "1/com.alibaba.product/alibaba.agent.product.simple.get"
@@ -264,7 +312,7 @@ func (self *Alibaba) OpenDB (read bool,hand func(*bolt.Tx)error) error {
 func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
 
 	return self.OpenDB(true,func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists([]byte("product"))
+		b,err := t.CreateBucketIfNotExists(goodsDB)
 		if err != nil {
 			return err
 		}

@@ -17,8 +17,6 @@ import(
 
 var (
 	Port = flag.String("p",":8083","port")
-
-
 	Router = gin.Default()
 	stocksDB = flag.String("stocks", "stocks.db","stocks")
 	stockBucket = []byte("stocks")
