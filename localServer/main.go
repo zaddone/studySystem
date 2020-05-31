@@ -9,6 +9,8 @@ import(
 	"github.com/zaddone/studySystem/chromeServer"
 	"github.com/gorilla/websocket"
 	"github.com/gin-gonic/gin"
+	"strconv"
+	//"github.com/boltdb/bolt"
 	"net/url"
 	"time"
 	"sort"
@@ -37,10 +39,12 @@ var(
 		},
 	}
 )
+
 func Sign(c *gin.Context){
 	url_ := c.Request.URL.Query()
 	addSign(&url_)
 }
+
 func addSign(u *url.Values){
 	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	li := []string{WXtoken}
@@ -50,6 +54,7 @@ func addSign(u *url.Values){
 	sort.Strings(li)
 	u.Add("sign",shopping.Sha1([]byte(strings.Join(li,""))))
 }
+
 func HandForward(c *gin.Context){
 	//c.Request.Body.Close()
 	err := requestHttp(
@@ -67,6 +72,7 @@ func HandForward(c *gin.Context){
 	}
 
 }
+
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
 	if u == nil {
 		u = url.Values{}
@@ -74,6 +80,7 @@ func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Re
 	addSign(&u)
 	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
 }
+
 func InitShoppingMap()error{
 	return requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
 		var db []*shopping.ShoppingInfo
@@ -108,6 +115,7 @@ func downHandler(w http.ResponseWriter, r *http.Request) {
         }
 	fmt.Println(t,string(reply))
 }
+
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	var conn *websocket.Conn
 	var err error
@@ -215,10 +223,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn.CloseHandler()(2,"end")
 
 }
+
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
 
-	Info:= &shopping.ShoppingInfo{}
-	err := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
+	Info := &shopping.ShoppingInfo{}
+	err  := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
 		return json.NewDecoder(body).Decode(Info)
 	})
 	if err != nil {
@@ -233,7 +242,6 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 func init(){
 	flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
-
 	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
 	Router.LoadHTMLGlob(config.Conf.Templates)
 	Router.GET("/",func(c *gin.Context){
@@ -244,20 +252,28 @@ func init(){
 	})
 	Router.GET("goods/list",func(c *gin.Context){
 		var li []interface{}
-		err := initAlibaba(func(ali *shopping.Alibaba)error {
-			return ali.GoodsShow(
-				[]byte(c.Query("goodsid")),
-				func(db interface{})error{
-				li = append(li,db)
-				return nil
-			})
-		})
+		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
 		if err != nil {
 			c.JSON(http.StatusOK,err)
 			return
 		}
-		c.JSON(http.StatusOK,li)
-
+		err = initAlibaba(func(ali *shopping.Alibaba)error {
+			return ali.GoodsShow(
+				[]byte(c.Query("goodsid")),
+				func(db interface{})error{
+				li = append(li,db)
+				if len(li)>= sum{
+					return io.EOF
+				}
+				return nil
+			})
+		})
+		if len(li)>0{
+			c.JSON(http.StatusOK,li)
+			return
+		}
+		c.JSON(http.StatusOK,err)
+		return
 	})
 	Router.GET("goods/order",func(c *gin.Context){
 		err := initAlibaba(func(ali *shopping.Alibaba)error {
@@ -277,13 +293,20 @@ func init(){
 	Router.GET("goods/down",func(c *gin.Context){
 		var li []interface{}
 		err := initAlibaba(func(ali *shopping.Alibaba)error {
+			err := ali.ClearProduct()
+			if err != nil {
+				return err
+			}
 			alibaba.HandGoods = func(db interface{}){
 				//li = append(li,db)
 				db_:= db.(map[string]interface{})
 				productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
 				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
 				obj := ali.GoodsDetail(productId)
-				obj.(map[string]interface{})["itemid"] = itemId
+				obj_ := obj.(map[string]interface{})
+				obj_["itemid"] = itemId
+				catid := obj_["productInfo"].(map[string]interface{})["categoryID"].(float64)
+				obj_["cat"] = ali.GetCategory(fmt.Sprintf("%.0f",catid))
 				err := ali.SaveProduct(productId,obj)
 				if err != nil {
 					//return err
@@ -313,7 +336,6 @@ func init(){
 	Router.GET("down",func(c *gin.Context){
 		downHandler(c.Writer, c.Request)
 	})
-
 	//Router.GET("init",func(c *gin.Context){
 	//	InitShoppingMap()
 	//	c.String(http.StatusOK,"success")
@@ -324,8 +346,11 @@ func init(){
 	//})
 	//Router.POST("updateorder/:py",HandForward)
 	go Router.Run(config.Conf.Port)
+
 }
+
 func DownOrder(){
+
 	shopping.ShoppingMap.Range(func(k,v interface{})bool{
 		fmt.Println(k.(string))
 		v_ := v.(shopping.ShoppingInterface)
@@ -375,7 +400,9 @@ func DownOrder(){
 		//fmt.Println(req_)
 		return true
 	})
+
 }
+
 func main(){
 	//InitShoppingMap()
 	//DownOrder()

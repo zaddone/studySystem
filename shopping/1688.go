@@ -53,8 +53,8 @@ type AlProductForOrder struct {
 	Quantity float64 `json:"quantity"`
 }
 func (self *AlProductForOrder)LoadTestDB(){
-	self.Offerid = 609079420580
-	self.SpecId = "2a6b5fbe4d682e1c87a3e9e2455096df"
+	self.Offerid = 586899647105
+	self.SpecId = "4fac2a41ec29cef08c68c5cac25382d8"
 	self.Quantity = 1
 }
 
@@ -225,6 +225,20 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
+func (self *Alibaba) GetCategory(id string) interface{} {
+	uri := "1/com.alibaba.product/alibaba.category.get"
+	u := &url.Values{}
+	u.Add("categoryID",id)
+	u.Add("access_token",self.Info.Token)
+	obj := self.ClientHttp(uri,u)
+	if obj == nil {
+		return nil
+	}
+	return obj.(map[string]interface{})["categoryInfo"]
+	//fmt.Println(obj)
+	//return obj
+	//com.alibaba.product:alibaba.category.get-1
+}
 func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
 
 	addr_,err := json.Marshal(a)
@@ -309,6 +323,15 @@ func (self *Alibaba) OpenDB (read bool,hand func(*bolt.Tx)error) error {
 	return hand(t)
 
 }
+
+func (self *Alibaba) ClearProduct() error {
+
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		return t.DeleteBucket(goodsDB)
+	})
+
+}
+
 func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
 
 	return self.OpenDB(true,func(t *bolt.Tx)error{
