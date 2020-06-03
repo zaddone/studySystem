@@ -38,6 +38,7 @@ var(
 			return true
 		},
 	}
+
 )
 
 func Sign(c *gin.Context){
@@ -237,8 +238,6 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 
 }
 
-
-
 func init(){
 	flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
@@ -249,6 +248,8 @@ func init(){
 	})
 	Router.GET("ws",func(c *gin.Context){
 		WsHandler(c.Writer, c.Request)
+	})
+	Router.GET("goods/page",func(c *gin.Context){
 	})
 	Router.GET("goods/list",func(c *gin.Context){
 		var li []interface{}
@@ -261,7 +262,14 @@ func init(){
 			return ali.GoodsShow(
 				[]byte(c.Query("goodsid")),
 				func(db interface{})error{
-				li = append(li,db)
+				err := GoodsWithAlibabaToWX(db,func(obj interface{}){
+					li = append(li,obj)
+				})
+				if err != nil {
+					//fmt.Println(err)
+					return err
+				}
+				//li = append(li,db)
 				if len(li)>= sum{
 					return io.EOF
 				}
@@ -272,6 +280,7 @@ func init(){
 			c.JSON(http.StatusOK,li)
 			return
 		}
+		fmt.Println(err)
 		c.JSON(http.StatusOK,err)
 		return
 	})
@@ -308,6 +317,11 @@ func init(){
 				catid := obj_["productInfo"].(map[string]interface{})["categoryID"].(float64)
 				obj_["cat"] = ali.GetCategory(fmt.Sprintf("%.0f",catid))
 				err := ali.SaveProduct(productId,obj)
+				if err != nil {
+					//return err
+					panic(err)
+				}
+				err = ali.Crossborder(productId)
 				if err != nil {
 					//return err
 					panic(err)

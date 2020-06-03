@@ -2,7 +2,6 @@ package main
 import(
 	"fmt"
 	"io"
-	//"time"
 	"net/url"
 	"github.com/gin-gonic/gin"
 	"github.com/zaddone/studySystem/request"
@@ -13,7 +12,7 @@ import(
 	"bytes"
 	"regexp"
 	"strings"
-	//"sync"
+	"sync"
 	//"math"
 	//"os"
 	"github.com/nfnt/resize"
@@ -43,7 +42,7 @@ func GetKeywords(w string,hand func(string)){
 	}
 }
 
-func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
+func GoodsWithAlibabaToWX(obj interface{}) error {
 
 	db := obj.(map[string]interface{})
 	cats := db["cat"]
@@ -54,17 +53,19 @@ func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 	subject := product["subject"].(string)
 	content := product["description"].(string)
 	images := product["image"].(map[string]interface{})["images"].([]interface{})
-	//for i,img := range images{
-	//	err := uploadImg("https://cbu01.alicdn.com/"+img.(string),
-	//	func(_img string){
-	//		images[i] = _img
-	//	})
-	//	if err != nil {
-	//		fmt.Println(err)
-	//		return err
-	//	}
-	//	//images[i] = "https://cbu01.alicdn.com/"+img.(string)
-	//}
+	for i,img := range images{
+		//err := uploadImg("https://cbu01.alicdn.com/"+img.(string),func(img_ string){
+		//	images[i] = img_
+		//	fmt.Println(img_)
+		//})
+		//if err != nil {
+		//	fmt.Println(err)
+		//}
+		//panic(0)
+		images[i] = "https://cbu01.alicdn.com/"+img.(string)
+	}
+	//fmt.Println(images)
+	//cat := cats.([]interface{})[0].(map[string]interface{})["name"].(string)
 	return openCategoryDB(false,func(t *bolt.Tx)error{
 		b := t.Bucket(WxWorks)
 		if b == nil {
@@ -116,69 +117,25 @@ func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 		if err != nil {
 			return err
 		}
-		var detail []interface{}
 		doc.Find("img").Each(func(i int,s *goquery.Selection){
 			img,_:=s.Attr("src")
-
-			//err := uploadImg(img,func(_img string){
-			//	detail = append(detail,map[string]interface{}{
-			//		"img":_img,
-			//	})
-			//})
-			//if err != nil {
-			//	fmt.Println(err)
-			//}
-
-			//fmt.Println(img)
-			detail = append(detail,map[string]interface{}{
-				"img":img,
-			})
+			fmt.Println(img)
 		})
 		//imgs := imgUrlReg.FindAllString(content,-1)
 		//fmt.Println(imgs)
 		base_attr := map[string]interface{}{
-			"main_img":images[0],
-			"img":images,
 			"name":subject,
-			"detail":detail,
-			"category":[]string{string(b__.Get([]byte("id")))},
-		}
-		delivery_info := map[string]interface{}{
-			"delivery_type":0,
-			"template_id":0,
-			"express":[]interface{}{
+			"detail":[]interface{}{
 				map[string]interface{}{
-					"id": 10000027,
-					"price": 100,
-				},
-				map[string]interface{}{
-					"id": 10000028,
-					"price": 100,
-				},
-				map[string]interface{}{
-					"id": 10000029,
-					"price": 100,
+					"text":"",
+					"img":"",
 				},
 			},
+			"category":string(b__.Get([]byte("id"))),
 		}
-		//fmt.Println(base_attr)
-		base:=map[string]interface{}{
-			"product_base":base_attr,
-			"delivery_info":delivery_info,
-		}
-		hand(base)
-		//return nil
-		//return fmt.Errorf("%+v",base)
-		return Request(
-			"https://api.weixin.qq.com/merchant/create",
-			base,
-			func(res interface{})error{
-				fmt.Println(res)
-				return nil
-			},
-		)
+		fmt.Println(base_attr)
 		//fmt.Println(subject,catn)
-		//return nil
+		return nil
 	})
 
 }
@@ -253,7 +210,6 @@ func ShowCategory(name string,hand func(string,interface{})error)error{
 	})
 
 }
-
 func GetCategoryInfo(id string,hand func(interface{})error)error{
 	return Request(
 		"https://api.weixin.qq.com/merchant/category/getproperty",
@@ -349,90 +305,62 @@ func uploadImg(uri string,hand func(string)) error {
 	w_,h_ := sizeImg(float64(img.Bounds().Dx()),float64(img.Bounds().Dy()))
 	m := resize.Resize(uint(w_), uint(h_), img, resize.Lanczos3)
 	r_img,w_img := io.Pipe()
-	//var wait sync.WaitGroup
-	//wait.Add(2)
+	var wait sync.WaitGroup
+	wait.Add(2)
 	go func(){
 		err = jpeg.Encode(w_img,m,nil)
 		if err != nil {
 			fmt.Println(err)
 			//panic(err)
 		}
-		w_img.Close()
-		//wait.Done()
+		wait.Done()
 	//	fmt.Println("end encode")
 	}()
-
-	db,err := ioutil.ReadAll(r_img)
-	if err != nil {
-		return err
-	}
-	//go func(){
-	return GetToken(func(token string)error{
-		us := strings.Split(uri,"/")
-		u := url.Values{}
-		//us := strings.Split(uri,"/")
-		u.Set("filename",us[len(us)-1])
-		u.Set("access_token",token)
-		resp,err := http.Post("https://api.weixin.qq.com/merchant/common/upload_img?"+u.Encode(),"multipart/form-data",bytes.NewReader(db))
+	go func(){
+		err := GetToken(func(token string)error{
+			us := strings.Split(uri,"/")
+			u := url.Values{}
+			//us := strings.Split(uri,"/")
+			u.Set("filename",us[len(us)-1])
+			u.Set("access_token",token)
+			//header := http.Header{}
+			res.Header.Add("Content-Disposition","application/x-www-form-urlencoded")
+			return request.ClientHttp_(
+				"https://api.weixin.qq.com/merchant/common/upload_img?"+u.Encode(),
+				//"https://api.weixin.qq.com/cgi-bin/media/uploadimg?"+u.Encode(),
+				"POST",
+				r_img,
+				res.Header,
+				//http.Header{"Content-Type":[]string{"multipart/form-data"}},
+				//http.Header{"Content-Type":[]string{"application/x-www-form-urlencoded"}},
+				func(body io.Reader,re int)error{
+				//fmt.Println(re)
+				if re != 200 {
+					db,err := ioutil.ReadAll(body)
+					if err != nil {
+						return err
+					}
+					return fmt.Errorf("err:%s %d",string(db),re)
+				}
+				var req interface{}
+				json.NewDecoder(body).Decode(&req)
+				img_url := req.(map[string]interface{})["image_url"]
+				if img_url == nil {
+					return fmt.Errorf("%+v",req)
+				}
+				fmt.Println(req)
+				hand(img_url.(string))
+				return nil
+			})
+		})
 		if err != nil {
-			return err
+			fmt.Println(err)
+			//panic(err)
 		}
-		if resp.StatusCode  != 200 {
-			fmt.Println(resp.Request.Header)
-			return fmt.Errorf("%d %s",resp.StatusCode,resp.Status)
-		}
-		var req interface{}
-		err = json.NewDecoder(resp.Body).Decode(&req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		img_url := req.(map[string]interface{})["image_url"]
-		if img_url == nil {
-			return fmt.Errorf("%+v",req)
-		}
-		//fmt.Println(req)
-		hand(img_url.(string))
-		return nil
-
-
-		//return request.ClientHttp_(
-		//	"https://api.weixin.qq.com/merchant/common/upload_img?"+u.Encode(),
-		//	//"https://api.weixin.qq.com/cgi-bin/media/uploadimg?"+u.Encode(),
-		//	"POST",
-		//	r_img,
-		//	header,
-		//	//http.Header{"Content-Type":[]string{"multipart/form-data"}},
-		//	//http.Header{"Content-Type":[]string{"application/x-www-form-urlencoded"}},
-		//	func(body io.Reader,re int)error{
-		//	//fmt.Println(re)
-		//	if re != 200 {
-		//		db,err := ioutil.ReadAll(body)
-		//		if err != nil {
-		//			return err
-		//		}
-		//		return fmt.Errorf("err:%s %d",string(db),re)
-		//	}
-		//	var req interface{}
-		//	json.NewDecoder(body).Decode(&req)
-		//	img_url := req.(map[string]interface{})["image_url"]
-		//	if img_url == nil {
-		//		return fmt.Errorf("%+v",req)
-		//	}
-		//	fmt.Println(req)
-		//	hand(img_url.(string))
-		//	return nil
-		//})
-	})
-	//if err != nil {
-	//	fmt.Println(err)
-	//	//panic(err)
-	//}
-	////wait.Done()
-	//
-	//wait.Wait()
-	//return nil
+		wait.Done()
+	}()
+	wait.Wait()
+	return nil
 
 }
 
