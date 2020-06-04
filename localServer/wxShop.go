@@ -2,6 +2,7 @@ package main
 import(
 	"fmt"
 	"io"
+	"strconv"
 	//"time"
 	"net/url"
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,14 @@ var(
 	//DelKeywords = regexp.MustCompile(`定制|批发|一件代发|厂家直销|`)
 	//imgUrlReg = regexp.MustCompile(`http[s?]\://[a-z0-9A-Z./_]+`)
 )
+//https://api.weixin.qq.com/merchant/express/add
+func GetallExpress(hand func(interface{})error)error{
+	//http.Post()
+	return Request(
+		"https://api.weixin.qq.com/merchant/express/getall",
+		nil,
+		hand)
+}
 
 func GetKeywords(w string,hand func(string)){
 	for _,key := range keywordsReg.FindAllString(w,-1){
@@ -42,7 +51,6 @@ func GetKeywords(w string,hand func(string)){
 		}
 	}
 }
-
 func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 
 	db := obj.(map[string]interface{})
@@ -54,26 +62,26 @@ func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 	subject := product["subject"].(string)
 	content := product["description"].(string)
 	images := product["image"].(map[string]interface{})["images"].([]interface{})
-	//for i,img := range images{
-	//	err := uploadImg("https://cbu01.alicdn.com/"+img.(string),
-	//	func(_img string){
-	//		images[i] = _img
-	//	})
-	//	if err != nil {
-	//		fmt.Println(err)
-	//		return err
-	//	}
-	//	//images[i] = "https://cbu01.alicdn.com/"+img.(string)
-	//}
+	for i,img := range images{
+		err := uploadImg("https://cbu01.alicdn.com/"+img.(string),
+		func(_img string){
+			images[i] = _img
+		})
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		//images[i] = "https://cbu01.alicdn.com/"+img.(string)
+	}
 	return openCategoryDB(false,func(t *bolt.Tx)error{
 		b := t.Bucket(WxWorks)
 		if b == nil {
 			return nil
 		}
-		bc := t.Bucket(WxCategory)
-		if bc == nil {
-			return nil
-		}
+		//bc := t.Bucket(WxCategory)
+		//if bc == nil {
+		//	return nil
+		//}
 		valMap := map[string]int{}
 		sk := ""
 		for _,cat := range cats.([]interface{}){
@@ -108,63 +116,168 @@ func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 				catn = k
 			}
 		}
-		b__ := bc.Bucket([]byte(catn))
-		if b__ == nil {
-			panic(0)
-		}
+
+		//b__ := bc.Bucket([]byte(catn))
+		//if b__ == nil {
+		//	panic(0)
+		//}
 		doc,err := goquery.NewDocumentFromReader(strings.NewReader(content))
 		if err != nil {
 			return err
 		}
-		var detail []interface{}
+		detail := []interface{}{
+			map[string]interface{}{
+				"text": "test first",
+			},
+		}
 		doc.Find("img").Each(func(i int,s *goquery.Selection){
 			img,_:=s.Attr("src")
-
-			//err := uploadImg(img,func(_img string){
-			//	detail = append(detail,map[string]interface{}{
-			//		"img":_img,
-			//	})
-			//})
-			//if err != nil {
-			//	fmt.Println(err)
-			//}
-
-			//fmt.Println(img)
-			detail = append(detail,map[string]interface{}{
-				"img":img,
+			err := uploadImg(img,func(_img string){
+				detail = append(detail,map[string]interface{}{
+					"img":_img,
+				})
 			})
+			if err != nil {
+				fmt.Println(err)
+			}
+			//fmt.Println(img)
+			//detail = append(detail,map[string]interface{}{
+			//	"img":img,
+			//})
 		})
 		//imgs := imgUrlReg.FindAllString(content,-1)
 		//fmt.Println(imgs)
+
+		var catinfo []interface{}
+		err = GetCategory(catn,t.Bucket(WxCategory),true,func(n string,db interface{})error{
+			catinfo =append(catinfo,db)
+			//fmt.Println(catinfo)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 		base_attr := map[string]interface{}{
 			"main_img":images[0],
 			"img":images,
 			"name":subject,
 			"detail":detail,
-			"category":[]string{string(b__.Get([]byte("id")))},
+			"property":[]interface{}{},
+			"buy_limit":"0",
+			//"category_id":[]string{catinfo["id"].(string)},
+			//"cats":catinfo,
 		}
+		var cats []string
+		for _,c := range catinfo{
+			cats = append(cats,c.(map[string]interface{})["id"].(string))
+		}
+		base_attr["category_id"] = cats
+		var sku_list []interface{}
+		//sku_info
+		skumap := map[string]map[string]int{}
+		pr_ :=strings.Split(product["referencePrice"].(string),"~")
+		pr,err := strconv.ParseFloat(pr_[len(pr_)-1],64)
+		if err != nil {
+			return err
+			panic(err)
+		}
+		pr = pr/0.99*100
+		//pr,_ = strconv.ParseFloat(fmt.Sprintf("%.2f",pr/0.99),64)
+		//fmt.Println(product)
+		for _,p := range product["skuInfos"].([]interface{}){
+			p_ := p.(map[string]interface{})
+
+			obj := map[string]interface{}{
+				"quantity":fmt.Sprintf("%.0f",p_["amountOnSale"].(float64)),
+				"product_code":p_["specId"],
+				//"ori_price":pr,
+				"price":int(pr),
+				//"icon_url":p_[""]
+			}
+			var attrl  []string
+			for _,attr := range p_["attributes"].([]interface{}){
+				attr_ := attr.(map[string]interface{})
+				skuname := attr_["attributeDisplayName"].(string)
+				skuval := attr_["attributeValue"].(string)
+				l:= fmt.Sprintf("$%s:$%s",skuname,skuval)
+				attrl = append(attrl,l)
+				_val := skumap[skuname]
+				if _val == nil {
+					skumap[skuname] = map[string]int{skuval:1}
+				}else{
+					skumap[skuname][skuval]++
+				}
+				//skumap[l]=map[string]interface{}{
+				//	"id":"$"+skuname,
+				//	"vid":"$"+skuval,
+				//}
+				if attr_["skuImageUrl"] != nil {
+					obj["icon_url"] ="https://cbu01.alicdn.com/" + attr_["skuImageUrl"].(string)
+				}
+			}
+
+			if obj["icon_url"] != nil {
+				err := uploadImg(obj["icon_url"].(string),func(_img string){
+					obj["icon_url"] = _img
+				})
+				if err != nil {
+					return err
+				}
+			}
+			obj["sku_id"] = strings.Join(attrl,";")
+			sku_list = append(sku_list,obj)
+		}
+		var sku_info []interface{}
+		for k,v:= range skumap {
+			//v_ := v.(map[string]interface{})
+			//val_ := skumap_[v_["id"].(string)]
+			//if val_ == nil {
+			//	
+			//}
+			var v_ []string
+			for _k,_ := range v {
+				v_ = append(v_,"$"+_k)
+			}
+			sku_info = append(sku_info,map[string]interface{}{"id":"$"+k,"vid":v_})
+		}
+		base_attr["sku_info"] = sku_info
+
 		delivery_info := map[string]interface{}{
-			"delivery_type":0,
-			"template_id":0,
-			"express":[]interface{}{
-				map[string]interface{}{
-					"id": 10000027,
-					"price": 100,
-				},
-				map[string]interface{}{
-					"id": 10000028,
-					"price": 100,
-				},
-				map[string]interface{}{
-					"id": 10000029,
-					"price": 100,
-				},
+			//"delivery_type":0,
+			//"template_id":0,
+			//"express":[]interface{}{
+			//	map[string]interface{}{
+			//		"id": 10000027,
+			//		"price": 100,
+			//	},
+			//	map[string]interface{}{
+			//		"id": 10000028,
+			//		"price": 100,
+			//	},
+			//	map[string]interface{}{
+			//		"id": 10000029,
+			//		"price": 100,
+			//	},
+			//},
+		}
+		attrext := map[string]interface{}{
+			"isPostFree":"1",
+			"isHasReceipt":"0",
+			"isUnderGuaranty":"0",
+			"isSupportReplace":0,
+			"location":map[string]interface{}{
+				"country": "中国",
+				"province": "四川省",
+				"city": "成都市",
+				"address":"",
 			},
 		}
 		//fmt.Println(base_attr)
 		base:=map[string]interface{}{
 			"product_base":base_attr,
 			"delivery_info":delivery_info,
+			"sku_list":sku_list,
+			"attrext":attrext,
 		}
 		hand(base)
 		//return nil
@@ -212,39 +325,60 @@ func GetToken(hand func(string)error) error {
 	})
 }
 
+func GetCategory(na string,b *bolt.Bucket,isg bool,hand func(string,interface{})error)error{
+	b_ := b.Bucket([]byte(na))
+	if b_ == nil {
+		return nil
+	}
+	val := map[string]interface{}{"name":na}
+	err := b_.ForEach(func(k,v []byte)error{
+		//fmt.Println(string(k),string(v))
+		k_ := string(k)
+		if k_ == "id"{
+			val[k_] = string(v)
+		}else{
+			var db interface{}
+			if json.Unmarshal(v,&db) == nil {
+				val[k_] = db
+			}else{
+				val[k_] = string(v)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if isg && val["pName"] != nil {
+		GetCategory(val["pName"].(string),b,true,hand)
+	}
+	//fmt.Println(val)
+	return hand(na,val)
+}
+
 func ShowCategory(name string,hand func(string,interface{})error)error{
+
 	return openCategoryDB(false,func(t *bolt.Tx)error{
 		b := t.Bucket(WxCategory)
 		if b == nil {
 			return nil
 		}
 		if len(name) > 0 {
-			b_ := b.Bucket([]byte(name))
-			if b_ == nil {
-				return nil
-			}
-			val := map[string]interface{}{}
-			err := b_.ForEach(func(k,v []byte)error{
-				val[string(k)] = string(v)
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-			return hand(name,val)
+			return GetCategory(name,b,false,hand)
 		}
 		c := b.Cursor()
 		for b_,_ := c.First();b_ != nil;b_,_ = c.Next() {
-			val := map[string]interface{}{}
-			b__:= b.Bucket(b_)
-			err :=  b__.ForEach(func(k,v []byte)error{
-				val[string(k)] = string(v)
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-			err = hand(string(b_),val)
+			err := GetCategory(string(b_),b,false,hand)
+			//val := map[string]interface{}{}
+			//b__:= b.Bucket(b_)
+			//err :=  b__.ForEach(func(k,v []byte)error{
+			//	val[string(k)] = string(v)
+			//	return nil
+			//})
+			//if err != nil {
+			//	return err
+			//}
+			//err = hand(string(b_),val)
 			if err != nil {
 				return err
 			}
@@ -276,15 +410,30 @@ func Request(uri string,dbMap interface{},hand func(interface{})error) error {
 	return GetToken(func(token string)error{
 	u := url.Values{}
 	u.Set("access_token",token)
-	return request.ClientHttp_(uri+"?"+u.Encode(),"POST",bytes.NewReader(db_),nil,
-	func(body io.Reader,re int)error{
-		var val interface{}
-		err := json.NewDecoder(body).Decode(&val)
-		if err != nil {
-			return err
-		}
-		return hand(val)
-	})
+	//header := http.Header{}
+	//header.Add("Content-Type","multipart/form-data")
+	//header.Add("Content-Type","application/json")
+	//header.Add("Accept","application/json")
+	resp,err := http.Post(uri+"?"+u.Encode(),"multipart/form-data",bytes.NewReader(db_))
+	if err != nil {
+		return err
+	}
+	var val interface{}
+	err = json.NewDecoder(resp.Body).Decode(&val)
+	resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	return hand(val)
+	//return request.ClientHttp_(uri+"?"+u.Encode(),"POST",bytes.NewReader(db_),header,
+	//	func(body io.Reader,re int)error{
+	//		var val interface{}
+	//		err := json.NewDecoder(body).Decode(&val)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		return hand(val)
+	//	})
 	})
 
 }

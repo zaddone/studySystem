@@ -251,6 +251,28 @@ func init(){
 	})
 	Router.GET("goods/page",func(c *gin.Context){
 	})
+	Router.GET("goods/test",func(c *gin.Context){
+		db := `{"product_base":{"category_id":["538112937","537104243"],"property":[],"name":"平板电脑测试1","main_img":"https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png","img":["https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png"],"detail":[{"text":"test first"}],"buy_limit":"0"},"sku_list":[{"sku_id":"","price":100000,"icon_url":"","product_code":"","quantity":"10"}],"attrext":{"location":{"country":"中国","province":"四川","city":"成都","address":""},"isHasReceipt":"0","isUnderGuaranty":"0","isSupportReplace":0},"delivery_info":{}}`
+		var obj interface{}
+		err := json.Unmarshal([]byte(db),&obj)
+		if err != nil {
+			c.JSON(http.StatusOK,err)
+			return
+		}
+		err = Request(
+			"https://api.weixin.qq.com/merchant/create",
+			obj,
+			func(res interface{})error{
+				obj.(map[string]interface{})["res"] = res
+				c.JSON(http.StatusOK,obj)
+				fmt.Println(res)
+				return nil
+			},
+		)
+		if err != nil {
+			c.JSON(http.StatusOK,err)
+		}
+	})
 	Router.GET("goods/list",func(c *gin.Context){
 		var li []interface{}
 		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
@@ -263,13 +285,14 @@ func init(){
 				[]byte(c.Query("goodsid")),
 				func(db interface{})error{
 				err := GoodsWithAlibabaToWX(db,func(obj interface{}){
-					li = append(li,obj)
+					db.(map[string]interface{})["wxgoods"] = obj
+					//li = append(li,obj)
 				})
 				if err != nil {
 					//fmt.Println(err)
 					return err
 				}
-				//li = append(li,db)
+				li = append(li,db)
 				if len(li)>= sum{
 					return io.EOF
 				}
@@ -280,7 +303,7 @@ func init(){
 			c.JSON(http.StatusOK,li)
 			return
 		}
-		fmt.Println(err)
+		//fmt.Println(err)
 		c.JSON(http.StatusOK,err)
 		return
 	})

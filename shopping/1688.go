@@ -111,6 +111,7 @@ func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 	return j
 
 }
+
 func (self *Alibaba) ReToken_ (siteDB string) error {
 	uri := "https://gw.open.1688.com/openapi/param2/1/system.oauth2/postponeToken/"+self.Info.Client_id
 	u := url.Values{}
@@ -295,6 +296,7 @@ func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
 		return nil
 	})
 }
+
 func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	uri := "1/com.alibaba.product/alibaba.agent.product.simple.get"
 	u := &url.Values{}
@@ -347,6 +349,35 @@ func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
 	})
 }
 
+func (self *Alibaba) Crossborder(id string) error {
+
+	uri := "1/com.alibaba.product/alibaba.product.follow.crossborder"
+	u := &url.Values{}
+	u.Add("productId",id)
+	u.Add("access_token",self.Info.Token )
+	obj := self.ClientHttp(uri,u)
+	if obj.(map[string]interface{})["code"].(float64) == 0 {
+		return nil
+	}
+	//fmt.Println(obj)
+	return fmt.Errorf("%v",obj)
+}
+
+func (self *Alibaba) UnCrossborder(id string) error {
+
+	uri := "1/com.alibaba.product/alibaba.product.unfollow.crossborder"
+	u := &url.Values{}
+	u.Add("productId",id)
+	u.Add("access_token",self.Info.Token )
+	obj := self.ClientHttp(uri,u)
+	//fmt.Println(obj)
+	//return obj
+	if obj.(map[string]interface{})["code"].(float64) == 0 {
+		return nil
+	}
+	//fmt.Println(obj)
+	return fmt.Errorf("%v",obj)
+}
 
 func (self *Alibaba) SearchGoods(words ...string)interface{}{
 
