@@ -18,7 +18,7 @@ import(
 var (
 	//1688Url = "https://gw.open.1688.com/openapi/param2/%s/6020087"
 	Url1688 = "https://gw.open.1688.com/openapi/"
-	BuyShopping *Alibaba
+	AlibabaShopping *Alibaba
 	alibabatimeFormat = "20060102150405000-0700"
 	goodsDB = []byte("product")
 )
@@ -304,7 +304,7 @@ func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	u.Add("productID",words[0] )
 	u.Add("access_token",self.Info.Token )
 	obj := self.ClientHttp(uri,u)
-	fmt.Println(obj)
+	//fmt.Println(obj)
 	return obj
 }
 

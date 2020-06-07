@@ -249,38 +249,6 @@ func init(){
 	Router.GET("/",wxserverFunc,func(c *gin.Context){
 		c.String(http.StatusOK,c.Query("echostr"))
 	})
-	Router.GET("/goods_test",func(c *gin.Context){
-		db := `{"product_base":{"category_id":["538112937","537104243"],"property":[],"name":"平板电脑测试1","main_img":"https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png","img":["https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png"],"detail":[{"text":"test first"}],"buy_limit":"0"},"sku_list":[{"sku_id":"","price":100000,"icon_url":"","product_code":"","quantity":"10"}],"attrext":{"location":{"country":"中国","province":"四川","city":"成都","address":""},"isHasReceipt":"0","isUnderGuaranty":"0","isSupportReplace":0},"delivery_info":{}}`
-		u := url.Values{}
-		u.Set("access_token",WXTOKEN.String())
-		resp,err := http.Post("https://api.weixin.qq.com/merchant/create?"+u.Encode(),"multipart/form-data",strings.NewReader(db))
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-		var obj interface{}
-		err = json.NewDecoder(resp.Body).Decode(&obj)
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-		c.JSON(http.StatusOK,obj)
-		return
-
-	})
-	Router.GET("/uploadimg_test",func(c *gin.Context){
-		uri := c.Query("uri")
-		if uri == "" {
-			return
-		}
-		err := uploadImg(uri,func(u string){
-			c.JSON(http.StatusOK,gin.H{"uri":u})
-		})
-		if err != nil {
-			c.JSON(http.StatusFound,err)
-		}
-		return
-	})
 	Router.GET("/token_test",func(c *gin.Context){
 		c.String(http.StatusOK,WXTOKEN.String())
 	})

@@ -531,10 +531,10 @@ func init(){
 		c.JSONP(http.StatusOK,db)
 		return
 	})
-	Router.GET("test",func(c *gin.Context){
-		c.JSON(http.StatusOK,shopping.BuyShopping.GoodsDetail("618279451491"))
-		return
-	})
+	//Router.GET("test",func(c *gin.Context){
+	//	c.JSON(http.StatusOK,shopping.BuyShopping.GoodsDetail("618279451491"))
+	//	return
+	//})
 	Router.GET("robots.txt",func(c *gin.Context){
 		c.String(http.StatusOK,"User-agent: *\nAllow:　/")
 		return

@@ -21,17 +21,50 @@ func init(){
 		return checkManage
 	}()
 	v1 := Router.Group("/v2",manageFunc)
-	//v1.GET("/article/add",func(c *gin.Context){
-	//	ar := &article.Article{
-	//		title:c.Query("title"),
-	//		Content:c.Query("content")
-	//	}
-	//	err := ar.Save()
-	//	if err != nil {
-	//		return
-	//	}
-	//	c.JSON(http.StatusOK,gin.H{"msg":"seccess"})
-	//})
+	v1.POST("/goods/update",func(c *gin.Context){
+		id := c.Query("id")
+		if id == "" {
+			c.JSON(http.StatusFound,fmt.Errorf("id = nil"))
+			return
+		}
+		var db interface{}
+		err := json.NewDecoder(c.Request.Body).Decode(&db)
+		if err != nil {
+			c.JSON(http.StatusFound,err)
+			return
+		}
+		err = shopping.AlibabaShopping.SaveProduct(id,db)
+		if err != nil {
+			c.JSON(http.StatusFound,err)
+			return
+		}
+		c.JSON(http.StatusOK,db)
+	})
+	v1.GET("/goods/list",func(c *gin.Context){
+		var li []interface{}
+		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
+		if err != nil {
+			c.JSON(http.StatusFound,err)
+			return
+		}
+		err = shopping.AlibabaShopping.GoodsShow(
+			[]byte(c.Query("goodsid")),
+			func(db interface{})error{
+			li = append(li,db)
+			if len(li)>= sum{
+				return io.EOF
+			}
+			return nil
+		})
+		if len(li)>0{
+			c.JSON(http.StatusOK,li)
+			return
+		}
+		//fmt.Println(err)
+		c.JSON(http.StatusFound,err)
+		return
+	})
+
 	v1.GET("/wxtoken",func(c *gin.Context){
 		c.JSON(http.StatusOK,gin.H{"msg":toKen})
 	})

@@ -388,6 +388,16 @@ func ShowCategory(name string,hand func(string,interface{})error)error{
 
 }
 
+//func updateGoods(){}
+
+func getAllGoods(status int,hand func(interface{})error)error{
+	return Request(
+		"https://api.weixin.qq.com/merchant/getbystatus",
+		map[string]interface{}{"status":status},
+		hand)
+}
+
+
 func GetCategoryInfo(id string,hand func(interface{})error)error{
 	return Request(
 		"https://api.weixin.qq.com/merchant/category/getproperty",
@@ -410,30 +420,32 @@ func Request(uri string,dbMap interface{},hand func(interface{})error) error {
 	return GetToken(func(token string)error{
 	u := url.Values{}
 	u.Set("access_token",token)
-	//header := http.Header{}
+	header := http.Header{}
 	//header.Add("Content-Type","multipart/form-data")
-	//header.Add("Content-Type","application/json")
-	//header.Add("Accept","application/json")
-	resp,err := http.Post(uri+"?"+u.Encode(),"multipart/form-data",bytes.NewReader(db_))
-	if err != nil {
-		return err
-	}
-	var val interface{}
-	err = json.NewDecoder(resp.Body).Decode(&val)
-	resp.Body.Close()
-	if err != nil {
-		return err
-	}
-	return hand(val)
-	//return request.ClientHttp_(uri+"?"+u.Encode(),"POST",bytes.NewReader(db_),header,
-	//	func(body io.Reader,re int)error{
-	//		var val interface{}
-	//		err := json.NewDecoder(body).Decode(&val)
-	//		if err != nil {
-	//			return err
-	//		}
-	//		return hand(val)
-	//	})
+	header.Add("Content-Type","application/json")
+	header.Add("Content-Type","charset=utf-8")
+	header.Add("Accept","application/json")
+
+	//resp,err := http.Post(uri+"?"+u.Encode(),"multipart/form-data",bytes.NewReader(db_))
+	//if err != nil {
+	//	return err
+	//}
+	//var val interface{}
+	//err = json.NewDecoder(resp.Body).Decode(&val)
+	//resp.Body.Close()
+	//if err != nil {
+	//	return err
+	//}
+	//return hand(val)
+	return request.ClientHttp_(uri+"?"+u.Encode(),"POST",bytes.NewReader(db_),header,
+		func(body io.Reader,re int)error{
+			var val interface{}
+			err := json.NewDecoder(body).Decode(&val)
+			if err != nil {
+				return err
+			}
+			return hand(val)
+		})
 	})
 
 }

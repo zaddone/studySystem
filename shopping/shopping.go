@@ -796,7 +796,7 @@ func InitShoppingMap(dbname string){
 
 		}
 		if sh.Py == "1688" {
-			BuyShopping = NewAlibaba(sh,dbname)
+			AlibabaShopping = NewAlibaba(sh,dbname)
 		}
 		return nil
 	})

@@ -5,11 +5,9 @@ import(
 	"github.com/zaddone/studySystem/shopping"
 	"github.com/zaddone/studySystem/config"
 	"github.com/zaddone/studySystem/alimama"
-	"github.com/zaddone/studySystem/alibaba"
 	"github.com/zaddone/studySystem/chromeServer"
 	"github.com/gorilla/websocket"
 	"github.com/gin-gonic/gin"
-	"strconv"
 	//"github.com/boltdb/bolt"
 	"net/url"
 	"time"
@@ -225,18 +223,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func initAlibaba(hand func(*shopping.Alibaba)error)error{
-
-	Info := &shopping.ShoppingInfo{}
-	err  := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
-		return json.NewDecoder(body).Decode(Info)
-	})
-	if err != nil {
-		return err
-	}
-	return hand(shopping.NewAlibaba(Info,""))
-
-}
 
 func init(){
 	flag.Parse()
@@ -249,116 +235,7 @@ func init(){
 	Router.GET("ws",func(c *gin.Context){
 		WsHandler(c.Writer, c.Request)
 	})
-	Router.GET("goods/page",func(c *gin.Context){
-	})
-	Router.GET("goods/test",func(c *gin.Context){
-		db := `{"product_base":{"category_id":["538112937","537104243"],"property":[],"name":"平板电脑测试1","main_img":"https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png","img":["https://mmbiz.qpic.cn/mmbiz_png/jAx9T1U1HicyYk4Sr7fOBFSjWtmBMIibTMUNlVHrAEL0mVicaUXXkbwHFNQhOjN0KViaNMbBQoicauLGib9lsicAKRs4Q/0?wx_fmt=png"],"detail":[{"text":"test first"}],"buy_limit":"0"},"sku_list":[{"sku_id":"","price":100000,"icon_url":"","product_code":"","quantity":"10"}],"attrext":{"location":{"country":"中国","province":"四川","city":"成都","address":""},"isHasReceipt":"0","isUnderGuaranty":"0","isSupportReplace":0},"delivery_info":{}}`
-		var obj interface{}
-		err := json.Unmarshal([]byte(db),&obj)
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-		err = Request(
-			"https://api.weixin.qq.com/merchant/create",
-			obj,
-			func(res interface{})error{
-				obj.(map[string]interface{})["res"] = res
-				c.JSON(http.StatusOK,obj)
-				fmt.Println(res)
-				return nil
-			},
-		)
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-		}
-	})
-	Router.GET("goods/list",func(c *gin.Context){
-		var li []interface{}
-		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-		err = initAlibaba(func(ali *shopping.Alibaba)error {
-			return ali.GoodsShow(
-				[]byte(c.Query("goodsid")),
-				func(db interface{})error{
-				err := GoodsWithAlibabaToWX(db,func(obj interface{}){
-					db.(map[string]interface{})["wxgoods"] = obj
-					//li = append(li,obj)
-				})
-				if err != nil {
-					//fmt.Println(err)
-					return err
-				}
-				li = append(li,db)
-				if len(li)>= sum{
-					return io.EOF
-				}
-				return nil
-			})
-		})
-		if len(li)>0{
-			c.JSON(http.StatusOK,li)
-			return
-		}
-		//fmt.Println(err)
-		c.JSON(http.StatusOK,err)
-		return
-	})
-	Router.GET("goods/order",func(c *gin.Context){
-		err := initAlibaba(func(ali *shopping.Alibaba)error {
-			o := new(shopping.AlAddrForOrder)
-			p := new(shopping.AlProductForOrder)
-			o.LoadTestDB()
-			p.LoadTestDB()
-			obj := ali.CreateOrder(o,[]*shopping.AlProductForOrder{p})
-			c.JSON(http.StatusOK,obj)
-			return nil
-		})
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-	})
-	Router.GET("goods/down",func(c *gin.Context){
-		var li []interface{}
-		err := initAlibaba(func(ali *shopping.Alibaba)error {
-			err := ali.ClearProduct()
-			if err != nil {
-				return err
-			}
-			alibaba.HandGoods = func(db interface{}){
-				//li = append(li,db)
-				db_:= db.(map[string]interface{})
-				productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
-				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
-				obj := ali.GoodsDetail(productId)
-				obj_ := obj.(map[string]interface{})
-				obj_["itemid"] = itemId
-				catid := obj_["productInfo"].(map[string]interface{})["categoryID"].(float64)
-				obj_["cat"] = ali.GetCategory(fmt.Sprintf("%.0f",catid))
-				err := ali.SaveProduct(productId,obj)
-				if err != nil {
-					//return err
-					panic(err)
-				}
-				err = ali.Crossborder(productId)
-				if err != nil {
-					//return err
-					panic(err)
-				}
-				li = append(li,obj)
-			}
-			return alibaba.Run()
-		})
-		if err != nil {
-			c.JSON(http.StatusOK,err)
-			return
-		}
-		c.JSON(http.StatusOK,li)
-	})
+
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)
 	Router.GET("shopping",HandForward)
@@ -385,9 +262,7 @@ func init(){
 	go Router.Run(config.Conf.Port)
 
 }
-
 func DownOrder(){
-
 	shopping.ShoppingMap.Range(func(k,v interface{})bool{
 		fmt.Println(k.(string))
 		v_ := v.(shopping.ShoppingInterface)
