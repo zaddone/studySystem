@@ -3,9 +3,11 @@ import(
 	"net/http"
 	"bytes"
 	"fmt"
+	"strconv"
 	"math/rand"
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/config"
+	"github.com/gin-gonic/gin"
 	_rand "crypto/rand"
 	"encoding/json"
 	"crypto/x509"
@@ -32,7 +34,8 @@ var (
 	header = http.Header{}
 	rand_str = rand.New(rand.NewSource(time.Now().Unix()))
 	publicKey []byte
-	rfcTime = "2006-01-02T15:04:05.000-0700"
+	//rfcTime = "2006-01-02T15:04:05.000-07:00"
+	rfcTime = time.RFC3339
 	//timeFormat = "2006010215"
 
 )
@@ -51,6 +54,65 @@ func init(){
 	header.Set("User-Agent","zaddone")
 	header.Set("Accept-Language","zh-CN")
 	certificates()
+
+	cou := Router.Group("coupon",func() gin.HandlerFunc {
+
+		return checkManage
+	}())
+	cou.GET("/show",func(c *gin.Context){
+		userid := c.Query("userid")
+		if userid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"userid is nil"})
+			return
+		}
+		appid := c.Query("appid")
+		if appid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"appid is nil"})
+			return
+		}
+		err := couponShow(userid,appid,func(db interface{}){
+			c.JSON(http.StatusOK,db)
+		})
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+		}
+		return
+	})
+	cou.GET("/get",func(c *gin.Context){
+		amount,err :=strconv.Atoi(c.Query("amount"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			return
+		}
+		userid := c.Query("userid")
+		if userid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"userid is nil"})
+			return
+		}
+		appid := c.Query("appid")
+		if appid == "" {
+			c.JSON(http.StatusNotFound,gin.H{"msg":"appid is nil"})
+			return
+		}
+		err = couponCreate(amount,func(db interface{})error{
+			_db := db.(map[string]interface{})
+			_res := _db["req"].(map[string]interface{})
+			stock_id := _res["stock_id"].(string)
+			err := couponOpen(stock_id)
+			if err != nil {
+				return err
+			}
+			request_no := _db["out_request_no"].(string)
+			return couponGet(stock_id,userid,appid,request_no,amount)
+		})
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK,gin.H{"msg":"success"})
+	})
+
+
 }
 
 
@@ -225,12 +287,13 @@ func couponCreate(amount int,hand func(interface{})error)error{
 	if err != nil {
 		return err
 	}
-	begin :=time.Now()
-	end :=  begin.Add(36*time.Hour)
-	//end :=  begin.AddDate(0,0,2)
+	begin :=time.Now().Add(time.Second)
+	//begin :=time.Now()
+	//end :=  begin.Add(3*time.Hour)
+	end :=  begin.AddDate(0,0,1)
 	//am := amount*100
 	body := map[string]interface{}{
-		"stock_name":fmt.Sprintf("%.2f元代金券",float64(amount)/100),
+		"stock_name":fmt.Sprintf("%.2f元代金券-%d",float64(amount)/100,begin.Unix()),
 		"belong_merchant":*MerchantId,
 		"available_begin_time":begin.Format(rfcTime),
 		"available_end_time":end.Format(rfcTime),
@@ -245,14 +308,14 @@ func couponCreate(amount int,hand func(interface{})error)error{
 			"natural_person_limit":false,
 		},
 		"coupon_use_rule":map[string]interface{}{
-			//"coupon_available_time":map[string]interface{}{
-			//	//"fix_available_time":map[string]interface{}{
-			//	//	"begin_time":beginDay,
-			//	//	"end_time":beginDay+7200,
-			//	//},
-			//	"available_time_after_receive":120,
-			//	//"second_day_available":false,
-			//},
+			"coupon_available_time":map[string]interface{}{
+				//"fix_available_time":map[string]interface{}{
+				//	"begin_time":beginDay,
+				//	"end_time":beginDay+7200,
+				//},
+				"available_time_after_receive":1440,
+				"second_day_available":false,
+			},
 			"fixed_normal_coupon":map[string]interface{}{
 				"coupon_amount":amount,
 				"transaction_minimum":amount,
@@ -260,6 +323,7 @@ func couponCreate(amount int,hand func(interface{})error)error{
 			"available_merchants":[]string{*MerchantId},
 		},
 	}
+	//fmt.Println(body)
 	str,err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -277,7 +341,7 @@ func couponCreate(amount int,hand func(interface{})error)error{
 		func(res io.Reader,st int)error{
 			if st != 200 {
 				_db,_ := ioutil.ReadAll(res)
-				fmt.Println(body,_db)
+				fmt.Println(body,string(_db))
 				return fmt.Errorf("%s",_db)
 			}
 			return json.NewDecoder(res).Decode(&db)
@@ -292,19 +356,56 @@ func couponCreate(amount int,hand func(interface{})error)error{
 
 }
 
+func couponShow(uid,appid string,hand func(interface{}))error{
+
+	uri,err :=url.Parse(fmt.Sprintf("https://api.mch.weixin.qq.com/v3/marketing/favor/users/%s/coupons",uid))
+	u := url.Values{}
+	u.Set("appid",appid)
+	u.Set("available_mchid",*MerchantId)
+	//u.Set("offset",0)
+	//u.Set("limit",20)
+	//fmt.Println(pa)
+	err = Sign("GET",uri.Path+"?"+u.Encode(),"")
+	if err != nil {
+		panic(err)
+	}
+	return request.ClientHttp_(
+		uri.String()+"?"+u.Encode(),
+		"GET",
+		nil,
+		header,
+		func(res io.Reader,st int)error{
+			var db interface{}
+			err = json.NewDecoder(res).Decode(&db)
+			if err != nil {
+				return err
+			}
+			if st != 200 {
+				fmt.Println(db)
+				return fmt.Errorf("%v",db)
+			}
+
+			hand(db)
+			return nil
+			//return json.NewDecoder(res).Decode(&db)
+		},
+	)
+
+}
+
 func couponGet(stockid,uid,appid,requestNo string,amount int) error {
-	uri,err :=url.Parse(fmt.Sprintf("https://api.mch.weixin.qq.com/v3/marketing/favor/users/%s/coupons",stockid))
+	uri,err :=url.Parse(fmt.Sprintf("https://api.mch.weixin.qq.com/v3/marketing/favor/users/%s/coupons",uid))
 	if err != nil {
 		return err
 	}
 	body := map[string]interface{}{
 		"stock_id":stockid,
-		"openid":uid,
+		//"openid":uid,
 		"out_request_no":requestNo,
 		"appid":appid,
 		"stock_creator_mchid":*MerchantId,
-		"coupon_value":amount,
-		"coupon_minimum":amount,
+		//"coupon_value":amount,
+		//"coupon_minimum":amount,
 	}
 	str,err := json.Marshal(body)
 	if err != nil {
@@ -322,6 +423,7 @@ func couponGet(stockid,uid,appid,requestNo string,amount int) error {
 		func(res io.Reader,st int)error{
 			if st != 200 {
 				db,_ := ioutil.ReadAll(res)
+				fmt.Println(string(db))
 				return fmt.Errorf("%s",db)
 			}
 			return nil

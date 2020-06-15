@@ -54,12 +54,14 @@ func checkManage(c *gin.Context){
 	if d<0 {
 		d=-d
 	}
-	if d>60 {
+	if d>3600 {
+		fmt.Println("sign is nil")
 		c.Abort()
 		return
 	}
 	signature := c.Query("sign")
 	if signature == "" {
+		fmt.Println("sign is nil")
 		c.Abort()
 		return
 	}
@@ -72,6 +74,7 @@ func checkManage(c *gin.Context){
 	}
 	sort.Strings(qu)
 	if signature != shopping.Sha1([]byte(strings.Join(qu,""))) {
+		fmt.Println("sign is err")
 		c.Abort()
 		return
 	}
@@ -81,68 +84,13 @@ func checkManage(c *gin.Context){
 
 func init(){
 	flag.Parse()
-	manageFunc := func() gin.HandlerFunc {
-		return checkManage
-	}()
 	Router.POST("/callback",func(c *gin.Context){
 		res,err := ioutil.ReadAll(c.Request.Body)
 		fmt.Println(res,err)
 		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 	})
-	Router.GET("/coupon/test",func(c *gin.Context){
-		amount,err :=strconv.Atoi(c.Query("amount"))
-		if err != nil {
-			return
-		}
-		err = couponCreate(amount,func(db interface{})error{
-			_db := db.(map[string]interface{})
-			_res := _db["req"].(map[string]interface{})
-			stock_id := _res["stock_id"].(string)
-			err := couponOpen(stock_id)
-			if err != nil {
-				return err
-			}
-			c.JSON(http.StatusOK,db)
-			//request_no := _db["out_request_no"].(string)
-			//return couponGet(stock_id,userid,appid,request_no,amount)
-			return nil
-		})
-		if err != nil {
-			//c.JSON(http.StatusOK,err)
-			return
-		}
-		//c.JSON(http.StatusOK,gin.H{"msg":"success"})
-	})
-	Router.GET("/coupon/get",manageFunc,func(c *gin.Context){
-		amount,err :=strconv.Atoi(c.Query("amount"))
-		if err != nil {
-			return
-		}
-		userid := c.Query("userid")
-		if userid == "" {
-			return
-		}
-		appid := c.Query("appid")
-		if appid == "" {
-			return
-		}
-		err = couponCreate(amount,func(db interface{})error{
-			_db := db.(map[string]interface{})
-			_res := _db["req"].(map[string]interface{})
-			stock_id := _res["stock_id"].(string)
-			err := couponOpen(stock_id)
-			if err != nil {
-				return err
-			}
-			request_no := _db["out_request_no"].(string)
-			return couponGet(stock_id,userid,appid,request_no,amount)
-		})
-		if err != nil {
-			c.JSON(http.StatusOK,gin.H{"msg":err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK,gin.H{"msg":"success"})
-	})
+
+
 	go Router.Run(*Port)
 }
 

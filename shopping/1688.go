@@ -28,6 +28,7 @@ type Alibaba struct{
 	DbPath string
 	//Pid string
 }
+
 type AlAddrForOrder struct {
 	FullName string `json:"fullName"`
 	Mobile string `json:"mobile"`
@@ -37,6 +38,7 @@ type AlAddrForOrder struct {
 	TownText string `json:"townText"`
 	Address string `json:"address"`
 }
+
 func (self *AlAddrForOrder) LoadTestDB() {
 	self.FullName = "赵伟杰"
 	self.Mobile = "18628175526"

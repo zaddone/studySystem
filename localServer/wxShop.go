@@ -147,7 +147,6 @@ func GoodsWithAlibabaToWX(obj interface{},hand func(interface{})) error {
 		})
 		//imgs := imgUrlReg.FindAllString(content,-1)
 		//fmt.Println(imgs)
-
 		var catinfo []interface{}
 		err = GetCategory(catn,t.Bucket(WxCategory),true,func(n string,db interface{})error{
 			catinfo =append(catinfo,db)
