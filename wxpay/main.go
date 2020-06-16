@@ -89,8 +89,6 @@ func init(){
 		fmt.Println(res,err)
 		c.JSON(http.StatusOK,gin.H{"msg":"success"})
 	})
-
-
 	go Router.Run(*Port)
 }
 

@@ -31,6 +31,7 @@ var (
 	pemkey = flag.String("pemkey","cert/apiclient_key.pem","pemkey")
 	//rand_str = rand.New(rand.NewSource(time.Now().Unix()))
 	MerchantId = flag.String("m","1589104921","merchant")
+	AppId = flag.String("appid","wx1660ee29fd483da7","appid")
 	header = http.Header{}
 	rand_str = rand.New(rand.NewSource(time.Now().Unix()))
 	publicKey []byte

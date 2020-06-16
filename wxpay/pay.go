@@ -6,7 +6,10 @@ import(
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/config"
 	"github.com/gin-gonic/gin"
+	"crypto/md5"
+	"encoding/xml"
 	"time"
+	"bytes"
 	"strings"
 	"flag"
 	"io"
@@ -17,7 +20,23 @@ import(
 )
 var(
 	Remote = flag.String("r", "http://127.0.0.1:8080/v2","remote")
+	TimeFormat = "20060102150405"
 )
+func noPemSign(u map[string]interface{}){
+	u["nonce_str"] = RandString(16)
+	u["mch_id"] = *MerchantId
+	var li []string
+	for k,_ := range u{
+		li = append(li,k)
+	}
+	sort.Strings(li)
+	sign_:=[]string{}
+	for _,k := range li {
+		sign_  = append(sign_,k+"="+fmt.Sprintln(u[k]))
+	}
+	fmt.Println(sign_)
+	u["sign"]=fmt.Sprintf("%X", md5.Sum([]byte(strings.Join(sign_,"&")+config.Conf.Apikeyv3)))
+}
 
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
 	if u == nil {
@@ -53,15 +72,72 @@ func ShopPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(
 		return hand(ali.CreateOrder(o,[]*shopping.AlProductForOrder{p}))
 	})
 }
-type OrderInfo struct {
-	Goods shopping.AlProductForOrder    `json:"Goods"`
-	Addr  shopping.AlAddrForOrder `json:"Addr"`
+
+type clientInfo struct{
+	Appid string
+	Openid string
+	Clientip string
 }
+type OrderInfo struct {
+	Goods shopping.AlProductForOrder
+	Addr  shopping.AlAddrForOrder
+	Client clientInfo
+}
+func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(db interface{})error )error{
+
+	u := map[string]interface{}{}
+	u["appid"]=self.Client.Appid
+	u["body"] = "米果小店-订单支付"
+	u["out_trade_no"] = orderid
+	u["total_fee"] = fee
+	u["spbill_create_ip"] = self.Client.Clientip
+	begin := time.Now()
+	u["time_start"] = begin.Format(TimeFormat)
+	u["time_expire"] = begin.AddDate(0,0,5).Format(TimeFormat)
+	u["notify_url"] = "https://www.zaddone.com/wxpay/pay/notify_url"
+	u["trade_type"] = "JSAPI"
+	u["product_id"] = self.Goods.SpecId
+	u["openid"] = self.Client.Openid
+
+	noPemSign(u)
+	body, err := xml.MarshalIndent(Map(u), "", "  ")
+	if err != nil {
+		return err
+	}
+	//body,err := xml.Marshal(u)
+	//fmt.Println(string(body),err)
+	//return err
+	uri :="https://api.mch.weixin.qq.com/pay/unifiedorder"
+	return request.ClientHttp__(uri,"POST",bytes.NewReader(body),nil,func(Body io.Reader,res *http.Response)error{
+		if res.StatusCode != 200 {
+			return fmt.Errorf(res.Status)
+		}
+		db,err := ioutil.ReadAll(Body)
+		if err != nil {
+			return err
+		}
+		var db map[string]interface{}
+		err = xml.NewDecoder(Body).Decode(&db)
+		if err != nil {
+			return err
+		}
+		//db[]
+		//fmt.Println(string(db))
+		return hand(db)
+	})
+
+}
+
 func init(){
 	pay := Router.Group("pay",func() gin.HandlerFunc {
 		return checkManage
 	}())
+	pay.GET("/notify_url",func(c *gin.Context){
+		//https://api.mch.weixin.qq.com/pay/unifiedorder
+
+	})
 	pay.POST("/postordertoalibaba",func(c *gin.Context){
+		fmt.Println(c.Request.RemoteAddr,c.Request.Header.Get("X-Forwarded-For"))
 		db,err := ioutil.ReadAll(c.Request.Body)
 		c.Request.Body.Close()
 		if err != nil {
@@ -80,10 +156,28 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		//fmt.Printf("%v,%v\n",o.Goods,o.Addr)
+		//o.unifiedorder("",10)
+		//c.JSON(http.StatusOK,gin.H{"msg":"success"})
+		//return
 		err = ShopPay(&(o.Addr),&(o.Goods),func(db interface{})error{
-			c.JSON(http.StatusOK,gin.H{"msg":db})
-			return nil
+			//o.res = db
+			res := db.(map[string]interface{})["result"]
+			if res == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":db})
+				return nil
+			}
+			res_ := res.(map[string]interface{})
+			orderid := res_["orderId"]
+			if orderid == nil {
+				c.JSON(http.StatusNotFound,gin.H{"msg":db})
+				return nil
+			}
+			return o.unifiedorder(orderid.(string),int(res_["totalSuccessAmount"].(float64)*1.1),func(body interface{})error{
+				c.JSON(http.StatusOK,gin.H{"msg":db})
+				return nil
+			})
+			//fmt.Println(db)
+			//return nil
 		})
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
