@@ -32,10 +32,11 @@ func noPemSign(u map[string]interface{}){
 	sort.Strings(li)
 	sign_:=[]string{}
 	for _,k := range li {
-		sign_  = append(sign_,k+"="+fmt.Sprintln(u[k]))
+		sign_  = append(sign_,k+"="+fmt.Sprint(u[k]))
 	}
-	fmt.Println(sign_)
-	u["sign"]=fmt.Sprintf("%X", md5.Sum([]byte(strings.Join(sign_,"&")+config.Conf.Apikeyv3)))
+	sign :=fmt.Sprintf("%s&key=%s",strings.Join(sign_,"&"),config.Conf.Apikeyv3)
+	fmt.Println(sign)
+	u["sign"]=fmt.Sprintf("%X", md5.Sum([]byte(sign)))
 }
 
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
@@ -66,6 +67,11 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 	}
 	return hand(shopping.NewAlibaba(Info,""))
 }
+func ViewPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(interface{})error) error {
+	return initAlibaba(func(ali *shopping.Alibaba)error {
+		return hand(ali.PreviewCreateOrder(o,[]*shopping.AlProductForOrder{p}))
+	})
+}
 
 func ShopPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(interface{})error) error {
 	return initAlibaba(func(ali *shopping.Alibaba)error {
@@ -83,7 +89,7 @@ type OrderInfo struct {
 	Addr  shopping.AlAddrForOrder
 	Client clientInfo
 }
-func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(db interface{})error )error{
+func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(interface{})error )error{
 
 	u := map[string]interface{}{}
 	u["appid"]=self.Client.Appid
@@ -102,6 +108,7 @@ func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(db interface
 	noPemSign(u)
 	body, err := xml.MarshalIndent(Map(u), "", "  ")
 	if err != nil {
+		fmt.Println("xml is err",err)
 		return err
 	}
 	//body,err := xml.Marshal(u)
@@ -110,20 +117,25 @@ func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(db interface
 	uri :="https://api.mch.weixin.qq.com/pay/unifiedorder"
 	return request.ClientHttp__(uri,"POST",bytes.NewReader(body),nil,func(Body io.Reader,res *http.Response)error{
 		if res.StatusCode != 200 {
-			return fmt.Errorf(res.Status)
+			db,err := ioutil.ReadAll(Body)
+			fmt.Println(db,err)
+			return fmt.Errorf("%d %s %s",res.StatusCode,res.Status,string(db))
 		}
-		db,err := ioutil.ReadAll(Body)
+		//fmt.Println(res.Status,res.StatusCode)
+		//db,err := ioutil.ReadAll(Body)
+		//if err != nil {
+		//	return err
+		//}
+		Res := &unifiedRes{}
+		//var db interface{}
+		err = xml.NewDecoder(Body).Decode(Res)
 		if err != nil {
-			return err
-		}
-		var db map[string]interface{}
-		err = xml.NewDecoder(Body).Decode(&db)
-		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 		//db[]
-		//fmt.Println(string(db))
-		return hand(db)
+		//fmt.Println("success",db)
+		return hand(Res)
 	})
 
 }
@@ -144,40 +156,53 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		fmt.Println(string(db))
+		//fmt.Println(string(db))
 		var o OrderInfo
-		_db,_ := json.Marshal(&o)
-		fmt.Println(string(_db))
-
+		//_db,_ := json.Marshal(&o)
+		//fmt.Println(string(_db))
 		err = json.Unmarshal(db,&o)
-		fmt.Printf("%+v\n",o)
+		o.Client.Clientip =c.Request.Header.Get("X-Forwarded-For")
+		//fmt.Printf("%+v\n",o)
 		//err := json.NewDecoder(c.Request.Body).Decode(&o)
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		//o.unifiedorder("",10)
-		//c.JSON(http.StatusOK,gin.H{"msg":"success"})
+		//err = o.unifiedorder(RandString(16),10,func(body interface{})error{
+		//	fmt.Println(body)
+		//	c.JSON(http.StatusOK,body)
+		//	return nil
+		//})
+		//if err != nil {
+		//	c.JSON(http.StatusNotFound,gin.H{"msg":err})
+		//	return
+		//}
+		////c.JSON(http.StatusOK,gin.H{"msg":"success"})
 		//return
-		err = ShopPay(&(o.Addr),&(o.Goods),func(db interface{})error{
+		err = ViewPay(&(o.Addr),&(o.Goods),func(db interface{})error{
 			//o.res = db
-			res := db.(map[string]interface{})["result"]
-			if res == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":db})
-				return nil
-			}
-			res_ := res.(map[string]interface{})
-			orderid := res_["orderId"]
-			if orderid == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg":db})
-				return nil
-			}
-			return o.unifiedorder(orderid.(string),int(res_["totalSuccessAmount"].(float64)*1.1),func(body interface{})error{
-				c.JSON(http.StatusOK,gin.H{"msg":db})
-				return nil
-			})
+			fmt.Println(db)
+			c.JSON(http.StatusOK,db)
+			return nil
+
+			//res := db.(map[string]interface{})["result"]
+			//if res == nil {
+			//	c.JSON(http.StatusNotFound,gin.H{"msg1":db})
+			//	return nil
+			//}
+			//res_ := res.(map[string]interface{})
+			//orderid := res_["orderId"]
+			//if orderid == nil {
+			//	c.JSON(http.StatusNotFound,gin.H{"msg2":db})
+			//	return nil
+			//}
+			//return o.unifiedorder(orderid.(string),int(res_["totalSuccessAmount"].(float64)*1.1),func(_db interface{})error{
+			//	fmt.Println(_db)
+			//	c.JSON(http.StatusOK,_db)
+			//	return nil
+			//})
 			//fmt.Println(db)
-			//return nil
+
 		})
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})

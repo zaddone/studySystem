@@ -4,6 +4,22 @@ import(
 	"fmt"
 	"io"
 )
+type unifiedRes struct {
+	XMLName   xml.Name `xml:"xml"`
+	Return_code string `xml:"return_code"`
+	Return_msg  string `xml:"return_msg"`
+	Appid	    string `xml:"appid"`
+	Mch_id      string `xml:"mch_id"`
+	Nonce_str   string `xml:"nonce_str"`
+	Openid      string `xml:"openid"`
+	Sign	    string `xml:"sign"`
+	Result_code string `xml:"result_code"`
+	Prepay_id   string `xml:"prepay_id"`
+	Trade_type  string `xml:"trade_type"`
+	Err_code    string `xml:"err_code"`
+	Err_code_des string `xml:"err_code_des"`
+	Device_info string `xml:"device_info"`
+}
 type Map map[string]interface{}
 
 type xmlMapEntry struct {

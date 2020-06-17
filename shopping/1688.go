@@ -242,6 +242,29 @@ func (self *Alibaba) GetCategory(id string) interface{} {
 	//return obj
 	//com.alibaba.product:alibaba.category.get-1
 }
+func (self *Alibaba) PreviewCreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
+	addr_,err := json.Marshal(a)
+	if err != nil {
+		return err
+	}
+	product_,err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	//com.alibaba.trade:alibaba.trade.fastCreateOrder-1
+	uri := "1/com.alibaba.trade/alibaba.createOrder.preview"
+	u := &url.Values{}
+	u.Add("flow","saleproxy" )
+	//u.Add("addressParam",string(addr_))
+	u.Add("addressParam","")
+	u.Add("cargoParamList",string(product_))
+	u.Add("access_token",self.Info.Token)
+	u.Add("invoiceParam","")
+	obj := self.ClientHttp(uri,u)
+	//fmt.Println(obj)
+	return obj
+
+}
 func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
 
 	addr_,err := json.Marshal(a)
