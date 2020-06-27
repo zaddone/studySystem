@@ -5,6 +5,7 @@ import(
 	"io"
 	"net/http"
 	"net/url"
+	//"strings"
 	//"strconv"
 	"github.com/gin-gonic/gin"
 	"github.com/zaddone/studySystem/request"
@@ -13,6 +14,7 @@ import(
 	"encoding/json"
 	"io/ioutil"
 )
+
 func UpdateGoods(id string,obj interface{})error{
 	u := url.Values{}
 	u.Add("id",id)

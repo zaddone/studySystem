@@ -44,7 +44,7 @@ var (
 		"pinduoduo":NewPdd,
 		"taobao":NewTaobao,
 		"suning":NewSuning,
-		"mogu":NewMogu,
+		//"mogu":NewMogu,
 		"vip":NewVip,
 	}
 	Rate = 0.9

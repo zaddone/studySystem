@@ -29,6 +29,7 @@ import(
 var (
 	pemcert = flag.String("pemcert","cert/apiclient_cert.pem","pemcert")
 	pemkey = flag.String("pemkey","cert/apiclient_key.pem","pemkey")
+	rootca = flag.String("rootca","cert/root_ca.pem","rootca")
 	//rand_str = rand.New(rand.NewSource(time.Now().Unix()))
 	MerchantId = flag.String("m","1589104921","merchant")
 	AppId = flag.String("appid","wx1660ee29fd483da7","appid")
@@ -55,9 +56,7 @@ func init(){
 	header.Set("User-Agent","zaddone")
 	header.Set("Accept-Language","zh-CN")
 	certificates()
-
 	cou := Router.Group("coupon",func() gin.HandlerFunc {
-
 		return checkManage
 	}())
 	cou.GET("/show",func(c *gin.Context){

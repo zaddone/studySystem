@@ -73,11 +73,13 @@ func HandForward(c *gin.Context){
 }
 
 func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
+
 	if u == nil {
 		u = url.Values{}
 	}
 	addSign(&u)
 	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
+
 }
 
 func InitShoppingMap()error{
@@ -235,6 +237,7 @@ func init(){
 	Router.GET("ws",func(c *gin.Context){
 		WsHandler(c.Writer, c.Request)
 	})
+	Router.GET("goods/list",HandForward)
 
 	Router.GET("updatesite/:py",HandForward)
 	Router.GET("shopping/:py",HandForward)

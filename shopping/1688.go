@@ -150,6 +150,7 @@ func (self *Alibaba) ReToken_ (siteDB string) error {
 	)
 
 }
+
 func (self *Alibaba) ReToken (siteDB string) error {
 
 	uri := "https://gw.open.1688.com/openapi/param2/1/system.oauth2/getToken/"+self.Info.Client_id
@@ -202,7 +203,6 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	mac.Write([]byte(sign))
 	u.Add("_aop_signature",fmt.Sprintf("%X", mac.Sum(nil)))
 
-
 	var err error
 	uri = Url1688 + uri+"?"+u.Encode()
 	err = request.ClientHttp_(
@@ -228,6 +228,18 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
+func (self *Alibaba) GetTraceInfo(id string) interface{} {
+	//com.alibaba.logistics:alibaba.trade.getLogisticsTraceInfo.buyerView-1
+	uri := "1/com.alibaba.logistics/alibaba.trade.getLogisticsTraceInfo.buyerView"
+	u := &url.Values{}
+	u.Add("orderId",id)
+	u.Add("webSite","1688")
+	u.Add("access_token",self.Info.Token)
+	return self.ClientHttp(uri,u)
+
+
+}
+
 func (self *Alibaba) GetCategory(id string) interface{} {
 	uri := "1/com.alibaba.product/alibaba.category.get"
 	u := &url.Values{}
@@ -242,6 +254,7 @@ func (self *Alibaba) GetCategory(id string) interface{} {
 	//return obj
 	//com.alibaba.product:alibaba.category.get-1
 }
+
 func (self *Alibaba) PreviewCreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
 	addr_,err := json.Marshal(a)
 	if err != nil {
@@ -255,14 +268,13 @@ func (self *Alibaba) PreviewCreateOrder(a *AlAddrForOrder,p []*AlProductForOrder
 	uri := "1/com.alibaba.trade/alibaba.createOrder.preview"
 	u := &url.Values{}
 	u.Add("flow","saleproxy" )
-	//u.Add("addressParam",string(addr_))
-	u.Add("addressParam","")
+	u.Add("addressParam",string(addr_))
+	//u.Add("addressParam","")
 	u.Add("cargoParamList",string(product_))
 	u.Add("access_token",self.Info.Token)
 	u.Add("invoiceParam","")
-	obj := self.ClientHttp(uri,u)
+	return self.ClientHttp(uri,u)
 	//fmt.Println(obj)
-	return obj
 
 }
 func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
@@ -282,9 +294,8 @@ func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interf
 	u.Add("addressParam",string(addr_))
 	u.Add("cargoParamList",string(product_))
 	u.Add("access_token",self.Info.Token)
-	obj := self.ClientHttp(uri,u)
-	//fmt.Println(obj)
-	return obj
+	return self.ClientHttp(uri,u)
+
 
 }
 func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
@@ -308,7 +319,7 @@ func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
 		}
 		var err error
 		for ;k != nil;k,v = c.Next() {
-			var db map[string]interface{}
+			var db interface{}
 			err = json.Unmarshal(v,&db)
 			if err != nil {
 				return err
