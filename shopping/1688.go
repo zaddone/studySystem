@@ -228,6 +228,17 @@ func (self *Alibaba) ClientHttp(uri string,u *url.Values)( out interface{}){
 	}
 	return
 }
+
+func (self *Alibaba) GetTraceView(id string) interface{} {
+	//com.alibaba.logistics:alibaba.trade.getLogisticsInfos.buyerView-1
+	uri := "1/com.alibaba.logistics/alibaba.trade.getLogisticsInfos.buyerView"
+	u := &url.Values{}
+	u.Add("orderId",id)
+	u.Add("webSite","1688")
+	u.Add("fields","company.name,sender,receiver,sendgood")
+	u.Add("access_token",self.Info.Token)
+	return self.ClientHttp(uri,u)
+}
 func (self *Alibaba) GetTraceInfo(id string) interface{} {
 	//com.alibaba.logistics:alibaba.trade.getLogisticsTraceInfo.buyerView-1
 	uri := "1/com.alibaba.logistics/alibaba.trade.getLogisticsTraceInfo.buyerView"

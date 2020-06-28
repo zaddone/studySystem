@@ -1,7 +1,7 @@
 package main
 import(
 	"fmt"
-	"math"
+	//"math"
 	"encoding/json"
 	"encoding/gob"
 	"github.com/zaddone/studySystem/shopping"
@@ -10,6 +10,7 @@ import(
 	"github.com/gin-gonic/gin"
 	"github.com/boltdb/bolt"
 	//"github.com/go-gomail/gomail"
+	"strconv"
 	"crypto/md5"
 	"encoding/xml"
 	"time"
@@ -30,6 +31,7 @@ var(
 	Remote = flag.String("r", "http://127.0.0.1:8080/v2","remote")
 	TimeFormat = "20060102150405"
 	wxOrderDB = "wxOrder.db"
+	aliInfo *shopping.Alibaba = nil
 )
 
 func openDB(isWrite bool,hand func(*bolt.Tx)error)error{
@@ -77,13 +79,16 @@ func addSign(u *url.Values){
 	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	li := []string{config.Conf.Minitoken}
 	for _,v := range *u{
-		li = append(li,v...)
+	li = append(li,v...)
 	}
 	sort.Strings(li)
 	u.Add("sign",shopping.Sha1([]byte(strings.Join(li,""))))
 }
 
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
+	if aliInfo != nil {
+		return hand(aliInfo)
+	}
 	Info := &shopping.ShoppingInfo{}
 	err  := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
 		return json.NewDecoder(body).Decode(Info)
@@ -91,7 +96,8 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 	if err != nil {
 		return err
 	}
-	return hand(shopping.NewAlibaba(Info,""))
+	aliInfo = shopping.NewAlibaba(Info,"")
+	return hand(aliInfo)
 }
 
 func ViewPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(interface{})error) error {
@@ -122,6 +128,42 @@ type OrderInfo struct {
 	Client *clientInfo
 	Notify *notify
 	Alibaba string
+	Orderid string
+}
+func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
+	var err error
+	return openDB(false,func(t *bolt.Tx)error{
+		b := t.Bucket([]byte(openid))
+		if b == nil {
+			return fmt.Errorf("openid is nil")
+		}
+		c:=b.Cursor()
+		var k,v []byte
+		if len(orderid) == 0 {
+			k,v = c.First()
+		}else{
+			ord := []byte(orderid)
+			k,v = c.Seek(ord)
+			if bytes.EqualFold(k,ord){
+				k,v = c.Next()
+			}
+		}
+		for ;k != nil;k,v = c.Next(){
+			var o OrderInfo
+			err = gob.NewDecoder(bytes.NewReader(v)).Decode(&o)
+			if err != nil {
+				return err
+			}
+			o.Orderid = string(k)
+			err = hand(&o)
+			if err != nil {
+				return nil
+				//return err
+			}
+		}
+		return nil
+		//return gob.NewDecoder(bytes.NewReader(b.Get([]byte(orderid)))).Decode(self)
+	})
 }
 
 func (self *OrderInfo)ToByte(hand func([]byte)error) (err error) {
@@ -144,6 +186,7 @@ func (self *OrderInfo)Save(orderid string)error{
 		})
 	})
 }
+
 func (self *OrderInfo)Load(openid,orderid string)error{
 	return openDB(false,func(t *bolt.Tx)error{
 		b := t.Bucket([]byte(openid))
@@ -153,6 +196,7 @@ func (self *OrderInfo)Load(openid,orderid string)error{
 		return gob.NewDecoder(bytes.NewReader(b.Get([]byte(orderid)))).Decode(self)
 	})
 }
+
 func (self *OrderInfo)payRefund(hand func(interface{})error )error{
 	uri := "https://api.mch.weixin.qq.com/secapi/pay/refund"
 	u := map[string]interface{}{}
@@ -333,6 +377,50 @@ func init(){
 			return
 		}
 	})
+	pay.GET("/getorderlist",func(c *gin.Context){
+		pages,err :=strconv.Atoi(c.DefaultQuery("page","10"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		var li []interface{}
+		err = GetOrderList(c.Query("openid"),c.Query("orderid"),func(o *OrderInfo)error{
+			li = append(li,o)
+			if len(li)>=pages{
+				return io.EOF
+			}
+			return nil
+		})
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		c.JSON(http.StatusOK,gin.H{"list":li})
+		return
+	})
+	pay.GET("/gettraceview",func(c *gin.Context){
+		oi:= &OrderInfo{}
+		err := oi.Load(c.Query("openid"),c.Query("orderid"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		var bab interface{}
+		err = json.Unmarshal([]byte(oi.Alibaba),&bab)
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+
+		err =  initAlibaba(func(ali *shopping.Alibaba)error {
+			c.JSON(http.StatusOK,ali.GetTraceView(bab.(map[string]interface{})["orderId"].(string)))
+			return nil
+		})
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+	})
 	pay.GET("/gettraceinfo",func(c *gin.Context){
 		//orderid := c.Param("id")
 		oi:= &OrderInfo{}
@@ -385,38 +473,7 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 		}
 		return
-		err = ShopPay(o.Addr,o.Goods,func(db interface{})error{
-			res := db.(map[string]interface{})["result"]
-			if res == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg1":db})
-				return nil
-			}
-			res_ := res.(map[string]interface{})
-			orderid := res_["orderId"]
-			if orderid == nil {
-				c.JSON(http.StatusNotFound,gin.H{"msg2":db})
-				return nil
-			}
-			amount := math.Floor((res_["totalSuccessAmount"].(float64)*1.1)+0.5)
-			fmt.Println(amount,o.Client.SumPayment)
-			//int(res_["totalSuccessAmount"].(float64)*1.1)+0.5
-			return o.unifiedorder(orderid.(string),int(1),func(_db interface{})error{
-				//fmt.Println(_db)
-				if len(_db.(*unifiedRes).Prepay_id)==0{
-					c.JSON(http.StatusNotFound,_db)
-					return nil
-				}
 
-				c.JSON(http.StatusOK,_db)
-				return o.Save(orderid.(string))
-				//return nil
-			})
-
-		})
-		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err})
-		}
-		return
 
 	})
 	pay.POST("/postordertoalibaba",func(c *gin.Context){
