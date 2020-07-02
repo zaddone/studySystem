@@ -3,7 +3,7 @@ import(
 	"fmt"
 	//"math"
 	"encoding/json"
-	"encoding/gob"
+	//"encoding/gob"
 	"github.com/zaddone/studySystem/shopping"
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/config"
@@ -31,7 +31,7 @@ var(
 	Remote = flag.String("r", "http://127.0.0.1:8080/v2","remote")
 	TimeFormat = "20060102150405"
 	wxOrderDB = "wxOrder.db"
-	aliInfo *shopping.Alibaba = nil
+	//aliInfo *shopping.Alibaba = nil
 )
 
 func openDB(isWrite bool,hand func(*bolt.Tx)error)error{
@@ -86,9 +86,9 @@ func addSign(u *url.Values){
 }
 
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
-	if aliInfo != nil {
-		return hand(aliInfo)
-	}
+	//if aliInfo != nil {
+	//	return hand(aliInfo)
+	//}
 	Info := &shopping.ShoppingInfo{}
 	err  := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
 		return json.NewDecoder(body).Decode(Info)
@@ -96,19 +96,19 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 	if err != nil {
 		return err
 	}
-	aliInfo = shopping.NewAlibaba(Info,"")
-	return hand(aliInfo)
+	//aliInfo = shopping.NewAlibaba(Info,"")
+	return hand(shopping.NewAlibaba(Info,""))
 }
 
-func ViewPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(interface{})error) error {
+func ViewPay(o *shopping.AlAddrForOrder,p []*shopping.AlProductForOrder,hand func(interface{})error) error {
 	return initAlibaba(func(ali *shopping.Alibaba)error {
-		return hand(ali.PreviewCreateOrder(o,[]*shopping.AlProductForOrder{p}))
+		return hand(ali.PreviewCreateOrder(o,p))
 	})
 }
 
-func ShopPay(o *shopping.AlAddrForOrder,p *shopping.AlProductForOrder,hand func(interface{})error) error {
+func ShopPay(o *shopping.AlAddrForOrder,p []*shopping.AlProductForOrder,hand func(interface{})error) error {
 	return initAlibaba(func(ali *shopping.Alibaba)error {
-		return hand(ali.CreateOrder(o,[]*shopping.AlProductForOrder{p}))
+		return hand(ali.CreateOrder(o,p))
 	})
 }
 
@@ -123,11 +123,12 @@ type clientInfo struct{
 }
 
 type OrderInfo struct {
-	Goods *shopping.AlProductForOrder
+	Goods []*shopping.AlProductForOrder
 	Addr  *shopping.AlAddrForOrder
 	Client *clientInfo
 	Notify *notify
-	Alibaba string
+	Alibaba map[string]interface{}
+	//TraceView string
 	Orderid string
 }
 func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
@@ -150,7 +151,8 @@ func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
 		}
 		for ;k != nil;k,v = c.Next(){
 			var o OrderInfo
-			err = gob.NewDecoder(bytes.NewReader(v)).Decode(&o)
+			err = json.Unmarshal(v,&o)
+			//err = gob.NewDecoder(bytes.NewReader(v)).Decode(&o)
 			if err != nil {
 				return err
 			}
@@ -167,12 +169,13 @@ func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
 }
 
 func (self *OrderInfo)ToByte(hand func([]byte)error) (err error) {
-	var network bytes.Buffer
-	err = gob.NewEncoder(&network).Encode(self)
+	db,err := json.Marshal(self)
+	//var network bytes.Buffer
+	//err = gob.NewEncoder(&network).Encode(self)
 	if err != nil {
 		return err
 	}
-	return hand(network.Bytes())
+	return hand(db)
 }
 
 func (self *OrderInfo)Save(orderid string)error{
@@ -193,7 +196,8 @@ func (self *OrderInfo)Load(openid,orderid string)error{
 		if b == nil {
 			return fmt.Errorf("openid is nil")
 		}
-		return gob.NewDecoder(bytes.NewReader(b.Get([]byte(orderid)))).Decode(self)
+		return json.Unmarshal(b.Get([]byte(orderid)),self)
+		//return gob.NewDecoder(bytes.NewReader()).Decode(self)
 	})
 }
 
@@ -246,7 +250,7 @@ func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(interface{})
 	u["time_expire"] = begin.AddDate(0,0,5).Format(TimeFormat)
 	u["notify_url"] = "https://www.zaddone.com/wxpay/pay/notify_url"
 	u["trade_type"] = "JSAPI"
-	u["product_id"] = self.Goods.SpecId
+	//u["product_id"] = self.Goods.SpecId
 	u["openid"] = self.Client.Openid
 
 	noPemSign(u)
@@ -344,11 +348,11 @@ func init(){
 
 		go func(){
 			err := ShopPay(oi.Addr,oi.Goods,func(_db interface{})error{
-				res,err := json.Marshal(_db.(map[string]interface{})["result"])
-				if err != nil {
-					return err
-				}
-				oi.Alibaba = string(res)
+				//res,err := json.Marshal(_db.(map[string]interface{})["result"])
+				//if err != nil {
+				//	return err
+				//}
+				oi.Alibaba = _db.(map[string]interface{})["result"].(map[string]interface{})
 				return oi.Save(db.Out_trade_no)
 			})
 			if err != nil {
@@ -405,21 +409,39 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		var bab interface{}
-		err = json.Unmarshal([]byte(oi.Alibaba),&bab)
-		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err})
-			return
-		}
+		//var bab interface{}
+		//err = json.Unmarshal([]byte(oi.Alibaba),&bab)
+		//if err != nil {
+		//	c.JSON(http.StatusNotFound,gin.H{"msg":err})
+		//	return
+		//}
+		//fmt.Println(bab)
 
 		err =  initAlibaba(func(ali *shopping.Alibaba)error {
-			c.JSON(http.StatusOK,ali.GetTraceView(bab.(map[string]interface{})["orderId"].(string)))
+			c.JSON(http.StatusOK,ali.GetTraceView(oi.Alibaba["orderId"].(string)))
 			return nil
 		})
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
+	})
+	pay.GET("/cleartrace",func(c *gin.Context){
+		oi:= &OrderInfo{}
+		err := oi.Load(c.Query("openid"),c.Query("orderid"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		err =  initAlibaba(func(ali *shopping.Alibaba)error {
+			c.JSON(http.StatusOK,ali.ClearOrder(oi.Alibaba["orderId"].(string)))
+			return nil
+		})
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+
 	})
 	pay.GET("/gettraceinfo",func(c *gin.Context){
 		//orderid := c.Param("id")
@@ -429,15 +451,15 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		var bab interface{}
-		err = json.Unmarshal([]byte(oi.Alibaba),&bab)
-		if err != nil {
-			c.JSON(http.StatusNotFound,gin.H{"msg":err})
-			return
-		}
+		//var bab interface{}
+		//err = json.Unmarshal([]byte(oi.Alibaba),&bab)
+		//if err != nil {
+		//	c.JSON(http.StatusNotFound,gin.H{"msg":err})
+		//	return
+		//}
 
 		err =  initAlibaba(func(ali *shopping.Alibaba)error {
-			c.JSON(http.StatusOK,ali.GetTraceInfo(bab.(map[string]interface{})["orderId"].(string)))
+			c.JSON(http.StatusOK,ali.GetTraceInfo(oi.Alibaba["orderId"].(string)))
 			return nil
 		})
 		if err != nil {
