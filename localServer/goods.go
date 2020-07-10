@@ -11,9 +11,70 @@ import(
 	"github.com/zaddone/studySystem/request"
 	"github.com/zaddone/studySystem/alibaba"
 	"github.com/zaddone/studySystem/shopping"
+	"github.com/PuerkitoBio/goquery"
 	"encoding/json"
 	"io/ioutil"
+	"strings"
 )
+func getDesImg(des string,hand func(string))error{
+	doc,err := goquery.NewDocumentFromReader(strings.NewReader(des))
+	if err != nil {
+		return err
+	}
+	doc.Find("img").Each(func(i int,s *goquery.Selection){
+		v,_ := s.Attr("src")
+		//fmt.Println(v,e)
+		hand(v)
+	})
+	return nil
+}
+func PreviewOrder(obj map[string]interface{},ali *shopping.Alibaba)error{
+	pro := obj["productInfo"].(map[string]interface{})
+	skus := pro["skuInfos"]
+	if skus == nil {
+		return fmt.Errorf("obj is nil")
+	}
+	//var sku map[string]interface{}
+	var ss []interface{}
+	for _,s := range skus.([]interface{}){
+		if s.(map[string]interface{})["amountOnSale"].(float64) >1 {
+			ss = append(ss,s)
+		}
+	}
+	pro["skuInfos"] = ss
+	po := &shopping.AlProductForOrder{
+		Offerid:pro["productID"].(float64),
+		SpecId:ss[0].(map[string]interface{})["specId"].(string),
+		Quantity:1,
+	}
+	addr := &shopping.AlAddrForOrder{}
+	addr.LoadTestDB()
+	for {
+		res := ali.PreviewCreateOrder(addr,[]*shopping.AlProductForOrder{po})
+		switch r := res.(type){
+		case error:
+			return r
+		default:
+			errcode := r.(map[string]interface{})["errorCode"]
+			if errcode == nil{
+				obj["Preview"] = r
+				return nil
+			}
+			ec := errcode.(string)
+			if ec == "500_005" || ec == "500_006" {
+				fmt.Println(r)
+				po.Quantity++
+			}else{
+				return fmt.Errorf("%s",errcode)
+			}
+		}
+	}
+	return nil
+
+
+
+}
+
 
 func UpdateGoods(id string,obj interface{})error{
 	u := url.Values{}
@@ -75,13 +136,27 @@ func init(){
 				obj := ali.GoodsDetail(productId)
 				obj_ := obj.(map[string]interface{})
 				obj_["itemid"] = itemId
-				catid := obj_["productInfo"].(map[string]interface{})["categoryID"].(float64)
-				obj_["cat"] = ali.GetCategory(fmt.Sprintf("%.0f",catid))
-				err := UpdateGoods(productId,obj)
-				//err := ali.SaveProduct(productId,obj)
+				product := obj_["productInfo"].(map[string]interface{})
+				des := product["description"].(string)
+				//obj_["des_img"] = []string{}
+				var des_img []string
+				err := getDesImg(des,func(img string){
+					//fmt.Println(img)
+					des_img = append(des_img,img)
+				})
 				if err != nil {
-					//return err
-					//return err
+					panic(err)
+				}
+				product["des_img"] = des_img
+
+				err = PreviewOrder(obj_,ali)
+				if err != nil {
+					fmt.Println(err)
+					return
+
+				}
+				err = UpdateGoods(productId,obj)
+				if err != nil {
 					panic(err)
 				}
 

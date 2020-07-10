@@ -51,7 +51,7 @@ func GetGoodsList(_db interface{}){
 			val := u.Query()
 			val.Set("pageNum",fmt.Sprintf("%.0f",num+1))
 			uri_ := fmt.Sprintf("%s://%s%s?%s",u.Scheme,u.Host,u.Path,val.Encode())
-			fmt.Println(uri_)
+			//fmt.Println(uri_)
 			chromeServer.PageNavigate(uri_,func(res map[string]interface{}){
 				fmt.Println(res)
 			})

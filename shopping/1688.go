@@ -54,6 +54,7 @@ type AlProductForOrder struct {
 	SpecId string `json:"specId"`
 	Quantity float64 `json:"quantity"`
 }
+
 func (self *AlProductForOrder)LoadTestDB(){
 	self.Offerid = 586899647105
 	self.SpecId = "4fac2a41ec29cef08c68c5cac25382d8"
@@ -61,12 +62,10 @@ func (self *AlProductForOrder)LoadTestDB(){
 }
 
 func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
-
 	j:= &Alibaba{Info:sh,DbPath:"alibaba.db"}
 	if siteDB == "" {
 		return j
 	}
-	//return j
 	go func(){
 		for{
 			if j.Info.ReTimeOut == "" {
@@ -76,16 +75,6 @@ func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 			if err != nil {
 				panic(err)
 			}
-			//if err != nil {
-			//	fmt.Println(err)
-			//	//panic(err)
-			//	err := j.ReToken_(siteDB)
-			//	if err != nil {
-
-			//		fmt.Println(err)
-			//		panic(err)
-			//	}
-			//}
 			select{
 			case <- time.After(time.Second*time.Duration(j.Info.TimeOut - time.Now().Unix())):
 				err := j.ReToken(siteDB)
@@ -100,16 +89,6 @@ func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 			}
 		}
 	}()
-	//go func(){
-	//	for{
-	//	//time.Now().Unix()
-	//	err := j.ReToken(siteDB)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	time.Sleep(time.Second*time.Duration(j.Info.TimeOut-time.Now().Unix()))
-	//	}
-	//}()
 	return j
 
 }
@@ -130,7 +109,7 @@ func (self *Alibaba) ReToken_ (siteDB string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Println(res)
+			fmt.Println("retoken_",res)
 			if res["access_token"] == nil {
 				return io.EOF
 			}
@@ -168,7 +147,8 @@ func (self *Alibaba) ReToken (siteDB string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Println(res)
+			//fmt.Println(res)
+			fmt.Println("retoken",res)
 			if res["access_token"] == nil {
 				return io.EOF
 			}
@@ -265,6 +245,17 @@ func (self *Alibaba) GetCategory(id string) interface{} {
 	//return obj
 	//com.alibaba.product:alibaba.category.get-1
 }
+func (self *Alibaba) ClearOrder(orderid string)interface{}{
+	//alibaba.trade.cancel
+	uri := "1/com.alibaba.trade/alibaba.trade.cancel"
+	u := &url.Values{}
+	u.Add("webSite","1688")
+	u.Add("tradeID",orderid)
+	u.Add("cancelReason","other")
+	u.Add("access_token",self.Info.Token)
+	return self.ClientHttp(uri,u)
+
+}
 
 func (self *Alibaba) PreviewCreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interface{}{
 	addr_,err := json.Marshal(a)
@@ -309,6 +300,27 @@ func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interf
 
 
 }
+
+func (self *Alibaba) GoodsGet(goodsId string,hand func(interface{}))error {
+	return self.OpenDB(false,func(t *bolt.Tx)error{
+		b := t.Bucket(goodsDB)
+		if b == nil {
+			return nil
+		}
+		val := b.Get([]byte(goodsId))
+		if val == nil {
+			return fmt.Errorf("find not")
+		}
+		var db interface{}
+		err := json.Unmarshal(val,&db)
+		if err != nil {
+			return err
+		}
+		hand(db)
+		return nil
+	})
+}
+
 func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
 	return self.OpenDB(false,func(t *bolt.Tx)error{
 		b := t.Bucket(goodsDB)

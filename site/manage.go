@@ -40,6 +40,19 @@ func init(){
 		}
 		c.JSON(http.StatusOK,db)
 	})
+	v1.GET("/goods/get",func(c *gin.Context){
+		gid := c.Query("goodsid")
+		if len(gid)  == 0 {
+			return
+		}
+		err := shopping.AlibabaShopping.GoodsGet(gid,func(db interface{}){
+			c.JSON(http.StatusOK,db)
+		})
+		if err != nil {
+			c.JSON(http.StatusFound,err)
+			return
+		}
+	})
 	v1.GET("/goods/list",func(c *gin.Context){
 		var li []interface{}
 		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))

@@ -154,6 +154,8 @@ func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
 			err = json.Unmarshal(v,&o)
 			//err = gob.NewDecoder(bytes.NewReader(v)).Decode(&o)
 			if err != nil {
+				fmt.Println(err)
+				continue
 				return err
 			}
 			o.Orderid = string(k)
