@@ -74,9 +74,83 @@ func PreviewOrder(obj map[string]interface{},ali *shopping.Alibaba)error{
 
 
 }
+func GoodsListHand(li []string)(dbs []interface{}){
+
+	lis := strings.Join(li,",")
+	u := url.Values{}
+	u.Add("goodsids",lis)
+	addSign(&u)
+	//var li []interface{}
+	err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/list?"+u.Encode(),"GET",nil,nil,func(body io.Reader,re int)error{
+		if re != 200 {
+			return fmt.Errorf("start is %d",re)
+		}
+		return json.NewDecoder(body).Decode(&dbs)
+	})
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	return
+
+}
+func handGoods(obj map[string]interface{})interface{}{
+	pro := obj["productInfo"].(map[string]interface{})
+	if pro["skuInfos"] == nil {
+		return nil
+	}
+	op_ :=obj["Preview"].(map[string]interface{})["orderPreviewResuslt"]
+	if op_ == nil {
+		return nil
+	}
+	op_list := op_.([]interface{})
+	if len(op_list)==0 {
+		return nil
+	}
+	//pro["subject_old"] = pro["subject"]
+	resu := op_list[0].(map[string]interface{})
+	pro["price"] =fmt.Sprintf("%.2f", resu["sumPayment"].(float64)*1.1/100)
+	cl := resu["cargoList"].([]interface{})[0].(map[string]interface{})
+	pro["NumMin"] = cl["amount"].(float64)/cl["finalUnitPrice"].(float64)
+	if pro["NumMin"].(float64)<1 {
+		pro["NumMin"] = 1
+	}
+	Carriage := resu["sumCarriage"].(float64)/100
+	attrName := []string{}
+	for i,_v := range pro["skuInfos"].([]interface{}){
+		v := _v.(map[string]interface{})
+		skuName := ""
+		for _,v_ := range v["attributes"].([]interface{}){
+			_v_ := v_.(map[string]interface{})
+			if _v_["skuImageUrl"]!= nil {
+				v["imageUrl"] = "https://cbu01.alicdn.com/"+_v_["skuImageUrl"].(string)
+			}
+			skuName += _v_["attributeValue"].(string)
+			if i == 0 {
+				attrName =append(attrName, _v_["attributeDisplayName"].(string))
+			}
+		}
+		v["skuName"] = skuName
+		if v["price"]== nil {
+			v["price"] = pro["price"]
+		}else{
+			v["price"] =fmt.Sprintf("%.2f",(v["price"].(float64)+Carriage)*1.1)
+		}
+	}
+	pro["attrName"] = strings.Join(attrName,"/")
+
+	images := pro["image"].(map[string]interface{})["images"].([]interface{})
+	for i,image := range images {
+		images[i] = "https://cbu01.alicdn.com/"+image.(string)
+	}
+	return pro
+}
 
 
 func UpdateGoods(id string,obj interface{})error{
+	if obj == nil {
+		return fmt.Errorf("obj is nil")
+	}
 	u := url.Values{}
 	u.Add("id",id)
 	addSign(&u)
@@ -92,6 +166,7 @@ func UpdateGoods(id string,obj interface{})error{
 		return nil
 	})
 }
+
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
 	Info := &shopping.ShoppingInfo{}
 	err  := requestHttp("/shopping/1688","GET",nil,nil,func(body io.Reader,res *http.Response)error{
@@ -105,29 +180,50 @@ func initAlibaba(hand func(*shopping.Alibaba)error)error{
 
 func init(){
 	goods := Router.Group("goods")
-	goods.GET("/order",func(c *gin.Context){
-		err := initAlibaba(func(ali *shopping.Alibaba)error {
-			o := new(shopping.AlAddrForOrder)
-			p := new(shopping.AlProductForOrder)
-			o.LoadTestDB()
-			p.LoadTestDB()
-			obj := ali.CreateOrder(o,[]*shopping.AlProductForOrder{p})
-			c.JSON(http.StatusOK,obj)
+	goods.GET("/",func(c *gin.Context){
+		c.HTML(http.StatusOK,"goods.tmpl",nil)
+	})
+	goods.GET("/show",func(c *gin.Context){
+		u := url.Values{}
+		addSign(&u)
+		err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/list?"+u.Encode(),"GET",nil,nil,func(body io.Reader,re int)error{
+			if re != 200 {
+				return fmt.Errorf("%d",re)
+			}
+			var db interface{}
+			err := json.NewDecoder(body).Decode(&db)
+			if err != nil {
+				return err
+			}
+			c.JSON(http.StatusOK,db)
 			return nil
 		})
 		if err != nil {
-			c.JSON(http.StatusOK,err)
+			c.JSON(http.StatusNotFound,err)
 			return
 		}
+
 	})
+	//goods.GET("/order",func(c *gin.Context){
+	//	err := initAlibaba(func(ali *shopping.Alibaba)error {
+	//		o := new(shopping.AlAddrForOrder)
+	//		p := new(shopping.AlProductForOrder)
+	//		o.LoadTestDB()
+	//		p.LoadTestDB()
+	//		obj := ali.CreateOrder(o,[]*shopping.AlProductForOrder{p})
+	//		c.JSON(http.StatusOK,obj)
+	//		return nil
+	//	})
+	//	if err != nil {
+	//		c.JSON(http.StatusOK,err)
+	//		return
+	//	}
+	//})
 
 	goods.GET("/down",func(c *gin.Context){
-		var li []interface{}
+		//var li []interface{}
+		list := []string{}
 		err := initAlibaba(func(ali *shopping.Alibaba)error {
-			//err := ali.ClearProduct()
-			//if err != nil {
-			//	return err
-			//}
 			alibaba.HandGoods = func(db interface{}){
 				//li = append(li,db)
 				db_:= db.(map[string]interface{})
@@ -135,6 +231,10 @@ func init(){
 				itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
 				obj := ali.GoodsDetail(productId)
 				obj_ := obj.(map[string]interface{})
+				if obj_["productInfo"] == nil {
+					return
+				}
+				fmt.Println(obj_)
 				obj_["itemid"] = itemId
 				product := obj_["productInfo"].(map[string]interface{})
 				des := product["description"].(string)
@@ -153,11 +253,15 @@ func init(){
 				if err != nil {
 					fmt.Println(err)
 					return
-
 				}
-				err = UpdateGoods(productId,obj)
+				pro:= handGoods(obj_)
+				if pro == nil {
+					return
+				}
+				err = UpdateGoods(productId,pro)
 				if err != nil {
-					panic(err)
+					fmt.Println(err)
+					return
 				}
 
 				err = ali.Crossborder(productId)
@@ -165,12 +269,15 @@ func init(){
 					//return err
 					panic(err)
 				}
-				li = append(li,obj)
+				//li = append(li,pro)
+
+				list = append(list,productId)
 			}
 			return alibaba.Run()
 		})
-		if len(li)>0{
-			c.JSON(http.StatusOK,li)
+		if len(list)>0{
+
+			c.JSON(http.StatusOK,GoodsListHand(list))
 			return
 		}
 		c.JSON(http.StatusOK,err)

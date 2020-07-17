@@ -76,6 +76,7 @@ func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Re
 }
 
 func addSign(u *url.Values){
+
 	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
 	li := []string{config.Conf.Minitoken}
 	for _,v := range *u{
@@ -83,6 +84,7 @@ func addSign(u *url.Values){
 	}
 	sort.Strings(li)
 	u.Add("sign",shopping.Sha1([]byte(strings.Join(li,""))))
+
 }
 
 func initAlibaba(hand func(*shopping.Alibaba)error)error{
@@ -130,6 +132,8 @@ type OrderInfo struct {
 	Alibaba map[string]interface{}
 	//TraceView string
 	Orderid string
+	Static int `json:"static"`
+	Time int
 }
 func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
 	var err error
@@ -158,7 +162,10 @@ func GetOrderList(openid,orderid string,hand func(*OrderInfo)error)error{
 				continue
 				return err
 			}
-			o.Orderid = string(k)
+			if o.Orderid != string(k){
+				panic(fmt.Errorf("%s %s",o.Orderid,string(k)))
+			}
+			//o.Orderid = string(k)
 			err = hand(&o)
 			if err != nil {
 				return nil
@@ -180,14 +187,14 @@ func (self *OrderInfo)ToByte(hand func([]byte)error) (err error) {
 	return hand(db)
 }
 
-func (self *OrderInfo)Save(orderid string)error{
+func (self *OrderInfo)Save()error{
 	return openDB(true,func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists([]byte(self.Client.Openid))
 		if err != nil {
 			return err
 		}
 		return self.ToByte(func(val []byte)error{
-			return b.Put([]byte(orderid),val)
+			return b.Put([]byte(self.Orderid),val)
 		})
 	})
 }
@@ -204,6 +211,7 @@ func (self *OrderInfo)Load(openid,orderid string)error{
 }
 
 func (self *OrderInfo)payRefund(hand func(interface{})error )error{
+	//fmt.Println(self)
 	uri := "https://api.mch.weixin.qq.com/secapi/pay/refund"
 	u := map[string]interface{}{}
 	u["appid"]=self.Client.Appid
@@ -239,12 +247,12 @@ func (self *OrderInfo)payRefund(hand func(interface{})error )error{
 
 }
 
-func (self *OrderInfo)unifiedorder(orderid string,fee int,hand func(interface{})error )error{
+func (self *OrderInfo) unifiedorder(fee int,hand func(interface{})error )error{
 
 	u := map[string]interface{}{}
 	u["appid"]=self.Client.Appid
 	u["body"] = "米果小店-订单支付"
-	u["out_trade_no"] = orderid
+	u["out_trade_no"] =self.Orderid // orderid
 	u["total_fee"] = fee
 	u["spbill_create_ip"] = self.Client.Clientip
 	begin := time.Now()
@@ -346,8 +354,8 @@ func init(){
 			return
 		}
 		oi.Notify = &db
-
-
+		oi.Save()
+		//return
 		go func(){
 			err := ShopPay(oi.Addr,oi.Goods,func(_db interface{})error{
 				//res,err := json.Marshal(_db.(map[string]interface{})["result"])
@@ -355,7 +363,7 @@ func init(){
 				//	return err
 				//}
 				oi.Alibaba = _db.(map[string]interface{})["result"].(map[string]interface{})
-				return oi.Save(db.Out_trade_no)
+				return oi.Save()
 			})
 			if err != nil {
 				fmt.Println(err)
@@ -367,6 +375,26 @@ func init(){
 	pay := Router.Group("pay",func() gin.HandlerFunc {
 		return checkManage
 	}())
+	pay.GET("/set_order_static",func(c *gin.Context){
+		oi:= &OrderInfo{}
+		err := oi.Load(c.Query("openid"),c.Query("orderid"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		s,err := strconv.Atoi(c.Query("static"))
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		oi.Static = s
+		err = oi.Save()
+		if err != nil {
+			c.JSON(http.StatusNotFound,gin.H{"msg":err})
+			return
+		}
+		c.JSON(http.StatusOK,gin.H{"msg":"success"})
+	})
 	pay.GET("/pay_refund",func(c *gin.Context){
 		oi:= &OrderInfo{}
 		err := oi.Load(c.Query("openid"),c.Query("orderid"))
@@ -375,7 +403,9 @@ func init(){
 			return
 		}
 		err = oi.payRefund(func(db interface{})error{
-			c.JSON(http.StatusOK,gin.H{"msg":err})
+			fmt.Println(db)
+			oi.Static = 3
+			c.JSON(http.StatusOK,gin.H{"msg":oi.Save()})
 			return nil
 		})
 		if err != nil {
@@ -482,16 +512,20 @@ func init(){
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})
 			return
 		}
-		oid := RandString(32)
-		fmt.Println(o.Client.SumPayment)
-		//err = o.unifiedorder(oid,int(o.Client.SumPayment),func(_db interface{})error{
-		err = o.unifiedorder(oid,int(1),func(_db interface{})error{
+		//oid := o.Orderid
+		if o.Orderid == "" {
+			o.Orderid = RandString(32)
+		}
+		//fmt.Println(o.Client.SumPayment)
+		//err = o.unifiedorder(int(o.Client.SumPayment),func(_db interface{})error{
+		err = o.unifiedorder(int(1),func(_db interface{})error{
 			if len(_db.(*unifiedRes).Prepay_id)==0{
 				c.JSON(http.StatusNotFound,_db)
 				return nil
 			}
-			c.JSON(http.StatusOK,gin.H{"msg":_db,"orderid":oid})
-			return o.Save(oid)
+			c.JSON(http.StatusOK,gin.H{"msg":_db,"orderid":o.Orderid})
+			//return nil
+			return o.Save()
 		})
 		if err != nil {
 			c.JSON(http.StatusNotFound,gin.H{"msg":err})

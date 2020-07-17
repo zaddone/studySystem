@@ -21,6 +21,7 @@ var (
 	AlibabaShopping *Alibaba
 	alibabatimeFormat = "20060102150405000-0700"
 	goodsDB = []byte("product")
+	GoodsListDB = []byte("productList")
 )
 
 type Alibaba struct{
@@ -320,6 +321,35 @@ func (self *Alibaba) GoodsGet(goodsId string,hand func(interface{}))error {
 		return nil
 	})
 }
+func (self *Alibaba) GoodsShowList(num []byte,hand func(k,v []byte)error)error {
+	return self.OpenDB(false,func(t *bolt.Tx)error{
+		b := t.Bucket(GoodsListDB)
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		var k,v []byte
+		if len(num) == 0 {
+			k,v = c.First()
+			if k == nil {
+				return nil
+			}
+		}else{
+			k,v = c.Seek(num)
+			if bytes.Equal(k,num){
+				k,v  = c.Next()
+			}
+		}
+		var err error
+		for ;k != nil;k,v = c.Next() {
+			err = hand(k,v)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
 
 func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
 	return self.OpenDB(false,func(t *bolt.Tx)error{
@@ -385,6 +415,34 @@ func (self *Alibaba) OpenDB (read bool,hand func(*bolt.Tx)error) error {
 
 }
 
+func (self *Alibaba) DelGoods(k string) error {
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(GoodsListDB)
+		if err != nil {
+			return err
+		}
+		return b.Delete([]byte(k))
+	})
+}
+
+func (self *Alibaba) SaveGoods(k string ,obj interface{}) error {
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(GoodsListDB)
+		if err != nil {
+			return err
+		}
+		db,err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(k),db)
+	})
+}
+func (self *Alibaba) ClearDB(db []byte) error {
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		return t.DeleteBucket(db)
+	})
+}
 func (self *Alibaba) ClearProduct() error {
 
 	return self.OpenDB(true,func(t *bolt.Tx)error{
@@ -392,19 +450,60 @@ func (self *Alibaba) ClearProduct() error {
 	})
 
 }
-
-func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
-
+func (self *Alibaba) HandGoodsList(lis string,up func(interface{})error)error{
 	return self.OpenDB(true,func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(goodsDB)
 		if err != nil {
 			return err
 		}
+		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
+		if err != nil {
+			return err
+		}
+		return b_.ForEach(func(k,v []byte)error{
+			if len(lis)>0{
+				if !strings.Contains(lis,string(k)){
+					return b_.Delete(k)
+				}
+			}
+			if len(v) == 1{
+				var db interface{}
+				err = json.Unmarshal(b.Get(k),&db)
+				if err != nil {
+					return err
+				}
+				return up(db)
+			}
+			return nil
+		})
+
+	})
+}
+func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(goodsDB)
+		if err != nil {
+			return err
+		}
+		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
+		if err != nil {
+			return err
+		}
+		key := []byte(k)
 		v,err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(k),v)
+		_db := b.Get(key)
+		if _db != nil && bytes.Equal(_db,v){
+			return nil
+		}
+		err = b_.Put(key,[]byte{0})
+		if err != nil {
+			return err
+		}
+		return b.Put(key,v)
+
 	})
 }
 
