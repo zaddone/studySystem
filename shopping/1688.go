@@ -450,6 +450,48 @@ func (self *Alibaba) ClearProduct() error {
 	})
 
 }
+func (self *Alibaba) HandGoodsListT(id string,show bool,up func(interface{})error)error{
+	id_ := []byte(id)
+	return self.OpenDB(true,func(t *bolt.Tx)error{
+		b,err := t.CreateBucketIfNotExists(goodsDB)
+		if err != nil {
+			return err
+		}
+		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
+		if err != nil {
+			return err
+		}
+		c := b_.Cursor()
+		var k,v []byte
+		if len(id) == 0 {
+			k,v = c.First()
+		}else{
+			k,v = c.Seek(id_)
+			if bytes.Equal(id_,k){
+				k,v = c.Next()
+			}
+		}
+		for ;k!=nil;k,v=c.Next(){
+			if len(v) == 1 {
+				if show{
+					continue
+				}
+				v = b.Get(k)
+			}
+			var db interface{}
+			err=json.Unmarshal(v,&db)
+			if err != nil {
+				return err
+			}
+			err = up(db)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+
+	})
+}
 func (self *Alibaba) HandGoodsList(lis string,up func(interface{})error)error{
 	return self.OpenDB(true,func(t *bolt.Tx)error{
 		b,err := t.CreateBucketIfNotExists(goodsDB)

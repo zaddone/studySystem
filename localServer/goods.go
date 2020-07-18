@@ -183,10 +183,37 @@ func init(){
 	goods.GET("/",func(c *gin.Context){
 		c.HTML(http.StatusOK,"goods.tmpl",nil)
 	})
-	goods.GET("/show",func(c *gin.Context){
+	goods.POST("/save",func(c *gin.Context){
+		id := c.Query("id")
+		if id == "" {
+			c.JSON(http.StatusFound,fmt.Errorf("id = nil"))
+			return
+		}
 		u := url.Values{}
+		u.Set("id",id)
 		addSign(&u)
-		err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/list?"+u.Encode(),"GET",nil,nil,func(body io.Reader,re int)error{
+		err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/edit?"+u.Encode(),"POST",c.Request.Body,nil,func(body io.Reader,re int)error{
+
+			db,err := ioutil.ReadAll(body)
+			if err != nil {
+				return err
+			}
+			c.String(re,string(db))
+			return nil
+		})
+		if err != nil {
+			c.JSON(http.StatusFound,err)
+		}
+
+
+	})
+	goods.GET("/show",func(c *gin.Context){
+
+		u := url.Values{}
+		u.Add("id",c.Query("id"))
+		u.Add("show",c.Query("show"))
+		addSign(&u)
+		err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/list_t?"+u.Encode(),"GET",nil,nil,func(body io.Reader,re int)error{
 			if re != 200 {
 				return fmt.Errorf("%d",re)
 			}
