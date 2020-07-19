@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh" class="h-100">
+  <head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="keywords" content="zaddone,米果报,米果,推荐,网购,查价,优惠卷,省钱,链接,交换">
+    <meta name="description" content="zaddone.com,米果报,米果推荐,网购查价,优惠卷省钱,链接交换">
+    <meta name="author" content="zaddone, 米果报">
+    <meta name="generator" content="Jekyll v3.8.6">
+
+    <title>zaddone米果</title>
+    <link rel="canonical" href="https://www.zaddone.com">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
+
+<link rel="apple-touch-icon" href="/static/img/favicon180.png" sizes="180x180">
+<link rel="icon" href="/static/img/favicon32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/static/img/favicon16.png" sizes="16x16" type="image/png">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="mask-icon" href="/static/img/favicons.svg" color="#ffffff">
+<link rel="icon" href="/static/img/favicon.ico">
+<meta name="msapplication-config" content="/static/browserconfig.xml">
+<meta name="theme-color" content="#ffffff">
+
+<link href="/static/css/main.css" rel="stylesheet">
+<!-- Custom styles for this template -->
+</head>
+<body class="d-flex flex-column h-100">
+<header>
+ <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
+    <a class="navbar-brand" href="#">Carousel</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="javascript:runGoodsDown()">Home <span class="sr-only">(current)</span></a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="javascript:runGoodsList(true)">Link</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="javascript:runGoodsList(false)">Link1</a>
+        </li>
+      </ul>
+      <form class="form-inline mt-2 mt-md-0">
+        <input class="form-control mr-sm-2" type="text" placeholder="Search" aria-label="Search">
+        <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+      </form>
+    </div>
+ </nav>
+</header>
+
+<!-- Begin page content -->
+<main role="main" class="flex-shrink-0">
+<div class="container xcode">
+</div>
+<div class="container text-center">
+<div class="row">
+</div>
+</div>
+</main>
+<footer class="footer mt-auto py-3">
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal" data-whatever="@mdo">Open modal for @mdo</button>
+</footer>
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">New message</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+	<form>
+        <div class="form-group">
+            <input type="text" class="form-control" id="name">
+            <input type="hidden" id="index">
+        </div>
+	<div id="des" >
+		<div><img src="https://img.zaddone.com/static/img/qrcode_for_gh_4c0babf5f937_344.jpg" class="img-fluid" alt="Responsive image"></div>
+	</div>
+      </div>
+      <div class="modal-footer">
+	<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="saveGoods()" >Save</button>
+      </div>
+     </form>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"></script>
+<script>
+var list_db = []
+function runGoodsDown(){
+  $.ajax({
+	type:"get",
+	dataType:"json",
+	url:"/goods/down",
+	success:function(db){
+		list_db = db
+		db.forEach(function(v,i){
+			console.log(v)
+  			$('.row').append(handGoodsDB(v,i))
+		})
+
+	},
+  })
+	
+}
+function runGoodsList(show){
+	let len = list_db.length
+	let data = {show:show}
+	if (len>0){
+		data.id =  list_db[len-1].productID
+	}
+	$.ajax({
+		type:"get",
+		dataType:"json",
+		url:"/goods/show",
+		data:data,
+		success:function(db){
+			db.forEach(function(v,i){
+				list_db.push(v)
+				console.log(v)
+	  			$('.row').append(handGoodsDB(v,i+len))
+			})
+			if (db.length>0)runGoodsList(show)
+		},
+	})
+}
+
+function handGoodsDB(v,id){
+	return '<div class="col-lg-2 top" data-id="'+id+'"  data-toggle="modal" data-target="#exampleModal" data-title="'+v.subject+'" ><div class="goods card"><img src="'+v.image.images[0]+'" class="card-img-top"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger"></span><a href="/goods/del?pid='+v.productID+'">del</a><p class="name">'+v.subject+'</p></div></div></div></div>'
+}
+$(document).ready(function(){
+	//$('#myModal').modal('toggle')
+	$('#exampleModal').on('show.bs.modal', function (event) {
+		var button = $(event.relatedTarget) // Button that triggered the modal
+		var recipient = button.data('title') // Extract info from data-* attributes
+		var id = button.data('id')
+		var db =list_db[id]
+		var modal = $(this)
+		modal.find('.modal-body #name').val(recipient)
+		modal.find('.modal-body #index').val(id)
+		modal.find('.modal-title').text(recipient)
+		
+		modal.find('.modal-body #des').empty()
+		db.des_img.forEach(function(u,i){
+			modal.find('.modal-body #des').append('<div id="img_'+id+'"><button type="button" class="btn btn-secondary" onclick="delimg('+i+','+id+')"  id="delClick" data-index="'+i+'" data-id="'+id+'">del</button><img src="'+u+'" class="img-fluid" alt="Responsive image"></div>')
+		})
+	})
+});
+function delimg(i,id){
+	console.log(i,id)
+	delete list_db[id].des_img[i]
+	$('#img_'+id).remove()
+}
+function saveGoods(){
+	let id = $('.modal-body #index').val()
+	var body = list_db[id]
+	body.subject = $('.modal-body #name').val()
+	$.ajax({
+		type:"post",
+		contentType: "application/json; charset=utf-8",  
+		dataType:"json",
+		url:"/goods/save?id="+body.productID,
+		data:JSON.stringify(body),
+		success:function(db){
+			console.log(db)		
+		}
+	})
+}
+
+</script>
+
+</body>
+</html>
+

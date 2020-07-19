@@ -210,7 +210,7 @@ func init(){
 	goods.GET("/show",func(c *gin.Context){
 
 		u := url.Values{}
-		u.Add("id",c.Query("id"))
+		u.Add("goodsid",c.Query("id"))
 		u.Add("show",c.Query("show"))
 		addSign(&u)
 		err := request.ClientHttp_("https://www.zaddone.com/site/v2/goods/update/list_t?"+u.Encode(),"GET",nil,nil,func(body io.Reader,re int)error{

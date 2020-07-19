@@ -299,12 +299,11 @@ func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interf
 	u.Add("access_token",self.Info.Token)
 	return self.ClientHttp(uri,u)
 
-
 }
 
 func (self *Alibaba) GoodsGet(goodsId string,hand func(interface{}))error {
 	return self.OpenDB(false,func(t *bolt.Tx)error{
-		b := t.Bucket(goodsDB)
+		b := t.Bucket(GoodsListDB)
 		if b == nil {
 			return nil
 		}

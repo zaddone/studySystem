@@ -72,7 +72,8 @@
 
 showorder()
 function runDown(){
-	var ws = new WebSocket("ws://192.168.1.30:8008/ws")
+	//var ws = new WebSocket("ws://192.168.1.30:8008/ws")
+	var ws = new WebSocket("ws://127.0.0.1:8008/ws")
 	ws.onopen = function(evt) { 
 	  console.log("Connection open ..."); 
 	  ws.send("Hello WebSockets!");
@@ -118,19 +119,13 @@ function showorder(orderid){
 		db.forEach(function(v){
 			console.log(v)
 			lastid = v.order_id
-			if (v.goodsImg){
-  			$('.row').append('<div class="col-lg-2 top" ><a class="goods card btn btn-link"><img src="'+v.goodsImg+'" class="card-img-top"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger">'+formatDate(new Date(v.endTime*1000))+'</span><p class="name">'+v.goodsName+'</p></div></div></a></div>')
-			}else{
-  			$('.row').append('<div class="col-lg-2 top" ><a class="goods card btn btn-link"><div><div class="card-text"><span class="badge badge-danger">'+formatDate(new Date(v.endTime*1000))+'</span><p class="name">'+v.goodsName+'</p></div></div></a></div>')
-				
-			}
+  			$('.row').append('<div class="col-lg-2 top" ><div class="goods card"><img src="'+v.goodsImg+'" class="card-img-top"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger">'+formatDate(new Date(v.endTime*1000))+'</span><a href="/order/del?orderid='+v.order_id+'">del</a><p class="name">'+v.goodsName+'</p></div></div></div></div>')
 		})
 		if (db.length===10){
 			showorder(lastid)
 		}
 	},
   })
-
 }
 
 </script>
