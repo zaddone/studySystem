@@ -536,8 +536,11 @@ func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
 			return err
 		}
 		_db := b.Get(key)
-		if len(_db) == len(v)  {
-			return nil
+		if len(_db) > 0  {
+			fmt.Println(len(_db))
+			if bytes.Equal(_db,v){
+				return nil
+			}
 		}
 		err = b_.Put(key,[]byte{0})
 		if err != nil {

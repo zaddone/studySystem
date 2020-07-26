@@ -517,8 +517,8 @@ func init(){
 			o.Orderid = RandString(32)
 		}
 		//fmt.Println(o.Client.SumPayment)
-		//err = o.unifiedorder(int(o.Client.SumPayment),func(_db interface{})error{
-		err = o.unifiedorder(int(1),func(_db interface{})error{
+		err = o.unifiedorder(int(o.Client.SumPayment),func(_db interface{})error{
+		//err = o.unifiedorder(int(1),func(_db interface{})error{
 			if len(_db.(*unifiedRes).Prepay_id)==0{
 				c.JSON(http.StatusNotFound,_db)
 				return nil
