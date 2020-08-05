@@ -65,35 +65,35 @@ func init(){
 		return
 
 	})
-	v1.GET("/goods/update/list",func(c *gin.Context){
-		var li []interface{}
-		sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
-		if err != nil {
-			c.JSON(http.StatusFound,err)
-			return
-		}
-		//lis := c.Query("goodsids")
-		//if len(lis) == 0{
-		//	c.JSON(http.StatusFound,fmt.Errorf("goodsids is nil"))
-		//	return
-		//}
-		err = shopping.AlibabaShopping.HandGoodsList(
-			c.Query("goodsids"),
-			func(db interface{})error{
-			li = append(li,db)
-			if len(li)>=sum{
-				return io.EOF
-			}
-			return nil
-		})
-		if len(li)>0{
-			c.JSON(http.StatusOK,li)
-			return
-		}
-		//fmt.Println(err)
-		c.JSON(http.StatusFound,err)
-		return
-	})
+	//v1.GET("/goods/update/list",func(c *gin.Context){
+	//	var li []interface{}
+	//	sum,err :=strconv.Atoi(c.DefaultQuery("con","20"))
+	//	if err != nil {
+	//		c.JSON(http.StatusFound,err)
+	//		return
+	//	}
+	//	//lis := c.Query("goodsids")
+	//	//if len(lis) == 0{
+	//	//	c.JSON(http.StatusFound,fmt.Errorf("goodsids is nil"))
+	//	//	return
+	//	//}
+	//	err = shopping.AlibabaShopping.HandGoodsList(
+	//		c.Query("goodsids"),
+	//		func(db interface{})error{
+	//		li = append(li,db)
+	//		if len(li)>=sum{
+	//			return io.EOF
+	//		}
+	//		return nil
+	//	})
+	//	if len(li)>0{
+	//		c.JSON(http.StatusOK,li)
+	//		return
+	//	}
+	//	//fmt.Println(err)
+	//	c.JSON(http.StatusFound,err)
+	//	return
+	//})
 	v1.GET("/goods/update/del",func(c *gin.Context){
 		id := c.Query("id")
 		if id == "" {

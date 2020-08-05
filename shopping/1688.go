@@ -4,16 +4,20 @@ import(
 	"time"
 	"strings"
 	"net/url"
+	"net/http"
 	"crypto/hmac"
 	"crypto/sha1"
 	"github.com/zaddone/studySystem/request"
 	"github.com/boltdb/bolt"
+	//"golang.org/x/text/encoding/simplifiedchinese"
+	//"golang.org/x/text/transform"
 	"encoding/json"
 	"io"
 	"io/ioutil"
 	"sort"
 	"bytes"
 	"strconv"
+	"regexp"
 )
 var (
 	//1688Url = "https://gw.open.1688.com/openapi/param2/%s/6020087"
@@ -21,8 +25,18 @@ var (
 	AlibabaShopping *Alibaba
 	alibabatimeFormat = "20060102150405000-0700"
 	goodsDB = []byte("product")
-	GoodsListDB = []byte("productList")
+	goodsList = []byte("productL")
+	//GoodsListDB = []byte("productList")
 )
+//
+//func GbkToUtf8(s []byte) ([]byte, error) {
+//	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
+//	d, e := ioutil.ReadAll(reader)
+//	if e != nil {
+//		return nil, e
+//	}
+//	return d, nil
+//}
 
 type Alibaba struct{
 	Info *ShoppingInfo
@@ -67,6 +81,7 @@ func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 	if siteDB == "" {
 		return j
 	}
+	//return j
 	go func(){
 		for{
 			if j.Info.ReTimeOut == "" {
@@ -91,8 +106,9 @@ func NewAlibaba(sh *ShoppingInfo,siteDB string) (*Alibaba){
 		}
 	}()
 	return j
-
 }
+
+
 
 func (self *Alibaba) ReToken_ (siteDB string) error {
 	uri := "https://gw.open.1688.com/openapi/param2/1/system.oauth2/postponeToken/"+self.Info.Client_id
@@ -301,9 +317,33 @@ func (self *Alibaba) CreateOrder(a *AlAddrForOrder,p []*AlProductForOrder)interf
 
 }
 
+func (self *Alibaba) GoodsGetWithTaobao(taobaoId string,hand func(interface{}))error {
+	return self.OpenDB(false,func(t *bolt.Tx)error{
+		b_ := t.Bucket(goodsList)
+		if b_ == nil {
+			return nil
+		}
+		b := t.Bucket(goodsDB)
+		if b == nil {
+			return nil
+		}
+		val := b.Get(b_.Get([]byte(taobaoId)))
+		if val == nil {
+			return fmt.Errorf("find not")
+		}
+		var db interface{}
+		err := json.Unmarshal(val,&db)
+		if err != nil {
+			return err
+		}
+		hand(db)
+		return nil
+	})
+
+}
 func (self *Alibaba) GoodsGet(goodsId string,hand func(interface{}))error {
 	return self.OpenDB(false,func(t *bolt.Tx)error{
-		b := t.Bucket(GoodsListDB)
+		b := t.Bucket(goodsDB)
 		if b == nil {
 			return nil
 		}
@@ -322,7 +362,7 @@ func (self *Alibaba) GoodsGet(goodsId string,hand func(interface{}))error {
 }
 func (self *Alibaba) GoodsShowList(num []byte,hand func(k,v []byte)error)error {
 	return self.OpenDB(false,func(t *bolt.Tx)error{
-		b := t.Bucket(GoodsListDB)
+		b := t.Bucket(goodsDB)
 		if b == nil {
 			return nil
 		}
@@ -384,6 +424,133 @@ func (self *Alibaba) GoodsShow(num []byte,hand func(interface{})error)error {
 		return nil
 	})
 }
+func Get1688GoodsDetail(db_ interface{})interface{}{
+	db_m:= db_.(map[string]string)
+	db := db_m["body"]
+	cou := db_m["tfscom"]
+	var des_img []string
+	for _,im  := range regexp.MustCompile(`src=\"(.+)\"`).FindAllStringSubmatch(cou,-1){
+		des_img = append(des_img,im[1])
+	}
+	fmt.Println(des_img)
+	var imgs []string
+	for _,im := range regexp.MustCompile(`data-imgs='.+`).FindAllString(db,-1){
+		_ims:=regexp.MustCompile(`"original":"(.+)"`).FindStringSubmatch(im)
+		//fmt.Println(_ims)
+		imgs = append(imgs,_ims[1])
+	}
+	skumap_ := regexp.MustCompile(`skuMap:(.+)`).FindStringSubmatch(db)
+	if len(skumap_)<2{
+		return fmt.Errorf("find not skumap")
+	}
+	skumap__:=skumap_[1][0:len(skumap_[1])-1]
+
+	var skumap_db interface{}
+	err := json.Unmarshal([]byte(skumap__),&skumap_db)
+	if err != nil {
+		fmt.Println(string(skumap__))
+		return err
+	}
+	props_ :=regexp.MustCompile(`skuProps:(.+)`).FindStringSubmatch(db)
+	if len(props_)<2{
+		return fmt.Errorf("find not props")
+	}
+	props__:=props_[1][0:len(props_[1])-1]
+	var props_db interface{}
+	err = json.Unmarshal([]byte(props__),&props_db)
+	if err != nil {
+		fmt.Println(props__)
+		return err
+	}
+
+	return map[string]interface{}{
+		"videoUrl":fmt.Sprintf(
+			"https://cloud.video.taobao.com/play/u/%s/p/2/e/6/t/1/%s.mp4",
+			regexp.MustCompile(`"userId":"(\w+)"`).FindStringSubmatch(db)[1],
+			regexp.MustCompile(`"videoId":"(\w+)"`).FindStringSubmatch(db)[1],
+		),
+		"props":props_db,
+		"skumap":skumap_db,
+		"imgs":imgs,
+		"des_img":des_img,
+	}
+
+}
+
+func (self *Alibaba) GoodsDetailForUrl(words ...string)interface{}{
+
+	u:=fmt.Sprintf("https://detail.1688.com/offer/%s.html",words[0])
+	res,err := http.Get(u)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200{
+		return fmt.Errorf("%s",res.Status)
+	}
+	db,err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return err
+	}
+	//props,err :=GbkToUtf8(regexp.MustCompile(`skuProps:.+`).Find(db))
+	//if err != nil {
+	//	return err
+	//}
+	var imgs []string
+	for _,im := range regexp.MustCompile(`data-imgs='.+`).FindAll(db,-1){
+		_ims:=regexp.MustCompile(`"original":"(.+)"`).FindStringSubmatch(string(im))
+		//fmt.Println(_ims)
+		imgs = append(imgs,_ims[1])
+	}
+	skumap_ := regexp.MustCompile(`skuMap:(.+)`).FindSubmatch(db)
+	if len(skumap_)<2{
+		fmt.Println(string(db))
+		return fmt.Errorf("find not skumap")
+	}
+	skumap__,err:=GbkToUtf8(skumap_[1][0:len(skumap_[1])-1])
+	if err != nil {
+		return err
+	}
+	var skumap_db interface{}
+	err = json.Unmarshal(skumap__,&skumap_db)
+	if err != nil {
+		fmt.Println(string(skumap__))
+		return err
+	}
+	props_ :=regexp.MustCompile(`skuProps:(.+)`).FindSubmatch(db)
+	if len(props_)<2{
+		return fmt.Errorf("find not props")
+	}
+	props__,err:=GbkToUtf8(props_[1][0:len(props_[1])-1])
+	if err != nil {
+		return err
+	}
+	var props_db interface{}
+	err = json.Unmarshal(props__,&props_db)
+	if err != nil {
+		fmt.Println(string(props__))
+		return err
+	}
+
+
+
+	return map[string]interface{}{
+		"videoUrl":fmt.Sprintf(
+			"http://cloud.video.taobao.com/play/u/%s/p/2/e/6/t/1/%s.mp4",
+			string(regexp.MustCompile(`"userId":"(\w+)"`).FindSubmatch(db)[1]),
+			string(regexp.MustCompile(`"videoId":"(\w+)"`).FindSubmatch(db)[1]),
+		),
+		"props":props_db,
+		"skumap":skumap_db,
+		"imgs":imgs,
+	}
+
+	//return string(db)
+	//fmt.Println(string(db))
+	//return nil
+
+
+}
 
 func (self *Alibaba) GoodsDetail(words ...string)interface{}{
 	uri := "1/com.alibaba.product/alibaba.agent.product.simple.get"
@@ -416,7 +583,7 @@ func (self *Alibaba) OpenDB (read bool,hand func(*bolt.Tx)error) error {
 
 func (self *Alibaba) DelGoods(k string) error {
 	return self.OpenDB(true,func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(GoodsListDB)
+		b,err := t.CreateBucketIfNotExists(goodsDB)
 		if err != nil {
 			return err
 		}
@@ -426,7 +593,7 @@ func (self *Alibaba) DelGoods(k string) error {
 
 func (self *Alibaba) SaveGoods(k string ,obj interface{}) error {
 	return self.OpenDB(true,func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(GoodsListDB)
+		b,err := t.CreateBucketIfNotExists(goodsDB)
 		if err != nil {
 			return err
 		}
@@ -456,11 +623,11 @@ func (self *Alibaba) HandGoodsListT(id string,show bool,up func(interface{})erro
 		if err != nil {
 			return err
 		}
-		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
-		if err != nil {
-			return err
-		}
-		c := b_.Cursor()
+		//b_,err := t.CreateBucketIfNotExists(goodsListDB)
+		//if err != nil {
+		//	return err
+		//}
+		c := b.Cursor()
 		var k,v []byte
 		if len(id) == 0 {
 			k,v = c.First()
@@ -471,12 +638,12 @@ func (self *Alibaba) HandGoodsListT(id string,show bool,up func(interface{})erro
 			}
 		}
 		for ;k!=nil;k,v=c.Next(){
-			if len(v) == 1 {
-				if show{
-					continue
-				}
-				v = b.Get(k)
-			}
+			//if len(v) == 1 {
+			//	if show{
+			//		continue
+			//	}
+			//	v = b.Get(k)
+			//}
 			var db interface{}
 			err=json.Unmarshal(v,&db)
 			if err != nil {
@@ -491,33 +658,42 @@ func (self *Alibaba) HandGoodsListT(id string,show bool,up func(interface{})erro
 
 	})
 }
-func (self *Alibaba) HandGoodsList(lis string,up func(interface{})error)error{
+//func (self *Alibaba) HandGoodsList(lis string,up func(interface{})error)error{
+//	return self.OpenDB(true,func(t *bolt.Tx)error{
+//		b,err := t.CreateBucketIfNotExists(goodsDB)
+//		if err != nil {
+//			return err
+//		}
+//		//b_,err := t.CreateBucketIfNotExists(GoodsListDB)
+//		//if err != nil {
+//		//	return err
+//		//}
+//		return b.ForEach(func(k,v []byte)error{
+//			if len(lis)>0{
+//				if !strings.Contains(lis,string(k)){
+//					return b_.Delete(k)
+//				}
+//			}
+//			if len(v) == 1{
+//				var db interface{}
+//				err = json.Unmarshal(b.Get(k),&db)
+//				if err != nil {
+//					return err
+//				}
+//				return up(db)
+//			}
+//			return nil
+//		})
+//
+//	})
+//}
+func (self *Alibaba) SaveProductList(k,pid string) error {
 	return self.OpenDB(true,func(t *bolt.Tx)error{
-		b,err := t.CreateBucketIfNotExists(goodsDB)
+		b,err := t.CreateBucketIfNotExists(goodsList)
 		if err != nil {
 			return err
 		}
-		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
-		if err != nil {
-			return err
-		}
-		return b_.ForEach(func(k,v []byte)error{
-			if len(lis)>0{
-				if !strings.Contains(lis,string(k)){
-					return b_.Delete(k)
-				}
-			}
-			if len(v) == 1{
-				var db interface{}
-				err = json.Unmarshal(b.Get(k),&db)
-				if err != nil {
-					return err
-				}
-				return up(db)
-			}
-			return nil
-		})
-
+		return b.Put([]byte(pid),[]byte(k))
 	})
 }
 func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
@@ -526,23 +702,24 @@ func (self *Alibaba) SaveProduct(k string ,obj interface{}) error {
 		if err != nil {
 			return err
 		}
-		b_,err := t.CreateBucketIfNotExists(GoodsListDB)
-		if err != nil {
-			return err
-		}
+		//b_,err := t.CreateBucketIfNotExists(GoodsListDB)
+		//if err != nil {
+		//	return err
+		//}
 		key := []byte(k)
 		v,err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
-		_db := b.Get(key)
-		if len(_db) == len(v)  {
-			return nil
-		}
-		err = b_.Put(key,[]byte{0})
-		if err != nil {
-			return err
-		}
+		//_db := b.Get(key)
+		//if len(_db) == len(v)  {
+		//	return nil
+		//}
+		//err = b_.Put(key,[]byte{0})
+		//if err != nil {
+		//	return err
+		//}
+
 		return b.Put(key,v)
 
 	})

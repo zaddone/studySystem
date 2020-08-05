@@ -12,7 +12,7 @@ import(
 	"golang.org/x/text/encoding/unicode"
 )
 var(
-	path = flag.String("p","./taobaolist/goods_2.csv","path")
+	path = flag.String("p","goods/20200727.csv","path")
 	decoder *encoding.Decoder
 )
 func init(){
@@ -30,10 +30,12 @@ func loadTaobaoCsv() error{
 	cf := csv.NewReader(f)
 	for{
 		r,err := cf.Read()
-		fmt.Println(len(r))
+		fmt.Println(len(r),err)
 		if err != nil {
 			return err
 		}
+		fmt.Println(r)
+
 		//for _,l := range r {
 		//	fmt.Println(l)
 		//}
@@ -72,10 +74,17 @@ func loadCsv() error{
 		//str, _ := decoder.Bytes(li)
 		if line == 0{
 			fields = strings.Fields(string(li))
-			fmt.Println(fields)
-		}else{
+			fmt.Println("fields",fields)
+		}else if line<6 {
+			//fields = strings.Fields(string(li))
+			//fmt.Println(len(fields),fields)
 			//str := strings.ReplaceAll(string(li),"\"\"","\\\"")
-			fmt.Println(string(li))
+			lis := strings.Split(string(li),"	")
+			for _i,l := range lis {
+				fmt.Println(_i,l)
+			}
+		}else{
+			break
 		}
 		line++
 	}
@@ -84,7 +93,7 @@ func loadCsv() error{
 
 }
 func main(){
-	err := loadTaobaoCsv()
-	//err := loadCsv()
+	//err := loadTaobaoCsv()
+	err := loadCsv()
 	fmt.Println(err)
 }

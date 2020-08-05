@@ -36,7 +36,6 @@ func setToken() int {
 		panic(err)
 	}
 	if db["access_token"]==nil {
-
 		fmt.Println(db)
 		time.Sleep(1*time.Hour)
 		return setToken()
@@ -236,6 +235,7 @@ func SaveToWXDB(body string) error {
 
 	return AddToWXDB(config.Conf.CollPageName,body)
 }
+
 func UpDBToWX(coll,uri string)error{
 	fp,pid,err := UpFileToWX(uri)
 	if err != nil {

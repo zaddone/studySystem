@@ -8,11 +8,31 @@ import(
 	"encoding/json"
 )
 var (
-	Url_1= "https://guanjia.1688.com/page/portal.htm"
+	Url_1 = "https://guanjia.1688.com/page/portal.htm"
 	Url_2 = "https://guanjia.1688.com/page/start.htm"
+	attrUrl = "https://widget.1688.com/front/getJsonComponent.json"
 	indexUrl = "https://guanjia.1688.com/event/app/newchannel_fx_selloffer/querySuplierProducts.htm?_input_charset=utf8&keyword=&pageNum=1"
 	HandGoods func(interface{}) = nil
+	Public interface{}
 )
+func GetGoodsAttr(_db interface{}){
+	if !chromeServer.GetBody(_db,"1688.com/offer/",func(__id float64,result map[string]interface{}){
+		Public = result["body"]
+
+		//https://img.alicdn.com/tfscom
+		//chromeServer.ClosePage()
+	}){
+		chromeServer.GetBody(_db,"img.alicdn.com/tfscom",func(__id float64,result map[string]interface{}){
+			fmt.Println(result)
+
+			HandGoods(map[string]string{
+				"body":Public.(string),
+				"tfscom":result["body"].(string),
+			})
+			chromeServer.ClosePage()
+		})
+	}
+}
 func GetGoodsList(_db interface{}){
 	if !chromeServer.GetBody(_db,"page/start.htm",func(__id float64,result map[string]interface{}){
 		chromeServer.PageNavigate(indexUrl,func(res map[string]interface{}){
@@ -44,10 +64,12 @@ func GetGoodsList(_db interface{}){
 				chromeServer.ClosePage()
 				return
 			}
+
 			u,err := url.Parse(indexUrl)
 			if err != nil {
 				panic(err)
 			}
+
 			val := u.Query()
 			val.Set("pageNum",fmt.Sprintf("%.0f",num+1))
 			uri_ := fmt.Sprintf("%s://%s%s?%s",u.Scheme,u.Host,u.Path,val.Encode())
@@ -58,6 +80,12 @@ func GetGoodsList(_db interface{}){
 			//fmt.Println(result)
 		})
 	}
+}
+
+func RunDetail(id string) error {
+	Public = nil
+	chromeServer.HandleResponse = GetGoodsAttr
+	return chromeServer.Run(fmt.Sprintf("https://detail.1688.com/offer/%s.html",id))
 }
 func Run() error {
 	chromeServer.HandleResponse = GetGoodsList
