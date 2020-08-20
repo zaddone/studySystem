@@ -1,50 +1,56 @@
 package config
-import(
-	"net/http"
-	"github.com/BurntSushi/toml"
+
+import (
 	"flag"
+	"fmt"
+	"github.com/BurntSushi/toml"
+	"net/http"
 	"os"
 )
-var(
-	LogFileName   = flag.String("c", "conf.log", "config log")
-	Conf *Config
+
+var (
+	LogFileName = flag.String("c", "conf.log", "config log")
+	Conf        *Config
 )
-func init(){
+
+func init() {
 	//EntryList = make(chan *Entry,1000)
 	//flag.Parse()
 	Conf = NewConfig(*LogFileName)
 }
+
 type Config struct {
 	ArticleServer string
-	Proxy string
-	Port string
-	DbPath string
-	KvDbPath string
-	DeduPath string
-	Templates string
-	Static string
-	Header http.Header
-	WeixinUrl string
-	Coll bool
-	WXAppid string
-	WXSec string
-	CollPageName string
-	CollWordName string
-	CollPath string
-	ToutiaoUri []string
+	Proxy         string
+	Port          string
+	DbPath        string
+	KvDbPath      string
+	DeduPath      string
+	Templates     string
+	Static        string
+	Header        http.Header
+	WeixinUrl     string
+	Coll          bool
+	WXAppid       string
+	WXSec         string
+	CollPageName  string
+	CollWordName  string
+	CollPath      string
+	ToutiaoUri    []string
 	//UserInfo *url.Values
-	OutKey string
+	OutKey  string
 	MaxPage int
 	//Site []*SitePage
-	Minitoken string
-	WXtoken string
-	AliyunKeyid string
+	Minitoken    string
+	WXtoken      string
+	AliyunKeyid  string
 	AliyunSecret string
-	Apikeyv3 string
-	MerchantId string
+	Apikeyv3     string
+	MerchantId   string
 }
-func (self *Config) Save(fileName string){
-	fi,err := os.OpenFile(fileName,os.O_CREATE|os.O_WRONLY,0777)
+
+func (self *Config) Save(fileName string) {
+	fi, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, 0777)
 	if err != nil {
 		panic(err)
 	}
@@ -55,16 +61,16 @@ func (self *Config) Save(fileName string){
 		panic(err)
 	}
 }
-func NewConfig(fileName string)  *Config {
+func NewConfig(fileName string) *Config {
 	var c Config
-	_,err := os.Stat(fileName)
+	_, err := os.Stat(fileName)
 	if err != nil {
 		c.ArticleServer = "127.0.0.1:8080"
 		c.Coll = true
 		c.Proxy = ""
 		c.MaxPage = 60000
 		c.Static = "static"
-		c.Port=":8080"
+		c.Port = ":8080"
 		c.Templates = "./templates/*"
 		c.WXAppid = ""
 		c.WXSec = ""
@@ -75,14 +81,15 @@ func NewConfig(fileName string)  *Config {
 		c.WXtoken = ""
 		c.Apikeyv3 = ""
 		c.MerchantId = ""
-		_,err = os.Stat(c.CollPath)
+		_, err = os.Stat(c.CollPath)
 		if err != nil {
-			err = os.MkdirAll(c.CollPath,0777)
+			err = os.MkdirAll(c.CollPath, 0777)
 			if err != nil {
-				panic(err)
+				fmt.Println(err)
+				//panic(err)
 			}
 		}
-		c.OutKey="头条客户端|头条号|转载|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
+		c.OutKey = "头条客户端|头条号|转载|(点击[\\s\\S]+?关注)|(购买[\\s\\S]+?优惠)"
 		c.ToutiaoUri = []string{
 			"https://www.toutiao.com",
 			"https://www.toutiao.com/ch/news_hot/",
@@ -107,18 +114,18 @@ func NewConfig(fileName string)  *Config {
 		}
 		c.Header = http.Header{
 			//"Content-Type":[]string{"application/x-www-form-urlencoded","multipart/form-data"},
-			"Upgrade-Insecure-Requests":[]string{"1"},
-			"Pragma": []string{"no-cache"},
-			"Cache-Control": []string{"no-cache"},
-			"TE":[]string{"Trailers"},
-			"Accept":[]string{"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
-			"Connection":[]string{"keep-alive"},
-			"Accept-Encoding":[]string{"gzip, deflate, sdch"},
-			"Accept-Language":[]string{"zh-CN,zh;q=0.8"},
-			"User-Agent":[]string{"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0"}}
+			"Upgrade-Insecure-Requests": []string{"1"},
+			"Pragma":                    []string{"no-cache"},
+			"Cache-Control":             []string{"no-cache"},
+			"TE":                        []string{"Trailers"},
+			"Accept":                    []string{"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+			"Connection":                []string{"keep-alive"},
+			"Accept-Encoding":           []string{"gzip, deflate, sdch"},
+			"Accept-Language":           []string{"zh-CN,zh;q=0.8"},
+			"User-Agent":                []string{"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0"}}
 		c.Save(fileName)
-	}else{
-		if _,err := toml.DecodeFile(fileName,&c);err != nil {
+	} else {
+		if _, err := toml.DecodeFile(fileName, &c); err != nil {
 			panic(err)
 		}
 	}

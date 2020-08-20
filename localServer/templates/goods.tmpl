@@ -113,25 +113,33 @@ function runGoodsDown(){
   })
 	
 }
-function runGoodsList(show){
-	let len = list_db.length
-	let data = {show:show}
-	if (len>0){
-		data.id =  list_db[len-1].productID
-	}
+function runFunc(req,hand){
 	$.ajax({
-		type:"get",
+		type:"post",
 		dataType:"json",
-		url:"/goods/show",
-		data:data,
+		contentType:"application/json;charset=utf-8",
+		url:"/goods/func?name=getGoods",
+		data:JSON.stringify(req),
 		success:function(db){
-			db.forEach(function(v,i){
-				list_db.push(v)
-				console.log(v)
-	  			$('.row').append(handGoodsDB(v,i+len))
-			})
-			if (db.length>0)runGoodsList(show)
+			console.log(db)
+			if (db.errcode==0)hand(JSON.parse(db.resp_data))
 		},
+	})
+}
+function runGoodsList(){
+	let len = list_db.length
+	let data = {limit:10}
+	if (len>0){
+		data.update =  list_db[len-1].productID
+	}
+	runFunc(data,function(db){
+		console.log(db)
+		db.data.forEach(function(v,i){
+			list_db.push(v)
+			console.log(v)
+	  		$('.row').append(handGoodsDB(v,i+len))
+		})
+		if (db.data.length>0)runGoodsList()
 	})
 }
 
@@ -139,6 +147,7 @@ function handGoodsDB(v,id){
 	return '<div class="col-lg-2 top" data-id="'+id+'"  data-toggle="modal" data-target="#exampleModal" data-title="'+v.subject+'" ><div class="goods card"><img src="'+v.image.images[0]+'" class="card-img-top"><div class="overflow-hidden" style="height:100px"><div class="card-text"><span class="badge badge-danger"></span><a href="/goods/del?pid='+v.productID+'">del</a><p class="name">'+v.subject+'</p></div></div></div></div>'
 }
 $(document).ready(function(){
+	runGoodsList()
 	//$('#myModal').modal('toggle')
 	$('#exampleModal').on('show.bs.modal', function (event) {
 		var button = $(event.relatedTarget) // Button that triggered the modal

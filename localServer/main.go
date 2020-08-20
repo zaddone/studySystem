@@ -1,33 +1,34 @@
 package main
-import(
+
+import (
 	"fmt"
-	"github.com/zaddone/studySystem/request"
-	"github.com/zaddone/studySystem/shopping"
-	"github.com/zaddone/studySystem/config"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/zaddone/studySystem/alimama"
 	"github.com/zaddone/studySystem/chromeServer"
-	"github.com/gorilla/websocket"
-	"github.com/gin-gonic/gin"
+	"github.com/zaddone/studySystem/config"
+	"github.com/zaddone/studySystem/request"
+	"github.com/zaddone/studySystem/shopping"
 	//"github.com/boltdb/bolt"
-	"net/url"
-	"time"
-	"sort"
-	"strings"
 	"bytes"
+	"encoding/json"
+	"flag"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"encoding/json"
+	"net/url"
+	"sort"
+	"strings"
 	"sync"
-	"flag"
+	"time"
 )
 
-var(
+var (
 	//flag.String("site","127.0.0.1")
 	WXtoken = config.Conf.Minitoken
-	Router = gin.Default()
+	Router  = gin.Default()
 	//shop = Router.Group("wxshop")
-	Remote = flag.String("r", "https://www.zaddone.com/site/v2","remote")
+	Remote     = flag.String("r", "https://www.zaddone.com/site/v2", "remote")
 	wsupgrader = websocket.Upgrader{
 		ReadBufferSize:   1024,
 		WriteBufferSize:  1024,
@@ -36,63 +37,62 @@ var(
 			return true
 		},
 	}
-
 )
 
-func Sign(c *gin.Context){
+func Sign(c *gin.Context) {
 	url_ := c.Request.URL.Query()
 	addSign(&url_)
 }
 
-func addSign(u *url.Values){
-	u.Add("timestamp",fmt.Sprintf("%d",time.Now().Unix()))
+func addSign(u *url.Values) {
+	u.Add("timestamp", fmt.Sprintf("%d", time.Now().Unix()))
 	li := []string{WXtoken}
-	for _,v := range *u{
-		li = append(li,v...)
+	for _, v := range *u {
+		li = append(li, v...)
 	}
 	sort.Strings(li)
-	u.Add("sign",shopping.Sha1([]byte(strings.Join(li,""))))
+	u.Add("sign", shopping.Sha1([]byte(strings.Join(li, ""))))
 }
 
-func HandForward(c *gin.Context){
+func HandForward(c *gin.Context) {
 	//c.Request.Body.Close()
 	err := requestHttp(
 		c.Request.URL.Path,
 		c.Request.Method,
 		c.Request.URL.Query(),
 		c.Request.Body,
-		func(body io.Reader,res *http.Response)error{
-			c.DataFromReader(res.StatusCode,res.ContentLength,res.Header.Get("content-type"),res.Body,nil)
+		func(body io.Reader, res *http.Response) error {
+			c.DataFromReader(res.StatusCode, res.ContentLength, res.Header.Get("content-type"), res.Body, nil)
 			return nil
 		},
 	)
 	if err != nil {
-		c.JSON(http.StatusNotFound,gin.H{"msg":err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"msg": err.Error()})
 	}
 
 }
 
-func requestHttp(path,Method string,u url.Values, body io.Reader,hand func(io.Reader,*http.Response)error)error{
+func requestHttp(path, Method string, u url.Values, body io.Reader, hand func(io.Reader, *http.Response) error) error {
 
 	if u == nil {
 		u = url.Values{}
 	}
 	addSign(&u)
-	return request.ClientHttp__(*Remote+path+"?"+u.Encode(),Method,body,nil,hand)
+	return request.ClientHttp__(*Remote+path+"?"+u.Encode(), Method, body, nil, hand)
 
 }
 
-func InitShoppingMap()error{
-	return requestHttp("/shopping","GET",url.Values{},nil,func(body io.Reader,res *http.Response)error{
+func InitShoppingMap() error {
+	return requestHttp("/shopping", "GET", url.Values{}, nil, func(body io.Reader, res *http.Response) error {
 		var db []*shopping.ShoppingInfo
 		err := json.NewDecoder(body).Decode(&db)
 		if err != nil {
 			return err
 		}
-		for _,sh := range db {
+		for _, sh := range db {
 			hand := shopping.FuncMap[sh.Py]
 			if hand != nil {
-				shopping.ShoppingMap.Store(sh.Py,hand(sh,""))
+				shopping.ShoppingMap.Store(sh.Py, hand(sh, ""))
 			}
 		}
 		//fmt.Println(shopping.ShoppingMap)
@@ -109,12 +109,12 @@ func downHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-        t, reply, err := conn.ReadMessage()
-        if err != nil {
+	t, reply, err := conn.ReadMessage()
+	if err != nil {
 		fmt.Println(err)
 		return
-        }
-	fmt.Println(t,string(reply))
+	}
+	fmt.Println(t, string(reply))
 }
 
 func WsHandler(w http.ResponseWriter, r *http.Request) {
@@ -126,74 +126,74 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-    //for {
-        t, reply, err := conn.ReadMessage()
-        if err != nil {
+	//for {
+	t, reply, err := conn.ReadMessage()
+	if err != nil {
 		fmt.Println(err)
 		return
-        }
-	fmt.Println(t,string(reply))
+	}
+	fmt.Println(t, string(reply))
 	err = InitShoppingMap()
 	if err != nil {
-		err = conn.WriteMessage(t,[]byte(err.Error()))
+		err = conn.WriteMessage(t, []byte(err.Error()))
 		if err != nil {
 			fmt.Println(err)
 		}
 		return
 	}
-	chanmsg := make(chan interface{},100)
+	chanmsg := make(chan interface{}, 100)
 	defer close(chanmsg)
-	go func(){
-	for m := range chanmsg {
-		//fmt.Println("chan",m)
-		switch m_ := m.(type){
-		case string:
-			err = conn.WriteMessage(t,[]byte(m_))
-			if err != nil {
-				fmt.Println(err)
-			}
+	go func() {
+		for m := range chanmsg {
+			//fmt.Println("chan",m)
+			switch m_ := m.(type) {
+			case string:
+				err = conn.WriteMessage(t, []byte(m_))
+				if err != nil {
+					fmt.Println(err)
+				}
 
-		case []byte:
-			err = conn.WriteMessage(t,m_)
-			if err != nil {
-				fmt.Println(err)
-			}
-		default:
-			err = conn.WriteJSON(m_)
-			if err != nil {
-				fmt.Println(err)
+			case []byte:
+				err = conn.WriteMessage(t, m_)
+				if err != nil {
+					fmt.Println(err)
+				}
+			default:
+				err = conn.WriteJSON(m_)
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
-	}
 	}()
-	alimama.TaobaoLoginEvent = func(path string){
-		fmt.Println("event",path)
-		chanmsg<-"/"+config.Conf.Static+"/"+path
+	alimama.TaobaoLoginEvent = func(path string) {
+		fmt.Println("event", path)
+		chanmsg <- "/" + config.Conf.Static + "/" + path
 	}
 	var wait sync.WaitGroup
-	shopping.ShoppingMap.Range(func(_k,_v interface{})bool{
+	shopping.ShoppingMap.Range(func(_k, _v interface{}) bool {
 		//fmt.Println(k.(string))
 		//chanmsg<-k.(string)
 		wait.Add(1)
-		go func(k interface{},v_ shopping.ShoppingInterface){
+		go func(k interface{}, v_ shopping.ShoppingInterface) {
 			defer wait.Done()
 			//v_ := v.(shopping.ShoppingInterface)
-			err := v_.OrderDown(func(db interface{}){
-				fmt.Println(k.(string),db)
-				db_,err := json.Marshal(db)
+			err := v_.OrderDown(func(db interface{}) {
+				fmt.Println(k.(string), db)
+				db_, err := json.Marshal(db)
 				if err != nil {
 					panic(err)
 					fmt.Println(err)
 					return
 				}
 				u := url.Values{}
-				u.Add("orderid",db.(map[string]interface{})["order_id"].(string))
-				err = requestHttp("/updateorder/"+k.(string),"POST",u,bytes.NewReader(db_),func(body io.Reader,res *http.Response)error{
-					data,err := ioutil.ReadAll(body)
+				u.Add("orderid", db.(map[string]interface{})["order_id"].(string))
+				err = requestHttp("/updateorder/"+k.(string), "POST", u, bytes.NewReader(db_), func(body io.Reader, res *http.Response) error {
+					data, err := ioutil.ReadAll(body)
 					if err != nil {
 						return err
 					}
-					chanmsg<-data
+					chanmsg <- data
 					return nil
 					//return conn.WriteMessage(t,db)
 				})
@@ -206,51 +206,50 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(err)
 				return
 			}
-			u_:= url.Values{}
-			u_.Set("update",fmt.Sprintf("%d",v_.GetInfo().Update))
-			err = requestHttp("/updatesite/"+k.(string),"GET",u_,nil,func(body io.Reader,res *http.Response)error{
-				db,err := ioutil.ReadAll(body)
-				fmt.Println("site",string(db))
+			u_ := url.Values{}
+			u_.Set("update", fmt.Sprintf("%d", v_.GetInfo().Update))
+			err = requestHttp("/updatesite/"+k.(string), "GET", u_, nil, func(body io.Reader, res *http.Response) error {
+				db, err := ioutil.ReadAll(body)
+				fmt.Println("site", string(db))
 				return err
 			})
 			if err != nil {
 				//panic(err)
 				fmt.Println(err)
 			}
-		}(_k,_v.(shopping.ShoppingInterface))
+		}(_k, _v.(shopping.ShoppingInterface))
 		return true
 	})
 	wait.Wait()
-	conn.CloseHandler()(2,"end")
+	conn.CloseHandler()(2, "end")
 
 }
 
-
-func init(){
+func init() {
 	flag.Parse()
 	//shopping.InitShoppingMap(*siteDB)
-	Router.Static("/"+config.Conf.Static,"./"+config.Conf.Static)
+	Router.Static("/"+config.Conf.Static, "./"+config.Conf.Static)
 	Router.LoadHTMLGlob(config.Conf.Templates)
-	Router.GET("/",func(c *gin.Context){
-		c.HTML(http.StatusOK,"index.tmpl",nil)
+	Router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.tmpl", nil)
 	})
-	Router.GET("ws",func(c *gin.Context){
+	Router.GET("ws", func(c *gin.Context) {
 		WsHandler(c.Writer, c.Request)
 	})
-	Router.GET("goods/list",HandForward)
+	Router.GET("goods/list", HandForward)
 
-	Router.GET("updatesite/:py",HandForward)
-	Router.GET("shopping/:py",HandForward)
-	Router.GET("shopping",HandForward)
-	Router.GET("/delsite/:py",HandForward)
+	Router.GET("updatesite/:py", HandForward)
+	Router.GET("shopping/:py", HandForward)
+	Router.GET("shopping", HandForward)
+	Router.GET("/delsite/:py", HandForward)
 	//Router.GET("order/:py",HandForward)
 	//Router.GET("order",HandForward)
-	Router.GET("order/list",HandForward)
-	Router.GET("order/time",HandForward)
-	Router.GET("order_apply",HandForward)
-	Router.GET("order/del",HandForward)
-	Router.GET("wxtoken",HandForward)
-	Router.GET("down",func(c *gin.Context){
+	Router.GET("order/list", HandForward)
+	Router.GET("order/time", HandForward)
+	Router.GET("order_apply", HandForward)
+	Router.GET("order/del", HandForward)
+	Router.GET("wxtoken", HandForward)
+	Router.GET("down", func(c *gin.Context) {
 		downHandler(c.Writer, c.Request)
 	})
 	//Router.GET("init",func(c *gin.Context){
@@ -265,23 +264,23 @@ func init(){
 	go Router.Run(config.Conf.Port)
 
 }
-func DownOrder(){
-	shopping.ShoppingMap.Range(func(k,v interface{})bool{
+func DownOrder() {
+	shopping.ShoppingMap.Range(func(k, v interface{}) bool {
 		fmt.Println(k.(string))
 		v_ := v.(shopping.ShoppingInterface)
-		err := v_.OrderDown(func(db interface{}){
-			db_,err := json.Marshal(db)
+		err := v_.OrderDown(func(db interface{}) {
+			db_, err := json.Marshal(db)
 			if err != nil {
 				panic(err)
 				fmt.Println(err)
 				return
 			}
 			u := url.Values{}
-			u.Add("orderid",db.(map[string]interface{})["order_id"].(string))
+			u.Add("orderid", db.(map[string]interface{})["order_id"].(string))
 			//var req interface{}
-			err = requestHttp("/updateorder/"+k.(string),"POST",u,bytes.NewReader(db_),func(body io.Reader,res *http.Response)error{
-				db,err := ioutil.ReadAll(body)
-				fmt.Println("order",string(db))
+			err = requestHttp("/updateorder/"+k.(string), "POST", u, bytes.NewReader(db_), func(body io.Reader, res *http.Response) error {
+				db, err := ioutil.ReadAll(body)
+				fmt.Println("order", string(db))
 				return err
 				//return json.NewDecoder(body).Decode(&req)
 			})
@@ -294,17 +293,17 @@ func DownOrder(){
 			//fmt.Println(db)
 		})
 		if err != nil {
-			fmt.Println(k,err)
+			fmt.Println(k, err)
 			return true
 		}
-		u_:= url.Values{}
-		u_.Set("update",fmt.Sprintf("%d",v_.GetInfo().Update))
+		u_ := url.Values{}
+		u_.Set("update", fmt.Sprintf("%d", v_.GetInfo().Update))
 		//var req_ interface{}
-		err = requestHttp("/updatesite/"+k.(string),"GET",u_,nil,func(body io.Reader,res *http.Response)error{
+		err = requestHttp("/updatesite/"+k.(string), "GET", u_, nil, func(body io.Reader, res *http.Response) error {
 			//return json.NewDecoder(body).Decode(&req_)
-			db,err := ioutil.ReadAll(body)
+			db, err := ioutil.ReadAll(body)
 			//fmt.Println(db)
-			fmt.Println("site",string(db))
+			fmt.Println("site", string(db))
 			//fmt.Println(string(db))
 			return err
 		})
@@ -318,12 +317,13 @@ func DownOrder(){
 
 }
 
-func main(){
+func main() {
 	//InitShoppingMap()
 	//DownOrder()
 	//sh,_ := shopping.ShoppingMap.Load("pinduoduo")
-	rooturl := fmt.Sprintf("http://127.0.0.1%s",config.Conf.Port)
+	rooturl := fmt.Sprintf("http://127.0.0.1%s", config.Conf.Port)
 	//fmt.Println(rooturl)
 	chromeServer.View(rooturl)
+	fmt.Println("end")
 	//select{}
 }
