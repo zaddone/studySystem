@@ -140,7 +140,7 @@ func PreviewOrder(obj map[string]interface{}, ali *shopping.Alibaba) error {
 			}
 		}
 	}
-	return nil
+	//return nil
 
 }
 
@@ -360,9 +360,11 @@ func init() {
 	})
 	goods.GET("/down_test", func(c *gin.Context) {
 		list := []interface{}{}
-		fn := "goods"
+		//fn := "goods"
 
-		err := initAlibaba(func(ali *shopping.Alibaba) error {
+		//err := initAlibaba(func(ali *shopping.Alibaba) error {
+		//err := initAlibaba(func(ali *shopping.Alibaba) error {
+		err := func() error {
 			alibaba.HandGoods = func(db interface{}) {
 				//db_:= db.(map[string]interface{})
 				//productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
@@ -391,7 +393,8 @@ func init() {
 				//}
 			}
 			return alibaba.Run()
-		})
+			//})
+		}()
 		if len(list) > 0 {
 			//f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
 			//if err != nil {
@@ -401,8 +404,7 @@ func init() {
 			for i, li := range list {
 				//i_ := i
 				db_ := li.(map[string]interface{})
-				productId := fmt.Sprintf("%.0f", db_["productId"].(float64))
-				itemId := fmt.Sprintf("%.0f", db_["itemId"].(float64))
+				productId := fmt.Sprintf("%.0f", db_["offerId"].(float64))
 				alibaba.HandGoods = func(db interface{}) {
 					d := shopping.Get1688GoodsDetail(db)
 					switch detail := d.(type) {
@@ -410,24 +412,17 @@ func init() {
 						fmt.Println(detail)
 						return
 					case map[string]interface{}:
-						detail["productTitle"] = db_["productTitle"]
-						detail["productId"] = productId
-						detail["itemId"] = itemId
-						detail["PurchasePrice"] = db_["minPurchasePrice"]
-						detail["SellPrice"] = db_["minTbSellPrice"]
-						body, err := json.Marshal(detail)
-						if err != nil {
-							panic(err)
-						}
 						fmt.Println(detail)
-						//f.WriteString(fmt.Sprintf("{_id:\"%s\",body:%s}",productId,string(body)))
 						list[i] = detail
-						err = wxmsgb.UpdateWXDB(fn, productId, string(body))
-						if err != nil {
-							panic(err)
-						}
+						//body, err := json.Marshal(detail)
+						//if err != nil {
+						//	panic(err)
+						//}
+						//err = wxmsgb.UpdateWXDB(fn, productId, string(body))
+						//if err != nil {
+						//	panic(err)
+						//}
 
-						//time.Sleep(10*time.Second)
 					}
 					//fmt.Println(d)
 				}

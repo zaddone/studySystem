@@ -102,6 +102,28 @@ func ShowCookies(hand func(map[string]interface{})) {
 		//"params":map[string]interface{}{"text":str},
 	}
 }
+func PageNavigate_(str, ref string, hand func(map[string]interface{})) {
+	//Page.navigate
+	Num++
+	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
+		delete(handMap, id__)
+		if hand != nil {
+			hand(req_)
+		}
+		//ClickBoxModel(sendbtn,func(){
+		//fmt.Println(sendbtn)
+		//})
+
+	}
+	writeChan <- map[string]interface{}{
+		"method": "Page.navigate",
+		"id":     Num,
+		"params": map[string]interface{}{
+			"url":      str,
+			"referrer": ref,
+		},
+	}
+}
 func PageNavigate(str string, hand func(map[string]interface{})) {
 	//Page.navigate
 	Num++
@@ -118,7 +140,9 @@ func PageNavigate(str string, hand func(map[string]interface{})) {
 	writeChan <- map[string]interface{}{
 		"method": "Page.navigate",
 		"id":     Num,
-		"params": map[string]interface{}{"url": str},
+		"params": map[string]interface{}{
+			"url": str,
+		},
 	}
 }
 

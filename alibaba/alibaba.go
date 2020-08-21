@@ -11,10 +11,28 @@ import (
 )
 
 var (
-	Url_1                       = "https://guanjia.1688.com/page/portal.htm"
-	Url_2                       = "https://guanjia.1688.com/page/start.htm"
-	attrUrl                     = "https://widget.1688.com/front/getJsonComponent.json"
-	indexUrl                    = "https://guanjia.1688.com/event/app/newchannel_fx_selloffer/querySuplierProducts.htm?_input_charset=utf8&keyword=&pageNum=1"
+	Url_1         = "https://guanjia.1688.com/page/portal.htm"
+	Url_2         = "https://guanjia.1688.com/page/start.htm"
+	refUrl        = "https://guanjia.1688.com/page/offers.htm?menuCode=dx_offers"
+	attrUrl       = "https://widget.1688.com/front/getJsonComponent.json"
+	indexUrl      = "https://guanjia.1688.com/event/app/newchannel_fx_selloffer/querySuplierProducts.htm?_input_charset=utf8&keyword=&pageNum=1"
+	goodslistUrl  = "https://widget.1688.com/front/getJsonComponent.json"
+	goodslistUrl_ = url.Values{
+		"props":      []string{"{\"loginId\":\"\",\"pageNo\":12,\"keyword\":\"\",\"memberId\":\"\",\"offerType\":\"normal\",\"supportDF\":true,\"supportNY\":false,\"supportCYS\":false}"},
+		"namespace":  []string{"AlifeCsbcDxManagentOfferListActionsQueryOffers"},
+		"widgetId":   []string{"AlifeCsbcDxManagentOfferListActionsQueryOffers"},
+		"methodName": []string{"execute"},
+	}
+	goodsProps = map[string]interface{}{
+		"loginId":    "",
+		"pageNo":     0,
+		"keyword":    "",
+		"memberId":   "",
+		"offerType":  "normal",
+		"supportDF":  true,
+		"supportNY":  false,
+		"supportCYS": false,
+	}
 	HandGoods func(interface{}) = nil
 	Public    string
 	VideoInfo string
@@ -62,14 +80,30 @@ func GetGoodsAttr(_db interface{}) {
 		chromeServer.ClosePage()
 	})
 }
+func getPageUrl() string {
+	no := goodsProps["pageNo"].(int)
+	no++
+	goodsProps["pageNo"] = no
+
+	props, err := json.Marshal(goodsProps)
+	if err != nil {
+		panic(err)
+	}
+	goodslistUrl_.Set("props", string(props))
+	u := goodslistUrl + "?" + goodslistUrl_.Encode()
+	fmt.Println(u, string(props))
+	return u
+
+}
 func GetGoodsList(_db interface{}) {
 	if !chromeServer.GetBody(_db, "page/start.htm", func(__id float64, result map[string]interface{}) {
-		chromeServer.PageNavigate(indexUrl, func(res map[string]interface{}) {
+
+		chromeServer.PageNavigate_(getPageUrl(), refUrl, func(res map[string]interface{}) {
 			fmt.Println(res)
 		})
 
 	}) {
-		chromeServer.GetBody(_db, "querySuplierProducts.htm", func(__id float64, result map[string]interface{}) {
+		chromeServer.GetBody(_db, goodslistUrl, func(__id float64, result map[string]interface{}) {
 			if HandGoods == nil {
 				return
 			}
@@ -81,32 +115,36 @@ func GetGoodsList(_db interface{}) {
 			var re map[string]interface{}
 			err := json.Unmarshal([]byte(body.(string)), &re)
 			if err != nil {
+				fmt.Println(result)
 				panic(err)
 			}
-			re_ := re["result"].(map[string]interface{})
-			for _, l := range re_["sellOfferVOList"].([]interface{}) {
+			re_ := re["content"]
+			if re_ == nil {
+				fmt.Println(re)
+				return
+			}
+			li := re_.(map[string]interface{})["list"]
+			if li == nil {
+				fmt.Println(re_)
+				//chromeServer.ClosePage()
+				return
+			}
+			li_ := li.([]interface{})
+			if len(li_) == 0 {
+				chromeServer.ClosePage()
+				return
+
+			}
+			for _, l := range li_ {
 				HandGoods(l)
 			}
 
-			num := re_["pageNum"].(float64)
-			if re_["pageCount"].(float64) == num {
-				chromeServer.ClosePage()
-				return
-			}
+			chromeServer.ClosePage()
+			return
 
-			u, err := url.Parse(indexUrl)
-			if err != nil {
-				panic(err)
-			}
-
-			val := u.Query()
-			val.Set("pageNum", fmt.Sprintf("%.0f", num+1))
-			uri_ := fmt.Sprintf("%s://%s%s?%s", u.Scheme, u.Host, u.Path, val.Encode())
-			//fmt.Println(uri_)
-			chromeServer.PageNavigate(uri_, func(res map[string]interface{}) {
+			chromeServer.PageNavigate_(getPageUrl(), refUrl, func(res map[string]interface{}) {
 				fmt.Println(res)
 			})
-			//fmt.Println(result)
 		})
 	}
 }

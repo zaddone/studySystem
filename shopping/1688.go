@@ -2,6 +2,7 @@ package shopping
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
 	"github.com/boltdb/bolt"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
 	//"golang.org/x/text/encoding/simplifiedchinese"
 	//"golang.org/x/text/transform"
 	"bytes"
@@ -424,6 +426,39 @@ func (self *Alibaba) GoodsShow(num []byte, hand func(interface{}) error) error {
 		return nil
 	})
 }
+func GetWordsKey(db string) []string {
+	regK := regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
+	keymap := map[string]int{}
+	for _, str := range regexp.MustCompile(`[0-9|a-z|A-Z|\p{Han}]+`).FindAllString(db, -1) {
+		//fmt.Println(i, str)
+		words := regK.FindAllString(str, -1)
+		for i_, w := range words {
+			//s := w_
+			keymap[w]++
+			for _, w_ := range words[i_+1:] {
+				w += w_
+				keymap[w]++
+				//fmt.Println(w)
+			}
+		}
+	}
+	sum := 0
+	var words []string
+	for k, _ := range keymap {
+		words = append(words, k)
+		//if v > 1 {
+		//	sum++
+		//	fmt.Println(k, v)
+		//}
+	}
+	fmt.Println(len(keymap), sum)
+	//regK := regexp.MustCompile(`[0-9a-zA-Z]+|\p{Han}`)
+	//for i, k := range regK.FindAllString(db, -1) {
+	//	fmt.Println(i, k)
+	//}
+	return words
+}
+
 func Get1688GoodsDetail(db_ interface{}) interface{} {
 	db_m := db_.(map[string]string)
 	db := db_m["body"]
@@ -440,6 +475,13 @@ func Get1688GoodsDetail(db_ interface{}) interface{} {
 	if len(title) > 1 {
 		title_str = title[1]
 	}
+	var keywords []string
+
+	//wordskey := regexp.MustCompile(`property="og:description" content="([^"]+)"`).FindStringSubmatch(db)
+	//if len(wordskey) > 1 {
+	//	keywords = GetWordsKey(wordskey[1])
+	//}
+
 	price_str := ""
 	price := regexp.MustCompile(`refPrice:'([^']+)'`).FindStringSubmatch(db)
 	if len(price) > 1 {
@@ -447,7 +489,7 @@ func Get1688GoodsDetail(db_ interface{}) interface{} {
 	}
 	fmt.Println(video_str, title_str, price_str)
 	//fmt.Println(video, db_m["video"][1])
-	fmt.Println(cou)
+	//fmt.Println(cou)
 	var des_img []string
 	for _, im := range regexp.MustCompile(`src=\\"([^\\]+)\\"`).FindAllStringSubmatch(cou, -1) {
 		des_img = append(des_img, im[1])
@@ -461,8 +503,9 @@ func Get1688GoodsDetail(db_ interface{}) interface{} {
 	}
 	skumap_ := regexp.MustCompile(`skuMap:(.+)`).FindStringSubmatch(db)
 	var skumap_db interface{}
+	var skumap__ string
 	if len(skumap_) > 1 {
-		skumap__ := skumap_[1][0 : len(skumap_[1])-1]
+		skumap__ = skumap_[1][0 : len(skumap_[1])-1]
 
 		err := json.Unmarshal([]byte(skumap__), &skumap_db)
 		if err != nil {
@@ -471,17 +514,19 @@ func Get1688GoodsDetail(db_ interface{}) interface{} {
 		}
 	}
 	var props_db interface{}
+	var props__ string
 
 	props_ := regexp.MustCompile(`skuProps:(.+)`).FindStringSubmatch(db)
 	if len(props_) > 1 {
-		//return fmt.Errorf("find not props")
-		props__ := props_[1][0 : len(props_[1])-1]
+		props__ = props_[1][0 : len(props_[1])-1]
 		err := json.Unmarshal([]byte(props__), &props_db)
 		if err != nil {
 			fmt.Println(props__)
 			return err
 		}
 	}
+	md5str := fmt.Sprintf("%x", md5.Sum([]byte(title_str+price_str+video_str+props__+skumap__+strings.Join(imgs, "")+strings.Join(des_img, ""))))
+	//fmt.Println(md5str)
 
 	return map[string]interface{}{
 		"videoUrl":     video_str,
@@ -491,6 +536,8 @@ func Get1688GoodsDetail(db_ interface{}) interface{} {
 		"des_img":      des_img,
 		"productTitle": title_str,
 		"SellPrice":    price_str,
+		"md5str":       md5str,
+		"keywords":     keywords,
 	}
 
 }
