@@ -359,88 +359,41 @@ func init() {
 
 	})
 	goods.GET("/down_test", func(c *gin.Context) {
-		list := []interface{}{}
-		//fn := "goods"
+		list := []string{}
+		alibaba.HandGoods = func(db interface{}) {
+			list = append(list, fmt.Sprintf("%.0f", db.(map[string]interface{})["offerId"].(float64)))
 
-		//err := initAlibaba(func(ali *shopping.Alibaba) error {
-		//err := initAlibaba(func(ali *shopping.Alibaba) error {
-		err := func() error {
-			alibaba.HandGoods = func(db interface{}) {
-				//db_:= db.(map[string]interface{})
-				//productId :=fmt.Sprintf("%.0f",db_["productId"].(float64))
-				//itemId := fmt.Sprintf("%.0f",db_["itemId"].(float64))
-				//fmt.Println(db_)
-				list = append(list, db)
-				//detail_ := ali.GoodsDetailForUrl(productId)
-				//switch detail:=detail_.(type){
-				//case error:
-				//	fmt.Println(detail)
-				//	return
-				//case map[string]interface{}:
-				//	detail["productTitle"] = db_["productTitle"]
-				//	detail["productId"] = productId
-				//	detail["itemId"] = itemId
-				//	detail["PurchasePrice"] = db_["minPurchasePrice"]
-				//	detail["SellPrice"] = db_["minTbSellPrice"]
-				//	body,err := json.Marshal(detail)
-				//	if err != nil {
-				//		panic(err)
-				//	}
-				//	//fmt.Println(detail)
-				//	f.WriteString(fmt.Sprintf("{_id:\"%s\",body:%s}",productId,string(body)))
-				//	list = append(list,string(body))
-				//	time.Sleep(10*time.Second)
-				//}
-			}
-			return alibaba.Run()
-			//})
-		}()
-		if len(list) > 0 {
-			//f,err := os.OpenFile(fn,os.O_APPEND|os.O_CREATE|os.O_RDWR,0777)
-			//if err != nil {
-			//	c.JSON(http.StatusNotFound,err)
-			//	return
-			//}
-			for i, li := range list {
-				//i_ := i
-				db_ := li.(map[string]interface{})
-				productId := fmt.Sprintf("%.0f", db_["offerId"].(float64))
-				alibaba.HandGoods = func(db interface{}) {
-					d := shopping.Get1688GoodsDetail(db)
-					switch detail := d.(type) {
-					case error:
-						fmt.Println(detail)
-						return
-					case map[string]interface{}:
-						fmt.Println(detail)
-						list[i] = detail
-						//body, err := json.Marshal(detail)
-						//if err != nil {
-						//	panic(err)
-						//}
-						//err = wxmsgb.UpdateWXDB(fn, productId, string(body))
-						//if err != nil {
-						//	panic(err)
-						//}
-
-					}
-					//fmt.Println(d)
-				}
-				err := alibaba.RunDetail(productId)
-				fmt.Println(err)
-			}
-			//f.Close()
-			//err = wxmsgb.UpDBToWX(fn,fn)
-			//fmt.Println("end",err)
-			//if err != nil {
-			//	c.String(http.StatusNotFound,fmt.Sprint(err))
-			//	return
-			//}
-			c.JSON(http.StatusOK, list)
+			//list = append(list, db)
+		}
+		err := alibaba.Run()
+		if len(list) == 0 {
+			c.JSON(http.StatusNotFound, err)
 			return
 		}
-		c.JSON(http.StatusNotFound, err)
+		list_ := []interface{}{}
+		alibaba.HandGoods = func(_db interface{}) {
+			d := shopping.Get1688GoodsDetail(_db)
+			switch detail := d.(type) {
+			case error:
+				fmt.Println(detail)
+				return
+			case map[string]interface{}:
+				//fmt.Println(detail)
+				//list[i] = detail
+				list_ = append(list_, detail)
+			}
+			//fmt.Println(d)
+		}
+		for _, id := range list {
+			err := alibaba.RunDetail(id)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+		}
+		c.JSON(http.StatusOK, list_)
 		return
+
 	})
 	goods.GET("/down", func(c *gin.Context) {
 		//var li []interface{}

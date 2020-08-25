@@ -37,6 +37,7 @@ var (
 	Public    string
 	VideoInfo string
 	stop      chan int
+	Sumlist   int = 0
 )
 
 func GetGoodsAttr(_db interface{}) {
@@ -46,20 +47,35 @@ func GetGoodsAttr(_db interface{}) {
 		//fmt.Println(result["body"])
 
 	}) {
-
 		return
 	}
 	if chromeServer.GetBody(_db, "1688.com/offer/", func(__id float64, result map[string]interface{}) {
-		if len(Public) == 0 {
-			Public = result["body"].(string)
+		if len(Public) > 0 || result["body"] == nil {
+			return
 		}
-
+		Public = result["body"].(string)
 		go func() {
-			select {
-			case <-time.After(1 * time.Second):
-				chromeServer.InputKey(34, nil)
-			case <-stop:
-				return
+			t := time.NewTicker(time.Second * 1)
+			defer func() {
+				fmt.Println("run goods end")
+				t.Stop()
+			}()
+			fmt.Println("run goods")
+			aft := time.After(15 * time.Second)
+			for {
+				select {
+				case <-aft:
+					fmt.Println("out Time")
+					chromeServer.ClosePage()
+					//defer t.Stop()
+					return
+				case <-stop:
+					//t.Stop()
+					return
+				case <-t.C:
+					chromeServer.InputKey(34, nil)
+					//return
+				}
 			}
 		}()
 
@@ -70,7 +86,9 @@ func GetGoodsAttr(_db interface{}) {
 	}
 	chromeServer.GetBody(_db, "img.alicdn.com/tfscom", func(__id float64, result map[string]interface{}) {
 		//fmt.Println(Public)
-
+		if result["body"] == nil {
+			return
+		}
 		HandGoods(map[string]string{
 			"body":   Public,
 			"tfscom": result["body"].(string),
@@ -83,6 +101,7 @@ func GetGoodsAttr(_db interface{}) {
 func getPageUrl() string {
 	no := goodsProps["pageNo"].(int)
 	no++
+	//fmt.Println(no)
 	goodsProps["pageNo"] = no
 
 	props, err := json.Marshal(goodsProps)
@@ -91,7 +110,7 @@ func getPageUrl() string {
 	}
 	goodslistUrl_.Set("props", string(props))
 	u := goodslistUrl + "?" + goodslistUrl_.Encode()
-	fmt.Println(u, string(props))
+	fmt.Println(string(props))
 	return u
 
 }
@@ -123,10 +142,11 @@ func GetGoodsList(_db interface{}) {
 				fmt.Println(re)
 				return
 			}
-			li := re_.(map[string]interface{})["list"]
+			re__ := re_.(map[string]interface{})
+			li := re__["list"]
 			if li == nil {
 				fmt.Println(re_)
-				//chromeServer.ClosePage()
+				chromeServer.ClosePage()
 				return
 			}
 			li_ := li.([]interface{})
@@ -135,12 +155,19 @@ func GetGoodsList(_db interface{}) {
 				return
 
 			}
+			Sumlist += len(li_)
+
 			for _, l := range li_ {
 				HandGoods(l)
 			}
+			if int(re__["total"].(float64)) < Sumlist {
+				chromeServer.ClosePage()
+				return
+			}
+			//fmt.Println(props)
 
-			chromeServer.ClosePage()
-			return
+			//chromeServer.ClosePage()
+			//return
 
 			chromeServer.PageNavigate_(getPageUrl(), refUrl, func(res map[string]interface{}) {
 				fmt.Println(res)
@@ -153,10 +180,11 @@ func RunDetail(id string) error {
 	Public = ""
 	VideoInfo = ""
 	stop = make(chan int)
-	chromeServer.HandleResponse = GetGoodsAttr
-	return chromeServer.Run(fmt.Sprintf("https://detail.1688.com/offer/%s.html", id))
+	//chromeServer.HandleResponse = GetGoodsAttr
+	return chromeServer.Run(fmt.Sprintf("https://detail.1688.com/offer/%s.html", id), GetGoodsAttr)
 }
 func Run() error {
-	chromeServer.HandleResponse = GetGoodsList
-	return chromeServer.Run(Url_2)
+	Sumlist = 0
+	//chromeServer.HandleResponse = GetGoodsList
+	return chromeServer.Run(Url_2, GetGoodsList)
 }

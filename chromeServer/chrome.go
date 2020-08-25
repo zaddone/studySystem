@@ -38,14 +38,16 @@ var (
 		"--no-default-browser-check",
 		//rooturl,
 	}
-	Ourl                   = "http://127.0.0.1:" + port
-	handMap                = map[float64]func(float64, map[string]interface{}){}
-	handleFinish           = map[string]func(string, map[string]interface{}){}
-	HandleResponse Hfunc   = nil
-	Num            float64 = 0
-	writeChan              = make(chan interface{}, 5)
-	StreamId       string
-	RunChrome      bool
+	Ourl = "http://127.0.0.1:" + port
+	//handMap                  = map[float64]func(float64, map[string]interface{}){}
+	//handleFinish             = map[string]func(string, map[string]interface{}){}
+	handMapSync              = sync.Map{}
+	handleFinishSync         = sync.Map{}
+	HandleResponse   Hfunc   = nil
+	Num              float64 = 0
+	writeChan                = make(chan interface{}, 5)
+	StreamId         string
+	RunChrome        bool
 )
 
 //func init(){
@@ -54,12 +56,13 @@ var (
 //}
 func InputKey(str int, endHand func()) {
 	Num++
-	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
-		delete(handMap, id__)
+	handMapSync.Store(Num, func(id__ float64, req_ map[string]interface{}) {
+		handMapSync.Delete(id__)
+		//delete(handMap, id__)
 		if endHand != nil {
 			endHand()
 		}
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "Input.dispatchKeyEvent",
 		"id":     Num,
@@ -72,12 +75,13 @@ func InputKey(str int, endHand func()) {
 }
 func InputText(str string, endHand func()) {
 	Num++
-	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
-		delete(handMap, id__)
+	handMapSync.Store(Num, func(id__ float64, req_ map[string]interface{}) {
+		//delete(handMap, id__)
+		handMapSync.Delete(id__)
 		if endHand != nil {
 			endHand()
 		}
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "Input.insertText",
 		"id":     Num,
@@ -86,8 +90,9 @@ func InputText(str string, endHand func()) {
 }
 func ShowCookies(hand func(map[string]interface{})) {
 	Num++
-	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
-		delete(handMap, id__)
+	handMapSync.Store(Num, func(id__ float64, req_ map[string]interface{}) {
+		//delete(handMap, id__)
+		handMapSync.Delete(id__)
 		if hand != nil {
 			hand(req_)
 		}
@@ -95,7 +100,7 @@ func ShowCookies(hand func(map[string]interface{})) {
 		//fmt.Println(sendbtn)
 		//})
 
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "Network.getAllCookies",
 		"id":     Num,
@@ -105,8 +110,9 @@ func ShowCookies(hand func(map[string]interface{})) {
 func PageNavigate_(str, ref string, hand func(map[string]interface{})) {
 	//Page.navigate
 	Num++
-	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
-		delete(handMap, id__)
+	handMapSync.Store(Num, func(id__ float64, req_ map[string]interface{}) {
+		//delete(handMap, id__)
+		handMapSync.Delete(id__)
 		if hand != nil {
 			hand(req_)
 		}
@@ -114,7 +120,7 @@ func PageNavigate_(str, ref string, hand func(map[string]interface{})) {
 		//fmt.Println(sendbtn)
 		//})
 
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "Page.navigate",
 		"id":     Num,
@@ -127,8 +133,9 @@ func PageNavigate_(str, ref string, hand func(map[string]interface{})) {
 func PageNavigate(str string, hand func(map[string]interface{})) {
 	//Page.navigate
 	Num++
-	handMap[Num] = func(id__ float64, req_ map[string]interface{}) {
-		delete(handMap, id__)
+	handMapSync.Store(Num, func(id__ float64, req_ map[string]interface{}) {
+		handMapSync.Delete(id__)
+		//delete(handMap, id__)
 		if hand != nil {
 			hand(req_)
 		}
@@ -136,7 +143,7 @@ func PageNavigate(str string, hand func(map[string]interface{})) {
 		//fmt.Println(sendbtn)
 		//})
 
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "Page.navigate",
 		"id":     Num,
@@ -157,21 +164,23 @@ func getBody(_db interface{}, uri_ string, bodyMap func(float64, map[string]inte
 		return false
 	}
 	rid := u["requestId"].(string)
-	handleFinish[rid] = func(id_ string, db map[string]interface{}) {
+	handleFinishSync.Store(rid, func(id_ string, db map[string]interface{}) {
+		handleFinishSync.Delete(id_)
 		//id := float64(time.Now().Unix())
-		delete(handleFinish, id_)
+		//delete(handleFinish, id_)
 		Num++
-		handMap[Num] = func(__id float64, __db map[string]interface{}) {
-			delete(handMap, __id)
+		handMapSync.Store(Num, func(__id float64, __db map[string]interface{}) {
+			handMapSync.Delete(__id)
+			//delete(handMap, __id)
 			//fmt.Println(__db)
 			bodyMap(__id, __db)
-		}
+		})
 		writeChan <- map[string]interface{}{
 			"method": "Network.getResponseBody",
 			"id":     Num,
 			"params": map[string]interface{}{"requestId": id_},
 		}
-	}
+	})
 	return true
 
 }
@@ -272,7 +281,7 @@ func View(uri string) error {
 	//})
 }
 
-func Run(u string) error {
+func Run(u string, Handle func(interface{})) error {
 	//go Router.Run(":8001")
 	//return start(uri,func(u string)error{
 	//return start(func(u string)error{
@@ -289,14 +298,14 @@ func Run(u string) error {
 			id__ := __v["id"]
 			if id__ != nil {
 				_id__ := id__.(float64)
-				h := handMap[_id__]
-				if h != nil {
+				h, ok := handMapSync.Load(_id__)
+				if ok {
 					//fmt.Println(db)
 					db_ := db.(map[string]interface{})
 					if db_["result"] == nil {
-						go h(_id__, db_)
+						go h.(func(float64, map[string]interface{}))(_id__, db_)
 					} else {
-						go h(_id__, (db_["result"]).(map[string]interface{}))
+						go h.(func(float64, map[string]interface{}))(_id__, (db_["result"]).(map[string]interface{}))
 					}
 				}
 
@@ -304,18 +313,19 @@ func Run(u string) error {
 			}
 			switch __v["method"] {
 			case "Network.responseReceived":
-				if HandleResponse == nil {
-					return
+				if Handle != nil {
+					Handle(__v["params"])
+				} else if HandleResponse != nil {
+					HandleResponse(__v["params"])
 				}
-				HandleResponse(__v["params"])
 			case "Network.loadingFinished":
 				u := __v["params"].(map[string]interface{})
 				rid := u["requestId"].(string)
-				hand := handleFinish[rid]
-				if hand == nil {
+				hand, ok := handleFinishSync.Load(rid)
+				if !ok {
 					return
 				}
-				go hand(rid, u)
+				go hand.(func(string, map[string]interface{}))(rid, u)
 			default:
 			}
 
@@ -435,10 +445,11 @@ func start(hand func(string) error) (err error) {
 }
 func GetDoc(h func(map[string]interface{})) {
 	Num++
-	handMap[Num] = func(_id float64, _db map[string]interface{}) {
-		delete(handMap, _id)
+	handMapSync.Store(Num, func(_id float64, _db map[string]interface{}) {
+		handMapSync.Delete(_id)
+		//delete(handMap, _id)
 		h(_db)
-	}
+	})
 	writeChan <- map[string]interface{}{
 		"method": "DOM.getDocument",
 		"id":     Num,
@@ -528,8 +539,9 @@ func toChrldren(node map[string]interface{}, hand func(map[string]interface{}) b
 }
 func ClickBoxModel(nodeid float64, hand func()) {
 	Num++
-	handMap[Num] = func(__id_ float64, result map[string]interface{}) {
-		delete(handMap, __id_)
+	handMapSync.Store(Num, func(__id_ float64, result map[string]interface{}) {
+		handMapSync.Delete(__id_)
+		//delete(handMap, __id_)
 		if result["quads"] == nil {
 			fmt.Println(result)
 			return
@@ -538,14 +550,16 @@ func ClickBoxModel(nodeid float64, hand func()) {
 		Mx := xy[0].(float64) + (xy[2].(float64)-xy[0].(float64))/2
 		My := xy[1].(float64) + (xy[7].(float64)-xy[1].(float64))/2
 		//fmt.Println(xy,Mx,My)
-		handMap[Num] = func(__id float64, __db map[string]interface{}) {
+		handMapSync.Store(Num, func(__id float64, __db map[string]interface{}) {
 			//fmt.Println("released",__db)
-			delete(handMap, __id)
-			handMap[__id] = func(_id float64, _db map[string]interface{}) {
+			handMapSync.Delete(__id)
+			//delete(handMap, __id)
+			handMapSync.Store(__id, func(_id float64, _db map[string]interface{}) {
 				//fmt.Println("over",_db)
-				delete(handMap, _id)
+				handMapSync.Delete(_id)
+				//delete(handMap, _id)
 				hand()
-			}
+			})
 			//time.Sleep(time.Millisecond*100)
 			//fmt.Println(Mx,My)
 			writeChan <- map[string]interface{}{
@@ -560,7 +574,7 @@ func ClickBoxModel(nodeid float64, hand func()) {
 					"clickCount": 1,
 				},
 			}
-		}
+		})
 		writeChan <- map[string]interface{}{
 			"method": "Input.dispatchMouseEvent",
 			"id":     Num,
@@ -574,7 +588,7 @@ func ClickBoxModel(nodeid float64, hand func()) {
 			},
 		}
 
-	}
+	})
 	//writeChan<-map[string]interface{}{
 	//	"method":"DOM.focus",
 	//	"id":0,
