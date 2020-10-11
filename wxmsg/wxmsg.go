@@ -442,7 +442,6 @@ func Upload(url string, values map[string]io.Reader,fileName string) (err error)
         if _, err = io.Copy(fw, r); err != nil {
             return err
         }
-
     }
 
     w.Close()

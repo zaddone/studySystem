@@ -8,6 +8,24 @@ import (
 
 func main() {
 	redi := http.NewServeMux()
+	redi.HandleFunc("/calendar/", func(w http.ResponseWriter, r *http.Request) {
+		director := func(req *http.Request) {
+			req.URL.Path = req.URL.Path[9:]
+			req.URL.Scheme = "http"
+			req.URL.Host = "127.0.0.1:8086"
+		}
+		proxy := &httputil.ReverseProxy{Director: director}
+		proxy.ServeHTTP(w, r)
+	})
+	redi.HandleFunc("/content/", func(w http.ResponseWriter, r *http.Request) {
+		director := func(req *http.Request) {
+			req.URL.Path = req.URL.Path[8:]
+			req.URL.Scheme = "http"
+			req.URL.Host = "127.0.0.1:8085"
+		}
+		proxy := &httputil.ReverseProxy{Director: director}
+		proxy.ServeHTTP(w, r)
+	})
 	redi.HandleFunc("/wxserver/", func(w http.ResponseWriter, r *http.Request) {
 		director := func(req *http.Request) {
 			req.URL.Path = req.URL.Path[9:]

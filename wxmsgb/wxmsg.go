@@ -46,7 +46,7 @@ func setToken() int64 {
 	}
 	if db["access_token"] == nil {
 		fmt.Println(db)
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 		return setToken()
 	}
 	toKen = db["access_token"].(string)
