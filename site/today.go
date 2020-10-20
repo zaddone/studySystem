@@ -59,6 +59,7 @@ func oneApi() (o interface{},err error) {
 				Imgurl: "https://api.dujin.org/bing/1366.php",
 				//Imgurl:img,
 			}
+			saveCache(uri,o)
 			return nil
 		},
 	)
@@ -224,13 +225,7 @@ func reqImg(c *gin.Context){
 
 
 func reqToday(c *gin.Context){
-	//o,err := shanbayApi()
-	//if err == nil {
-	//	c.JSON(http.StatusOK,o)
-	//	return
-	//}
-	//fmt.Println(err)
-	//return
+
 	k := c.Query("pop")
 	if k != "" {
 		v,_ := todayMap.Load(k)
@@ -245,34 +240,21 @@ func reqToday(c *gin.Context){
 		}
 		return
 	}
-	hand := <-todayChan
-	todayChan<-hand
-	o,err := hand()
-	if err == nil {
-		c.JSON(http.StatusOK,o)
+	for{
+	select{
+	case hand := <-todayChan:
+		todayChan<-hand
+		o,err := hand()
+		if err == nil {
+			c.JSON(http.StatusOK,o)
+			return
+		}else{
+			fmt.Println(err)
+		}
+	default:
 		return
-	}else{
-		fmt.Println(err)
+	}
 	}
 	return
-
-
-	//for _,hand := range todayMap{
-	//	o,err := hand()
-	//	if err == nil {
-	//		//switch c := o.(type){
-	//		//case *Pop :
-	//		//	c.Imgurl = getImgUrl(c.Imgurl)
-	//		//default:
-	//		//	o.(map[string]interface{})["Imgurl"] = getImgUrl( o.(map[string]interface{})["Imgurl"].(string))
-	//		//}
-	//		c.JSON(http.StatusOK,o)
-	//		return
-	//	}else{
-	//		fmt.Println(err)
-	//	}
-
-	//}
-	//return
 
 }
