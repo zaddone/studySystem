@@ -1,3 +1,5 @@
+github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
+github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/PuerkitoBio/goquery v1.6.0 h1:j7taAbelrdcsOlGeMenZxc2AWXD5fieT1/znArdnx94=
 github.com/PuerkitoBio/goquery v1.6.0/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/andybalholm/cascadia v1.1.0 h1:BuuO6sSfQNFRu1LppgbD25Hr2vLYW25JvxHs5zzsLTo=
@@ -37,6 +39,8 @@ github.com/ugorji/go v1.1.7 h1:/68gy2h+1mWMrwZFeD1kQialdSzAb432dtpeJ42ovdo=
 github.com/ugorji/go v1.1.7/go.mod h1:kZn38zHttfInRq0xu/PH0az30d+z6vm202qpg1oXVMw=
 github.com/ugorji/go/codec v1.1.7 h1:2SvQaVZ1ouYrrKKwoSk2pzd4A9evlKJb9oTL+OaLUSs=
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
+github.com/zaddone/studySystem/config v0.0.0-20201020120646-901728bfbb79 h1:qoQj0G86TOkb5YoNxIiHhuEZP3jIY6HjzxsCWJcGp5k=
+github.com/zaddone/studySystem/config v0.0.0-20201020120646-901728bfbb79/go.mod h1:cSnEcNCiVIM4WgkpeSL2PdbBA581ob5GBqNbgEg+oho=
 github.com/zaddone/studySystem/request v0.0.0-20201011111721-ec442bb14909 h1:23O0Yls9HbOTiCf5CAq2Mzfou/Dnt4HyMuvs+u/E4iA=
 github.com/zaddone/studySystem/request v0.0.0-20201011111721-ec442bb14909/go.mod h1:zbS9pXL7fSOlpC3jwpTJBTQFPQMKjlKFxkhCNYYtkKk=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
