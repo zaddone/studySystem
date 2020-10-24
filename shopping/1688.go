@@ -86,6 +86,7 @@ func NewAlibaba(sh *ShoppingInfo, siteDB string) *Alibaba {
 	if siteDB == "" {
 		return j
 	}
+	return j
 	//return j
 	go func() {
 		for {

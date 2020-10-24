@@ -136,7 +136,7 @@ func shanbayApi() (o interface{},err error ) {
 					data["content"].(string),
 				},
 				//Imgurl: imgFile.ReplaceAllString(data["origin_img_urls"].([]interface{})[1].(string),"$1"),
-				Imgurl: data["origin_img_urls"].([]interface{})[1].(string),
+				Imgurl: data["origin_img_urls"].([]interface{})[0].(string),
 			}
 			//o.Imgurl = imgFile.ReplaceAllString(o.ImgUrl,"$1")
 			saveCache(uri,o)
