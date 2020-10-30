@@ -3,75 +3,41 @@ import (
     "net/http"
     "net/http/httputil"
     "log"
+    "strings"
+    "sync"
     //"fmt"
 )
-
+var (
+	pathList = map[string]string{
+		"shopping":"127.0.0.1:8087",
+		"calendar":"127.0.0.1:8086",
+		"content":"127.0.0.1:8085",
+		"wxserver":"127.0.0.1:8084",
+		"wxpay":"127.0.0.1:8083",
+		"v1":"127.0.0.1:8082",
+		"article":"127.0.0.1:8081",
+		"site":"127.0.0.1:8080",
+	}
+	mutex sync.Mutex
+)
 func main() {
 	redi := http.NewServeMux()
-	redi.HandleFunc("/calendar/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[9:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8086"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/content/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[8:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8085"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/wxserver/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[9:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8084"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/wxpay/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[6:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8083"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[3:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8082"
-			log.Println(req.URL)
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/article/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[8:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8081"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
-	redi.HandleFunc("/site/", func(w http.ResponseWriter, r *http.Request) {
-		director := func(req *http.Request) {
-			req.URL.Path = req.URL.Path[5:]
-			req.URL.Scheme = "http"
-			req.URL.Host = "127.0.0.1:8080"
-		}
-		proxy := &httputil.ReverseProxy{Director: director}
-		proxy.ServeHTTP(w, r)
-	})
+	for key,_ := range pathList {
+		redi.HandleFunc("/"+key+"/", func(w http.ResponseWriter, r *http.Request) {
+			director := func(req *http.Request) {
+				pa := strings.Split(req.URL.Path,"/")[1]
+				req.URL.Path = req.URL.Path[len(pa)+1:]
+				req.URL.Scheme = "http"
+				mutex.Lock()
+				req.URL.Host = pathList[pa]
+				mutex.Unlock()
+				//log.Println(req.URL,key,val)
+			}
+			proxy := &httputil.ReverseProxy{Director: director}
+			proxy.ServeHTTP(w, r)
+		})
+	}
+
 	redi.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "https://www.miguotuijian.cn", http.StatusMovedPermanently)
 		return

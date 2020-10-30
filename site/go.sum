@@ -53,6 +53,8 @@ github.com/zaddone/studySystem/request v0.0.0-20201011111721-ec442bb14909 h1:23O
 github.com/zaddone/studySystem/request v0.0.0-20201011111721-ec442bb14909/go.mod h1:zbS9pXL7fSOlpC3jwpTJBTQFPQMKjlKFxkhCNYYtkKk=
 github.com/zaddone/studySystem/shopping v0.0.0-20201020125729-3e2448aafba1 h1:/9o/xlTqtai3V4NtJY8PdIItXumJy6soJG2t52LVXZ8=
 github.com/zaddone/studySystem/shopping v0.0.0-20201020125729-3e2448aafba1/go.mod h1:OJ04dIzJuf3sxPusnF3hyKmcaFSrL5xgrXaUJ8YfZnc=
+github.com/zaddone/studySystem/shopping v0.0.0-20201024014555-e9a3190a495c h1:xh5k/HDcz8qTTj9nOpWMluSWqfDjN0RIXkxKwMrc9D0=
+github.com/zaddone/studySystem/shopping v0.0.0-20201024014555-e9a3190a495c/go.mod h1:OJ04dIzJuf3sxPusnF3hyKmcaFSrL5xgrXaUJ8YfZnc=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/net v0.0.0-20180218175443-cbe0f9307d01/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20200202094626-16171245cfb2 h1:CCH4IOTTfewWjGOlSp+zGcjutRKlBEZQ6wTn8ozI/nI=

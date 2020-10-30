@@ -14,5 +14,5 @@ require (
 	github.com/zaddone/studySystem/config v0.0.0-20201020120646-901728bfbb79
 	github.com/zaddone/studySystem/control v0.0.0-20201020125729-3e2448aafba1 // indirect
 	github.com/zaddone/studySystem/request v0.0.0-20201011111721-ec442bb14909
-	github.com/zaddone/studySystem/shopping v0.0.0-20201020125729-3e2448aafba1
+	github.com/zaddone/studySystem/shopping v0.0.0-20201024014555-e9a3190a495c
 )
