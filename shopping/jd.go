@@ -70,7 +70,11 @@ func NewJd(sh *ShoppingInfo,siteDB string) (ShoppingInterface){
 		for{
 		err := j.ReToken(siteDB)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			time.Sleep(time.Minute*1)
+			continue
+			//return
+			//panic(err)
 		}
 		time.Sleep(time.Second*time.Duration(j.Info.TimeOut-100))
 		}
