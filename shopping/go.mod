@@ -12,5 +12,5 @@ require (
 	github.com/zaddone/studySystem/config v0.0.0-20201030092551-014b96fa30a5 // indirect
 	github.com/zaddone/studySystem/control v0.0.0-20201030092551-014b96fa30a5 // indirect
 	github.com/zaddone/studySystem/request v0.0.0-20201030092551-014b96fa30a5
-	golang.org/x/text v0.3.4
+	golang.org/x/text v0.3.8
 )
